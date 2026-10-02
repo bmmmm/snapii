@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>fragment teasers</title>
+    <style>
+      body { margin: 0; padding: 0 20px; font: 16px/1.5 serif; }
+      #masthead { position: fixed; top: 0; left: 0; right: 0; height: 40px; margin: 0; padding: 4px 20px; background: #fff; }
+      main { width: 760px; padding-top: 56px; }
+      h2 { font-size: 20px; margin: 0; }
+      p { margin: 0; }
+      article { margin-bottom: 12px; }
+    </style>
+    <!-- fragment.spec and session.spec: a news front page in small. Every
+         teaser has a unique headline, then a blurb and an ad label that are
+         the same in all of them; the masthead is fixed and comes first in
+         the DOM. A range over several teasers ends in text that occurs once
+         per teaser, context and all. -->
+    <script type="application/json" id="expect">
+      {
+        "capture": "#t1",
+        "lines": [
+          "Teaser number 1 of the front page",
+          "Read the full story in our local news section today.",
+          "Advertisement"
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <h1 id="masthead">Front page masthead</h1>
+    <main id="feed"></main>
+    <script>
+      // 600 teasers, built while parsing: the page is complete at load.
+      const feed = document.getElementById("feed");
+      for (let i = 1; i <= 600; i++) {
+        const a = document.createElement("article");
+        a.id = `t${i}`;
+        a.innerHTML =
+          // Blanks around the headline, as templating leaves them.
+          `<h2>\n  Teaser number ${i} of the front page\n</h2>` +
+          "<p>Read the full story in our local news section today.</p>" +
+          "<div>Advertisement</div>";
+        feed.append(a);
+      }
+    </script>
+  </body>
+</html>

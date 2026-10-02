@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>letter-spacing</title>
+    <!-- Every character advances 1ch + 0.3em, so 12 characters fit per line. -->
+    <style>
+      body { margin: 0; padding: 20px; }
+      #cap { font: 20px/1.5 monospace; width: calc(12.5 * (1ch + 0.3em)); letter-spacing: 0.3em; }
+      .tight { letter-spacing: -0.05em; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["wide letters", "spread out", "over lines", "tight letters"]
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>wide letters
+        spread out over lines</p>
+      <p class="tight">tight letters</p>
+    </main>
+  </body>
+</html>

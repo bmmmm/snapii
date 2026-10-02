@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>fragment ambiguous</title>
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; }
+      main { width: 760px; }
+    </style>
+    <!-- fragment.spec: the passage "brown fox jumps over the" occurs in both
+         paragraphs; the second one is meant, so only prefix/suffix context
+         can tell them apart. -->
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": [
+          "The quick brown fox jumps over the lazy dog.",
+          "A slow brown fox jumps over the sleeping cat."
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p id="first">The quick brown fox jumps over the lazy dog.</p>
+      <p id="second">A slow brown fox jumps over the sleeping cat.</p>
+    </main>
+  </body>
+</html>

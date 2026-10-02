@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>images</title>
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; }
+      img { vertical-align: middle; margin-right: 10px; }
+      .logo { display: inline-block; width: 40px; height: 40px; background: #36c; vertical-align: middle; }
+      .visually-hidden {
+        position: absolute; width: 1px; height: 1px; overflow: hidden;
+        clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+      }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Images below.", "Logo link.", "After the icon link."],
+        "absent": ["About us"],
+        "links": [],
+        "areas": [
+          { "alt": "A red square", "href": null },
+          { "alt": "Gallery thumbnail", "href": "/gallery" },
+          { "alt": "Home", "href": "/home" },
+          { "alt": "About us", "href": "/about" }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>Images below.</p>
+      <p>
+        <img alt="A red square" width="50" height="50" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='50'%3E%3Crect width='50' height='50' fill='%23c00'/%3E%3C/svg%3E" />
+        <a href="/gallery"><img alt="Gallery thumbnail" width="60" height="40" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='40'%3E%3Crect width='60' height='40' fill='%230a0'/%3E%3C/svg%3E" /></a>
+        <img alt="" width="30" height="30" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30'%3E%3Crect width='30' height='30' fill='%23999'/%3E%3C/svg%3E" />
+      </p>
+      <p><a href="/home" class="logo" aria-label="Home"></a> Logo link.</p>
+      <p><a href="/about" class="logo"><span class="visually-hidden">About us</span></a> After the icon link.</p>
+    </main>
+  </body>
+</html>

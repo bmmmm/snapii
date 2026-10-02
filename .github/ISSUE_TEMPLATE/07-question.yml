@@ -1,0 +1,35 @@
+name: Question
+description: Ask about usage, behaviour, or whether something is intended
+title: "[question] "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the [README](https://github.com/bmmmm/snapii#readme) and
+        [docs/details.md](https://github.com/bmmmm/snapii/blob/main/docs/details.md) first —
+        what is in the saved file, OCR, viewers, limits and permissions are documented
+        there.
+
+        If the answer turns out to be "that is a bug", we will convert this into a proper
+        report, so do not worry about picking the wrong form.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: snapii version line, if it matters
+      description: The line at the very bottom of snapii's menu or settings page.
+      placeholder: "snapii 0.1.0 · 862b4ba · built 2026-10-01 15:45 UTC · Firefox 157.0"
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Steps or page that led here, if any
+      description: Remove tokens and personal data from any URL.

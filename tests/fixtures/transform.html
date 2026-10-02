@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>transform</title>
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": [
+          "STRASSE UND FLUSS",
+          "İSTANBUL İĞDIR",
+          "mixed case text",
+          "The Quick (Brown) Fox's Tail"
+        ],
+        "absent": ["Straße", "istanbul", "MIXED"]
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p lang="de" style="text-transform: uppercase">Straße und Fluß</p>
+      <p lang="tr" style="text-transform: uppercase">istanbul iğdır</p>
+      <p style="text-transform: lowercase">MIXED Case TEXT</p>
+      <p style="text-transform: capitalize">the quick (brown) fox's tail</p>
+    </main>
+  </body>
+</html>

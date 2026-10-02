@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>pre</title>
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; }
+      pre { font: 16px/1.5 monospace; }
+      .pre-wrap { white-space: pre-wrap; }
+      .pre-line { white-space: pre-line; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": [
+          "  two  spaces",
+          "line   two",
+          "pre-wrap   keeps   gaps",
+          "pre-line folds",
+          "spaces",
+          "Normal text folds everything."
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+<pre>  two  spaces
+line   two</pre>
+      <p class="pre-wrap">pre-wrap   keeps   gaps</p>
+      <p class="pre-line">pre-line    folds
+spaces</p>
+      <p>
+        Normal   text
+        folds    everything.
+      </p>
+    </main>
+  </body>
+</html>

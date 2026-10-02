@@ -1,0 +1,40 @@
+{
+  "name": "snapii",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Firefox extension: save a page region as SVG with real, selectable text and clickable links.",
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "preinstall": "node -e \"if(!(process.env.npm_config_user_agent||'').startsWith('pnpm')){console.error('\\nUse pnpm, not npm/yarn: https://pnpm.io/installation\\n');process.exit(1)}\"",
+    "check": "tsc --noEmit && tsc --noEmit -p tests && biome check .",
+    "format": "biome check --write .",
+    "test": "node --test 'tests/unit/**/*.test.ts' && node scripts/build.mjs --test && playwright test",
+    "test:glue": "node scripts/build.mjs && node --test tests/glue/",
+    "build": "node scripts/build.mjs",
+    "lint:ext": "web-ext lint --source-dir dist",
+    "package": "web-ext build --source-dir dist --artifacts-dir web-ext-artifacts --overwrite-dest",
+    "start": "web-ext run --firefox=/Applications/Firefox.app/Contents/MacOS/firefox --source-dir dist",
+    "drive": "node tools/drive/cli.mjs"
+  },
+  "packageManager": "pnpm@11.17.0+sha512.cca3cea332ad254bb84145f966d19f4879615210346fc92c79a047f23a0d7b3cca3c3792f0076ba1f1831d277efbcf0a9119b31a9a60eca7fb3d6231f331ef72",
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
+    "@playwright/test": "^1.63.0",
+    "@types/firefox-webext-browser": "^143.0.1",
+    "@types/node": "^26.6.3",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "web-ext": "^10.7.0"
+  },
+  "dependencies": {
+    "@tesseract.js-data/deu": "1.0.0",
+    "@tesseract.js-data/eng": "1.0.0",
+    "tesseract.js": "7.0.0",
+    "tesseract.js-core": "7.0.0",
+    "text-fragments-polyfill": "^6.7.0"
+  }
+}

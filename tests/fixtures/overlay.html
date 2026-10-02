@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>overlay</title>
+    <style>
+      body {
+        margin: 0;
+        font: 16px/1.4 sans-serif;
+      }
+      .abs {
+        position: absolute;
+        margin: 0;
+      }
+      #card {
+        left: 100px;
+        top: 100px;
+        width: 600px;
+        height: 300px;
+        background: #eef;
+      }
+      #title {
+        left: 50px;
+        top: 20px;
+        width: 400px;
+        height: 50px;
+      }
+      #para {
+        left: 50px;
+        top: 120px;
+        width: 400px;
+        height: 80px;
+      }
+      #art {
+        left: 800px;
+        top: 100px;
+        width: 400px;
+        height: 400px;
+        background: #efe;
+      }
+      #artp {
+        left: 20px;
+        top: 20px;
+        width: 300px;
+        height: 60px;
+      }
+      #spacer {
+        height: 3000px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="card" class="abs">
+      <h2 id="title" class="abs">A heading</h2>
+      <p id="para" class="abs">Some paragraph text with a <a id="link" href="#x">link</a> inside.</p>
+    </div>
+    <article id="art" class="abs"><p id="artp" class="abs">Inside an article.</p></article>
+    <div id="spacer"></div>
+  </body>
+</html>

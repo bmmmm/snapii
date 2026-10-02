@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>webfont</title>
+    <!--
+      Pacifico (OFL, fonts/pacifico/OFL.txt) has a far taller ascent+descent
+      than the serif fallback, so line boxes and baselines move when it
+      arrives. The face is only added in beforeCollect, right before the spec
+      collects: collection that does not wait for document.fonts.ready
+      measures the fallback layout. #cap has a fixed height so the capture
+      rect does not depend on the font.
+    -->
+    <style>
+      body { margin: 0; padding: 20px; }
+      #cap { height: 300px; }
+      #cap p { font: 40px "Snap Pacifico", serif; margin: 0 0 10px; }
+    </style>
+    <script>
+      window.beforeCollect = () => {
+        const face = new FontFace("Snap Pacifico", "url(fonts/pacifico/Pacifico-latin.woff2)");
+        document.fonts.add(face);
+        face.load().catch(() => {});
+        if (document.fonts.status !== "loading") throw new Error("webfont fixture: font load did not start");
+      };
+    </script>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Handwritten heading", "Second line here"],
+        "roundtripVerticalTolerance": 0.2,
+        "reason": "The SVG viewer does not have the page's webfont and draws the text layer in its fallback, whose ascent/descent differ from Pacifico's: R3 compares box centres within 20 % of the font size instead of box edges."
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>Handwritten heading</p>
+      <p>Second line here</p>
+    </main>
+  </body>
+</html>

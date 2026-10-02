@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>rtl</title>
+    <style>
+      body { margin: 0; padding: 20px; font: 20px/1.5 serif; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": [
+          { "text": "שלום עולם", "dir": "rtl" },
+          { "text": "مرحبا بالعالم", "dir": "rtl" },
+          { "text": "English then עברית then English", "dir": "ltr" },
+          { "text": "עברית with English inside ועוד", "dir": "rtl" }
+        ],
+        "baselineTolerance": { "مرحبا بالعالم": 5 },
+        "reason": "The Arabic line is drawn entirely in a fallback font; canvas metrics only describe the first available font, so its baseline is a ratio estimate (measured 3.25 px off on macOS at 20px). Tolerance 0.25em."
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p dir="rtl" lang="he">שלום עולם</p>
+      <p dir="rtl" lang="ar">مرحبا بالعالم</p>
+      <p>English then עברית then English</p>
+      <p dir="rtl" lang="he">עברית <span lang="en">with English inside</span> ועוד</p>
+    </main>
+  </body>
+</html>

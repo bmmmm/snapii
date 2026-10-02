@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>snapii glue page</title>
+    <!--
+      Fixed geometry (document CSS px) for the end-to-end glue tests:
+      #card 100,100 500x200 with #para 120,120 400x80 and #para2 120,220 400x60,
+      #swatch 700,100 300x200 in one flat colour, no text,
+      #below 100,3000 600x400 far below the fold.
+    -->
+    <style>
+      html, body { margin: 0; background: #fff; }
+      body { font: 16px/1.5 serif; color: #000; }
+      .abs { position: absolute; margin: 0; }
+      #card { left: 100px; top: 100px; width: 500px; height: 200px; background: #fff; }
+      #para { left: 20px; top: 20px; width: 400px; height: 80px; }
+      #para2 { left: 20px; top: 120px; width: 400px; height: 60px; }
+      #swatch { left: 700px; top: 100px; width: 300px; height: 200px; background: rgb(200, 100, 50); }
+      /* Item 13 saves with the pointer resting on the swatch: a hover state must not reach the raster. */
+      #swatch:hover { background: rgb(0, 0, 255); }
+      #below { left: 100px; top: 3000px; width: 600px; height: 400px; background: rgb(60, 140, 90); color: #fff; }
+      #below p { margin: 0; padding: 20px; }
+      #spacer { height: 4000px; }
+    </style>
+  </head>
+  <body>
+    <div id="card" class="abs">
+      <p id="para" class="abs">First glue paragraph with a <a href="/glue/target/one">first link</a> inside.</p>
+      <p id="para2" class="abs">Second glue paragraph, plain text.</p>
+    </div>
+    <div id="swatch" class="abs"></div>
+    <div id="below" class="abs"><p>Below the fold text.</p></div>
+    <div id="spacer"></div>
+  </body>
+</html>

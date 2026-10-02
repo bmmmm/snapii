@@ -1,0 +1,101 @@
+name: Feature request
+description: Propose new behaviour — a setting, an action, something new in the saved file
+title: "[feature] "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This form asks you to design the feature, not just wish for it — the answers below
+        are close to what someone would need to implement it without a follow-up question.
+
+        Things snapii deliberately keeps out: **network requests of any kind** (no upload,
+        no sharing service, no cloud OCR, no telemetry), **host permissions** (snapii only
+        touches the tab you click it in, via `activeTab`), and anything that runs on a page
+        before you start snapii there.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >-
+        What are you unable to do today? Describe the situation, not your solution — there
+        may be a better way to solve it than the one you have in mind.
+      placeholder: >-
+        I capture tables from documentation pages and paste them into a spreadsheet, but
+        Copy text gives one cell per line, so I rebuild the table by hand.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+      description: >-
+        The concrete surface this adds or changes: a button, a setting (name, default), an
+        element or field in the saved SVG. If it changes existing output, show the before
+        and after.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: >-
+        Written so someone else can tell whether it is done without asking you. One
+        Given/When/Then per behaviour, including a negative case.
+      placeholder: |
+        - Given a selection over a <table> with 3 rows and 2 columns
+          When I use Copy text and paste into a spreadsheet
+          Then it fills 3 rows and 2 columns
+        - Given a selection without a table
+          When I use Copy text
+          Then the result is unchanged from today
+    validations:
+      required: true
+
+  - type: textarea
+    id: nongoals
+    attributes:
+      label: Explicitly out of scope
+      description: The neighbouring things this should NOT grow into. Keeps the review from turning into a scope negotiation.
+      placeholder: Not a CSV export, not merged cells, not tables inside images.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: contract
+    attributes:
+      label: Does this change something people may rely on?
+      description: >-
+        The saved SVG's structure and its metadata record, the permissions snapii asks for,
+        the stored settings and the privacy promise are the surfaces that other tools and
+        users build on.
+      options:
+        - "Not sure"
+        - "No — purely additive"
+        - "Yes — the SVG structure or its metadata record"
+        - "Yes — permissions"
+        - "Yes — an existing setting's meaning or default"
+        - "Yes — what leaves the browser or what the file reveals"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and current workaround
+      description: What you do today, and why it is not good enough.
+
+  - type: dropdown
+    id: implement
+    attributes:
+      label: Would you implement it?
+      options:
+        - "Not decided yet"
+        - "No, proposing only"
+        - "Yes, if the design is accepted"
+        - "Yes, but I would need pointers on where to start"
+    validations:
+      required: true

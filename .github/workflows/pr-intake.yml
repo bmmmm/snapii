@@ -1,0 +1,41 @@
+name: pr intake
+
+# Advisory only: reads the PR description and writes a checklist of what is
+# still open to the job summary. Never fails a build — all enforcement rests
+# on the reviewer reading the summary.
+#
+# Deliberately `pull_request`, not `pull_request_target`: no secrets, no write
+# permissions, so a fork PR cannot escalate through this workflow. The price:
+# it runs the PR's own copy of this file and of the script, so the summary of
+# a PR that edits either one vouches for nothing.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: intake-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  intake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # No setup-node: the script has no dependencies and runs on the runner's
+      # Node, so there is one step less that could turn the job red.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Check the description
+        continue-on-error: true
+        env:
+          # Attacker-controlled text — passed as an environment variable so it is
+          # never interpolated into a shell command.
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: node .github/scripts/pr-intake.mjs

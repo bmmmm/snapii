@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>clip-partial</title>
+    <!--
+      Fixed geometry: line boxes 40px tall from y=100, so the ~20px text boxes
+      sit at about 110-130, 150-170, 190-210. The capture rect starts at y=125
+      (first line only ~25% inside: dropped) and ends at y=205 (third line
+      ~75% inside: kept, cut). word-spacing puts ~200px gaps between words; the
+      capture's left and right edges fall into gaps, so only whole middle
+      words survive the horizontal trim.
+    -->
+    <style>
+      body { margin: 0; }
+      #box { position: absolute; left: 100px; top: 100px; font: 20px/40px serif; word-spacing: 200px; white-space: nowrap; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": { "x": 250, "y": 125, "width": 250, "height": 80 },
+        "lines": ["EEE", "HHH"],
+        "absent": ["AAA", "BBB", "CCC", "DDD", "FFF", "GGG", "III"]
+      }
+    </script>
+  </head>
+  <body>
+    <div id="box">AAA BBB CCC<br />DDD EEE FFF<br />GGG HHH III</div>
+  </body>
+</html>

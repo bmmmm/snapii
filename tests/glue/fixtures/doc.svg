@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
+  <!-- An SVG opened directly (e.g. a saved snapii file): not an HTML page, so snapii refuses to start. -->
+  <rect x="100" y="100" width="300" height="200" fill="#eef"/>
+  <text x="120" y="160" font-size="24">SVG document text</text>
+</svg>

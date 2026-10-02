@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>scrolled</title>
+    <!--
+      Document coordinates on a scrolled page: beforeCollect scrolls the
+      window and the iframe's own document. The iframe shows 48px of five
+      24px lines scrolled by 24px, so only lines two and three are in its
+      viewport; the others would fall inside the capture rect if the frame
+      viewport did not clip them.
+    -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/24px serif; }
+      #spacer { height: 2000px; }
+      iframe { display: block; width: 300px; height: 48px; border: 2px solid #888; padding: 0; margin: 40px 0; }
+    </style>
+    <script>
+      window.beforeCollect = () => {
+        scrollTo(0, 1500);
+        document.querySelector("iframe").contentWindow.scrollTo(0, 24);
+        if (scrollY !== 1500) throw new Error(`scrolled fixture: window scrollY is ${scrollY}`);
+      };
+    </script>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Below the fold.", "Frame line two", "Frame line three", "After the frame."],
+        "absent": ["Frame line one", "Frame line four", "Frame line five"]
+      }
+    </script>
+  </head>
+  <body>
+    <div id="spacer"></div>
+    <main id="cap">
+      <p>Below the fold.</p>
+      <iframe
+        title="scrolled frame"
+        srcdoc="<style>body{margin:0;font:16px/24px serif}p{margin:0}</style><p>Frame line one</p><p>Frame line two</p><p>Frame line three</p><p>Frame line four</p><p>Frame line five</p>"
+      ></iframe>
+      <p>After the frame.</p>
+    </main>
+  </body>
+</html>

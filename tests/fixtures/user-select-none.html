@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>user-select-none</title>
+    <!-- Text the page makes unselectable is still text in the capture, on purpose. -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; }
+      .no-select { user-select: none; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Label that cannot be selected.", "Normal text.", "Mixed unselectable words."]
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p class="no-select">Label that cannot
+        be selected.</p>
+      <p>Normal text.</p>
+      <p>Mixed <span class="no-select">unselectable</span> words.</p>
+    </main>
+  </body>
+</html>

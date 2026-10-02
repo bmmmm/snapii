@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>snapii glue article</title>
+    <!--
+      A plain article for the M3 glue tests (checklist items 9 and 12): every
+      paragraph is at least two lines tall (above the overlay's 30 px pick
+      minimum) and its text occurs once on the page. #far starts at document
+      y 2400, far below the 715 px viewport, so a text-fragment navigation to
+      it has to scroll.
+    -->
+    <style>
+      html, body { margin: 0; background: #fff; }
+      body { font: 16px/1.5 serif; color: #000; }
+      article { width: 600px; margin: 0 0 0 100px; }
+      h1 { margin: 0; padding-top: 60px; height: 60px; }
+      p { margin: 0 0 24px; }
+      #gap { height: 1900px; }
+      #tail { height: 2000px; }
+    </style>
+  </head>
+  <body>
+    <article>
+      <h1>Notes on quartz</h1>
+      <p id="lead">
+        Quartz is a hard, crystalline mineral composed of silica. It is the second most abundant mineral
+        in the continental crust of the earth, after feldspar.
+      </p>
+      <p id="second">
+        Its crystals grow as six-sided prisms that end in six-sided pyramids, and many varieties are
+        prized as gemstones, from amethyst to citrine and smoky quartz.
+      </p>
+      <div id="gap"></div>
+      <p id="far">
+        Piezoelectric quartz oscillators keep the time in nearly every wristwatch and computer, because a
+        thin slice of the crystal vibrates at a very stable frequency.
+      </p>
+      <div id="tail"></div>
+    </article>
+  </body>
+</html>

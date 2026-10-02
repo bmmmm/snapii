@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>fragment fallback</title>
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; }
+      main { width: 760px; }
+      p { margin: 0 0 8px; }
+    </style>
+    <!-- fragment.spec: #cap's first paragraph comes again further down with
+         the same paragraphs around it, so it cannot be told apart on its
+         own; only #cap's last paragraph sets the first copy apart. -->
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Shared headline", "Shared blurb", "A closing line that occurs once."]
+      }
+    </script>
+  </head>
+  <body>
+    <main>
+      <p>Section label</p>
+      <div id="cap">
+        <p>Shared headline</p>
+        <p>Shared blurb</p>
+        <p>A closing line that occurs once.</p>
+      </div>
+      <p>Section label</p>
+      <p>Shared headline</p>
+      <p>Shared blurb</p>
+    </main>
+  </body>
+</html>

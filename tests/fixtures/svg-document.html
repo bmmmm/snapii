@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>svg-document</title>
+    <!--
+      A same-origin frame holding an SVG document (blob: URLs share the page's
+      origin). Text in non-HTML documents must not break the collection.
+    -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; }
+      iframe { display: block; width: 420px; height: 70px; border: 0; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Before the SVG frame.", "SVG document text", "After the SVG frame."]
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>Before the SVG frame.</p>
+      <iframe title="svg document"></iframe>
+      <script>
+        document.querySelector("iframe").src = URL.createObjectURL(
+          new Blob(
+            [
+              '<svg xmlns="http://www.w3.org/2000/svg" width="420" height="70">' +
+                '<text x="10" y="50" font-family="serif" font-size="40">SVG document text</text></svg>',
+            ],
+            { type: "image/svg+xml" },
+          ),
+        );
+      </script>
+      <p>After the SVG frame.</p>
+    </main>
+  </body>
+</html>

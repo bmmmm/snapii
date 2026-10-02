@@ -1,0 +1,129 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* System colours and font follow the browser's light/dark theme, like the
+   options page. Firefox sizes the panel to the content; the width is fixed so
+   the panel does not jump while the status line fills in. */
+:root {
+  color-scheme: light dark;
+}
+body {
+  margin: 0;
+  width: 300px;
+  font: message-box;
+  background: Canvas;
+  color: CanvasText;
+}
+main {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+h1 {
+  margin: 0;
+  font-size: 1.1em;
+  font-weight: 600;
+}
+button {
+  font: inherit;
+  color: inherit;
+}
+.primary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  background: AccentColor;
+  color: AccentColorText;
+  font-weight: 600;
+  text-align: start;
+}
+.primary:hover:not(:disabled) {
+  background: color-mix(in srgb, AccentColor 85%, CanvasText);
+}
+.primary:disabled {
+  background: color-mix(in srgb, CanvasText 12%, Canvas);
+  color: GrayText;
+}
+kbd {
+  font: inherit;
+  font-weight: normal;
+  opacity: 0.85;
+}
+kbd:empty {
+  display: none;
+}
+#status {
+  margin: 0;
+}
+#status:empty {
+  display: none;
+}
+fieldset {
+  margin: 0;
+  padding: 8px 0;
+  border: none;
+  border-block: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+}
+/* Floated, the legend is a heading above the toggles instead of a gap in
+   the separator line. */
+legend {
+  float: left;
+  width: 100%;
+  padding: 0 0 2px;
+  font-size: 0.9em;
+  opacity: 0.75;
+}
+fieldset > label {
+  clear: both;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+}
+fieldset > label input {
+  margin: 0;
+}
+/* The folder field sits under its label instead of beside it. */
+fieldset > label.folder {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+}
+label.folder input {
+  font: inherit;
+  padding: 3px 6px;
+}
+#folder-error {
+  clear: both;
+  margin: 0;
+  font-size: 0.9em;
+}
+.plain {
+  align-self: start;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  text-align: start;
+  cursor: pointer;
+}
+.plain:hover {
+  text-decoration: underline;
+}
+:focus-visible {
+  outline: 2px solid Highlight;
+  outline-offset: 2px;
+}
+#about {
+  font-size: 0.85em;
+  opacity: 0.7;
+  user-select: text;
+}

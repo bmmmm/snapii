@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>inline-links</title>
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": [
+          "Read the docs or external.",
+          "Skip top, js, empty and no href.",
+          "Keep highlight and mail.",
+          "shadow link text after."
+        ],
+        "links": [
+          { "text": "the docs", "href": "/docs/a.html" },
+          { "text": "external", "href": "https://example.org/x" },
+          { "text": "highlight", "href": "inline-links.html#:~:text=Read" },
+          { "text": "mail", "href": "mailto:x@example.org" },
+          { "text": "shadow link text", "href": "/shadow-target" }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>Read <a href="/docs/a.html">the <em>docs</em></a> or <a href="https://example.org/x">external</a>.</p>
+      <p>Skip <a href="#top">top</a>, <a href="javascript:void 0">js</a>, <a href="">empty</a> and <a>no href</a>.</p>
+      <p>Keep <a href="inline-links.html#:~:text=Read">highlight</a> and <a href="mailto:x@example.org">mail</a>.</p>
+      <p><a href="/shadow-target"><span><template shadowrootmode="open">shadow link text</template></span></a> after.</p>
+    </main>
+  </body>
+</html>

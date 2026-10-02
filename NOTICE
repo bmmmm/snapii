@@ -1,0 +1,99 @@
+snapii
+Copyright (C) 2026 snapii contributors
+Licensed under the GNU General Public License v3.0 or later (see LICENSE).
+
+This product bundles third-party software:
+
+- text-fragments-polyfill (https://github.com/GoogleChromeLabs/text-fragments-polyfill)
+  Copyright Google LLC. Licensed under the Apache License, Version 2.0.
+  Only dist/fragment-generation-utils.js is bundled (into content.js).
+  The license text ships as LICENSES/text-fragments-polyfill.txt.
+
+The OCR engine (ocr/, used only when "Recognize text in images" is on), all
+files copied unmodified from the npm releases named. License texts are in
+LICENSES/; where no installed package carries one, the file was copied
+unmodified from the upstream repository at the commit or tag named here and
+lives in the source tree under licenses/.
+
+- tesseract.js 7.0.0 (https://github.com/naptha/tesseract.js,
+  https://www.npmjs.com/package/tesseract.js/v/7.0.0)
+  Licensed under the Apache License, Version 2.0 (LICENSES/tesseract.js.txt).
+  Its source (src/) is bundled into background.js; dist/worker.min.js ships
+  as ocr/worker.min.js. Webpack's own extract of the notices in that file
+  (Buffer, ieee754, regenerator-runtime, zlib.js) is LICENSES/worker.min.js.txt.
+  The worker bundles (versions from comparing the bundle's source map with
+  the npm releases):
+  - bmp-js 0.1.0, MIT (LICENSES/bmp-js.txt)
+  - is-url 1.2.4, MIT (LICENSES/is-url.txt)
+  - regenerator-runtime 0.13.11, MIT (LICENSES/regenerator-runtime.txt)
+  - zlibjs 0.3.1, MIT (LICENSES/zlibjs.txt)
+  - idb-keyval 6.2.0/6.2.1 (identical builds), Apache-2.0
+    (LICENSES/idb-keyval.txt, from the installed 6.3.0: same text)
+  - wasm-feature-detect 1.8.0, Apache-2.0 (LICENSES/wasm-feature-detect.txt,
+    from the installed 1.9.0: same text)
+  - buffer 6.0.3, MIT (LICENSES/buffer.txt,
+    https://raw.githubusercontent.com/feross/buffer/v6.0.3/LICENSE)
+  - base64-js 1.5.1, MIT (LICENSES/base64-js.txt,
+    https://raw.githubusercontent.com/beatgammit/base64-js/v1.5.1/LICENSE)
+  - ieee754 1.2.1, BSD-3-Clause (LICENSES/ieee754.txt,
+    https://raw.githubusercontent.com/feross/ieee754/v1.2.1/LICENSE)
+- tesseract.js-core 7.0.0 (https://github.com/naptha/tesseract.js-core,
+  https://www.npmjs.com/package/tesseract.js-core/v/7.0.0, git tag v7.0.0 =
+  commit acffef2b66eb44a31df297e11d905f4b39001068), only
+  tesseract-core-simd-lstm.wasm.js. Licensed under the Apache License,
+  Version 2.0 (LICENSES/tesseract.js-core.txt). Its WebAssembly is compiled
+  from the git submodules pinned at that tag (third_party/, build.sh and
+  build-scripts/; leptonica is built with -DHAVE_LIBJP2K=0, so there is no
+  OpenJPEG). build.sh builds each of them and Tesseract's CMakeLists.txt
+  links them into the core. The WebAssembly carries their own messages or
+  version strings, except giflib (present through Leptonica's GIF reader,
+  which is only compiled with it) and openlibm (plain math functions):
+  - Tesseract OCR (fork https://github.com/Balearica/tesseract, commit
+    2a9c1c49c360462733c386d2a44fcd22c4e21411; its VERSION file says 5.3.0,
+    the binary reports 5.1.0-288-g2a9c1), Apache-2.0
+    (LICENSES/tesseract-ocr.txt, from .../2a9c1c49.../LICENSE)
+  - Leptonica 1.83.0 (https://github.com/DanBloomberg/leptonica, commit
+    4af068b56a9674da915debea4ed7e1b9885b17e8), BSD-2-Clause style
+    (LICENSES/leptonica.txt, from .../leptonica-license.txt)
+  - libpng 1.6.38.git (https://github.com/glennrp/libpng, commit
+    a37d4836519517bdce6cb9d956092321eca3e73b), PNG Reference Library
+    License version 2 (LICENSES/libpng.txt, from .../LICENSE)
+  - zlib 1.2.12 (https://github.com/madler/zlib, commit
+    21767c654d31d2dccdde4330529775c6c5fd5389), zlib license; that commit
+    has no LICENSE file, the notice is in its README (LICENSES/zlib.txt)
+  - libjpeg release 9a by the Independent JPEG Group (mirror
+    https://github.com/LuaDist/libjpeg, commit
+    6c0fcb8ddee365e7abc4d332662b06900612e923), IJG license, see "LEGAL
+    ISSUES" in its README (LICENSES/libjpeg.txt).
+    This software is based in part on the work of the Independent JPEG Group.
+  - libtiff 4.3.0 (https://gitlab.com/libtiff/libtiff, commit
+    b51bb157123264e26d34c09cc673d213aea61fc7), libtiff license
+    (LICENSES/libtiff.txt, from .../COPYRIGHT)
+  - libwebp 1.2.2 (https://github.com/webmproject/libwebp, commit
+    20ef03ee351d4ff03fc5ff3ec4804a879d1b9d5c), BSD-3-Clause plus a patent
+    grant (LICENSES/libwebp.txt from .../COPYING, LICENSES/libwebp-PATENTS.txt
+    from .../PATENTS)
+  - giflib 5.1.4 (mirror https://github.com/mirrorer/giflib, commit
+    fa37672085ce4b3d62c51627ab3c8cf2dda8009a), MIT-style
+    (LICENSES/giflib.txt, from .../COPYING)
+  - openlibm 0.8.0 (https://github.com/JuliaMath/openlibm, commit
+    ae2d91698508701c83cab83714d42a1146dccf85), MIT/BSD/ISC and others
+    (LICENSES/openlibm.txt, from .../LICENSE.md)
+  Raw URLs: https://raw.githubusercontent.com/<repository>/<commit>/<file>,
+  for libtiff https://gitlab.com/libtiff/libtiff/-/raw/<commit>/COPYRIGHT.
+- Language models deu and eng, variant 4.0.0_best_int, from
+  @tesseract.js-data/deu 1.0.0 and @tesseract.js-data/eng 1.0.0
+  (https://www.npmjs.com/package/@tesseract.js-data/deu,
+  https://www.npmjs.com/package/@tesseract.js-data/eng). Integerized by the
+  tesseract.js project from tesseract-ocr/tessdata_best
+  (https://github.com/tesseract-ocr/tessdata_best), which is licensed under
+  the Apache License, Version 2.0 (LICENSES/tessdata.txt). The npm packages
+  themselves declare MIT and carry no license file.
+
+Test fixtures only (not part of the extension package):
+
+- Pacifico (tests/fixtures/fonts/pacifico/Pacifico-latin.woff2, Latin subset
+  as served by Google Fonts)
+  Copyright 2018 The Pacifico Project Authors (https://github.com/googlefonts/Pacifico)
+  Licensed under the SIL Open Font License, Version 1.1
+  (tests/fixtures/fonts/pacifico/OFL.txt).

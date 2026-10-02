@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>shadow</title>
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": [
+          "Before shadow.",
+          "Shadow intro slotted span shadow outro.",
+          "Deep shadow text.",
+          "Default slotted text.",
+          "After shadow."
+        ],
+        "absent": ["Unassigned light text"]
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>Before shadow.</p>
+      <div>
+        <template shadowrootmode="open">
+          <p>Shadow intro <slot name="s"></slot> shadow outro.</p>
+          <div>
+            <template shadowrootmode="open"><p>Deep shadow text.</p></template>
+          </div>
+          <div><slot></slot></div>
+        </template>
+        <span slot="s">slotted span</span>
+        Default slotted text.
+        <span slot="nowhere">Unassigned light text</span>
+      </div>
+      <p>After shadow.</p>
+    </main>
+  </body>
+</html>

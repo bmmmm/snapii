@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>skip</title>
+    <!--
+      #overlay mimics the snapii overlay host (fixed, full viewport, shadow
+      root) and is passed as skip: none of its text, links or link areas may
+      appear, although it lies over the capture rect.
+    -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; }
+      #overlay { position: fixed; inset: 0; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "skip": "#overlay",
+        "lines": ["Page text.", "More page text."],
+        "absent": ["Overlay toolbar", "Save SVG"]
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>Page text.</p>
+      <p>More page text.</p>
+    </main>
+    <div id="overlay">
+      <template shadowrootmode="open">
+        <div style="padding: 40px 0 0 400px">
+          <span>Overlay toolbar</span> <a href="/save">Save SVG</a>
+          <a href="/close" aria-label="Close" style="display: inline-block; width: 20px; height: 20px"></a>
+        </div>
+      </template>
+    </div>
+  </body>
+</html>

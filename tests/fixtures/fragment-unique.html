@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>fragment unique</title>
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; }
+      main { width: 760px; }
+    </style>
+    <!-- fragment.spec: a passage whose text occurs once on the page. -->
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": [
+          "An opening paragraph with ordinary words.",
+          "Sphinx of black quartz, judge my vow - and mind the comma.",
+          "A closing paragraph with ordinary words."
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>An opening paragraph with ordinary words.</p>
+      <p id="target">Sphinx of black quartz, judge my vow - and mind the comma.</p>
+      <p>A closing paragraph with ordinary words.</p>
+    </main>
+    <!-- Outside the capture: a block whose own text runs into a nested one,
+         and a paragraph a drag ends in the middle of. -->
+    <div id="mixed">Loose text in front of a nested paragraph<p>The nested paragraph inside the div.</p></div>
+    <p id="inline">A passage with <b>bold words</b> and then a tail that stays unselected.</p>
+  </body>
+</html>

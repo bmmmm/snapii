@@ -1,0 +1,112 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* System colours and font follow the browser's light/dark theme, in a tab and
+   in the about:addons embedded panel alike. */
+:root {
+  color-scheme: light dark;
+}
+body {
+  margin: 0;
+  padding: 16px;
+  font: message-box;
+  background: Canvas;
+  color: CanvasText;
+}
+main {
+  max-width: 32em;
+}
+fieldset {
+  margin: 0 0 16px;
+  padding: 8px 12px 12px;
+  border: 1px solid color-mix(in srgb, CanvasText 30%, transparent);
+  border-radius: 6px;
+}
+legend {
+  padding: 0 4px;
+  font-weight: 600;
+}
+fieldset > label {
+  display: block;
+  padding: 4px 0;
+}
+.quality {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 0 20px;
+}
+.quality input[type="range"] {
+  flex: 1 1 8em;
+  min-width: 0;
+}
+.quality:has(input:disabled) {
+  opacity: 0.5;
+}
+output {
+  min-width: 3em;
+  font-variant-numeric: tabular-nums;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+button {
+  font: inherit;
+  padding: 4px 12px;
+}
+#status {
+  margin: 0;
+  min-height: 1.5em;
+}
+.folder-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+#folder {
+  font: inherit;
+  flex: 1 1 12em;
+  min-width: 0;
+  padding: 3px 8px;
+}
+#folder-error {
+  opacity: 1;
+}
+#shortcut {
+  margin: 16px 0 0;
+}
+.shortcut-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+#shortcut-input {
+  font: inherit;
+  width: 10em;
+  padding: 3px 8px;
+  text-align: center;
+}
+.hint {
+  margin: 8px 0 0;
+  opacity: 0.75;
+}
+/* Sits under its checkbox, aligned with the label text. */
+#ocr-hint {
+  margin: 0 0 0 20px;
+}
+#shortcut-status {
+  margin: 4px 0 0;
+  min-height: 1.5em;
+}
+:focus-visible {
+  outline: 2px solid Highlight;
+  outline-offset: 2px;
+}
+#about {
+  margin: 16px 0 0;
+  user-select: text;
+}

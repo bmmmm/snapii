@@ -1,0 +1,131 @@
+name: Implementation task (ready to pick up)
+description: A fully specified unit of work — enough that someone can open the PR without asking anything
+title: "[task] "
+labels: ["task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this once the *what* and the *why* are settled and only the *how* is left —
+        typically after a bug or feature issue has been triaged.
+
+        The bar: someone who has never seen this repository, or a coding agent working from
+        `AGENTS.md`, can implement it start to finish without a single clarifying question,
+        and both of you agree on what "done" means before any code exists. If you cannot
+        fill in the contract and the acceptance criteria, the design is not settled yet —
+        file a feature request instead and settle it there.
+
+  - type: input
+    id: goal
+    attributes:
+      label: Goal, in one sentence
+      description: Observable outcome, not implementation. Start with a verb.
+      placeholder: Make Copy link report EXECUTION_FAILED instead of "no text selected" for picks inside a shadow tree.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Why — and what breaks today
+      description: Link the issue this came from. Someone reading in six months must understand the motivation without archaeology.
+      placeholder: >-
+        Closes #12. Shadow-tree picks never get a text fragment (the polyfill's generator
+        loops forever there, so it is not called), and the toast then claims no text was
+        selected — which sends the user looking for a selection problem that does not exist.
+    validations:
+      required: true
+
+  - type: textarea
+    id: files
+    attributes:
+      label: Files in scope
+      description: >-
+        Every file expected to change, and one line on why. The module map is in
+        `CONTRIBUTING.md`. A surprise file appearing in the PR is a review flag — list it
+        here instead.
+      placeholder: |
+        src/content/fragment.ts       — return EXECUTION_FAILED for shadow-tree picks
+        tests/layout/fragment.spec.ts — a shadow-tree pick yields EXECUTION_FAILED
+    validations:
+      required: true
+
+  - type: textarea
+    id: contract
+    attributes:
+      label: Contract — exact before and after
+      description: >-
+        Signatures, data shapes, message types, settings keys, toast strings, SVG elements
+        or metadata fields. This is the field that makes review mechanical: the reviewer
+        diffs the PR against this block instead of reverse-engineering the intent.
+      placeholder: |
+        before: a pick inside a shadow root → textFragmentStatus "INVALID_SELECTION",
+                toast "Copied page link (no text selected)"
+        after:  textFragmentStatus "EXECUTION_FAILED",
+                toast "Copied page link (no text link possible)"
+        No new status value, no metadata schema change, no settings change.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: >-
+        Machine-checkable. Every line must be something a reviewer can run or read off a
+        diff — no "works well", no "is clean".
+      placeholder: |
+        - `pnpm check`, `pnpm test` and `pnpm test:glue` pass
+        - the new spec fails on current main and passes with the change
+        - picks outside shadow roots keep their current status (existing specs unchanged)
+        - `<snapii:capture>` keeps `schema: 1`; no field added, removed or retyped
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: nongoals
+    attributes:
+      label: Out of scope
+      description: Adjacent work that must not be bundled in. Keeps the diff reviewable.
+      placeholder: No fix for the polyfill's loop itself, no text fragments for shadow trees.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Blast radius
+      options:
+        - "Not sure"
+        - "Local — one module, no public surface"
+        - "Internal — several modules, no public surface"
+        - "Saved file — changes the bytes of the SVG (golden file, metadata)"
+        - "Public contract — permissions, settings keys, add-on id or privacy"
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Hints, gotchas, prior art
+      description: >-
+        Anything that saves the implementer an hour: a similar pattern elsewhere in the
+        repo, a subtlety in the platform, a dead end already ruled out.
+      placeholder: >-
+        The measured platform facts behind capture and tiling are in `src/shared/spike.ts`;
+        do not change a value there without a new measurement of the kind its header describes.
+
+  - type: checkboxes
+    id: ready
+    attributes:
+      label: Readiness
+      description: All three must be true, or this is not a task yet.
+      options:
+        - label: The contract above is precise enough that two people would implement the same interface.
+          required: true
+        - label: Every acceptance criterion can be verified by running a command or reading the diff.
+          required: true
+        - label: The design decisions are made — no open questions are left for the implementer.
+          required: true

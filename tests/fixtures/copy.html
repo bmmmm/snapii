@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>copy</title>
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; }
+      main { width: 760px; }
+      .x { color: green; }
+    </style>
+    <!-- copy.spec: Copy text on #cap (clean HTML + plain text). -->
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": [
+          "Copy me",
+          "First bold italic paragraph with a real link and a script link.",
+          "Shown text and more.",
+          "Erster Punkt",
+          "Second item",
+          "Escaped <b> & text"
+        ],
+        "absent": ["HIDDENDISPLAY", "HIDDENVIS", "SCRIPTTEXT"],
+        "links": [{ "text": "real link", "href": "/target?a=1&b=2" }]
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <h1 class="x" id="title">Copy <em>me</em></h1>
+      <!-- One line: whitespace at the edges of a paragraph would survive into the HTML. -->
+      <p id="first" class="x" style="color: red" onclick="window.clicked = true">First <b>bold</b> <i>italic</i> paragraph with a <a href="/target?a=1&amp;b=2" class="l" target="_blank" rel="noopener">real link</a> and a <a href="javascript:void(0)">script link</a>.</p>
+      <!-- a comment that must not be copied -->
+      <p>Shown <span style="display: none">HIDDENDISPLAY </span>text and <span style="visibility: hidden">HIDDENVIS</span> more.</p>
+      <script>window.copyFixture = "SCRIPTTEXT";</script>
+      <style>.y { color: blue; }</style>
+      <ul>
+        <li lang="de">Erster Punkt</li>
+        <li>Second <code>item</code></li>
+      </ul>
+      <p>Escaped &lt;b&gt; &amp; text</p>
+    </main>
+  </body>
+</html>

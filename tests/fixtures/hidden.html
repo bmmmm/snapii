@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>hidden</title>
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; }
+      /* One 24px line fits, the second overflows into the capture rect below. */
+      #clipbox { height: 24px; overflow: hidden; margin-bottom: 40px; }
+      .clip-path { clip-path: inset(100%); }
+      .offscreen { position: absolute; left: -9999px; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Visible start.", "Clip box first line", "Visible end."],
+        "absent": [
+          "HIDDENVISIBILITY",
+          "HIDDENOPACITY",
+          "HIDDENDISPLAY",
+          "HIDDENOVERFLOW",
+          "HIDDENCLIPPATH",
+          "HIDDENOFFSCREEN",
+          "HIDDENFONTSIZE"
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>Visible start.</p>
+      <p style="visibility: hidden">HIDDENVISIBILITY text</p>
+      <p style="opacity: 0">HIDDENOPACITY text</p>
+      <p style="display: none">HIDDENDISPLAY text</p>
+      <div id="clipbox">Clip box first line<br />HIDDENOVERFLOW second line</div>
+      <p class="clip-path">HIDDENCLIPPATH text</p>
+      <p class="offscreen">HIDDENOFFSCREEN text</p>
+      <p style="font-size: 0">HIDDENFONTSIZE text</p>
+      <p>Visible end.</p>
+    </main>
+  </body>
+</html>

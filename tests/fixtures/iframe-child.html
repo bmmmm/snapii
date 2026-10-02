@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>iframe-child</title>
+    <!-- Shown inside iframe-same-origin.html; also checked on its own. -->
+    <style>
+      body { margin: 0; padding: 8px; font: 16px/1.5 serif; }
+      h1 { font-size: 20px; margin: 0; }
+      p { margin: 4px 0; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Child heading", "Child text with a link."],
+        "links": [{ "text": "a link", "href": "/child-target" }]
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <h1>Child heading</h1>
+      <p>Child text with <a href="/child-target">a link</a>.</p>
+    </main>
+  </body>
+</html>

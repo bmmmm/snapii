@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>astral</title>
+    <!--
+      A wrapped line that starts with a character outside the BMP (a surrogate
+      pair in UTF-16): the pair must start the second line, not end the first.
+      MATHEMATICAL BOLD CAPITAL A is a letter, so no break opportunity sits
+      between it and "delta".
+    -->
+    <style>
+      body { margin: 0; padding: 20px; }
+      #cap { width: 17.5ch; font: 20px/1.5 monospace; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["alpha beta gamma", "𝐀delta epsilon", "zeta"]
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>alpha beta gamma &#x1D400;delta epsilon zeta</p>
+    </main>
+  </body>
+</html>

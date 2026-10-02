@@ -1,0 +1,8 @@
+{
+  "manifest_version": 3,
+  "name": "snapii csp probe",
+  "version": "1.0",
+  "description": "Test-only: measures how a content script can style a closed shadow root on a strict-CSP page.",
+  "content_scripts": [{ "matches": ["http://127.0.0.1/glue/fixtures/*"], "js": ["probe.js"] }],
+  "browser_specific_settings": { "gecko": { "id": "csp-probe@snapii.test" } }
+}

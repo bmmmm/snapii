@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>buttons</title>
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; }
+      button { font: inherit; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": [
+          "Before the buttons.",
+          "Formaction button Plain button",
+          "Role button span and data href span.",
+          "Anchor role button"
+        ],
+        "links": [{ "text": "Anchor role button", "href": "https://q.example/" }]
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>Before the buttons.</p>
+      <form action="/submit">
+        <button type="submit" formaction="/s">Formaction button</button> <button type="button">Plain button</button>
+      </form>
+      <p><span role="button" tabindex="0">Role button span</span> and <span data-href="/x">data href span</span>.</p>
+      <p><a role="button" href="https://q.example/">Anchor role button</a></p>
+    </main>
+  </body>
+</html>

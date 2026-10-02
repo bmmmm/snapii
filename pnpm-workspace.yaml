@@ -1,0 +1,11 @@
+# Supply-chain hardening. Both entries are policy, not preference:
+# a compromised release is usually yanked within hours, so a cooldown window
+# turns "we installed it the minute it shipped" into a non-event.
+minimumReleaseAge: 4320 # 3 days
+onlyBuiltDependencies: [] # no install-time build scripts unless curated here
+# pnpm 11 reads build approval from allowBuilds. esbuild runs fine without its
+# postinstall (pnpm installs the platform binary as an optional dependency).
+allowBuilds:
+  esbuild: false
+  # Its postinstall only prints an Open Collective donation banner.
+  tesseract.js: false

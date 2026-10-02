@@ -1,0 +1,165 @@
+name: Text in the SVG is missing, wrong or misplaced
+description: The saved file's selectable text (or links, or OCR words) does not match what the picture shows
+title: "[text] "
+labels: ["bug: text-layer", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A saved SVG has two layers: the **picture** and an **invisible text layer** on top of
+        it (one `<text>` per run of page text, links as `<a>`, OCR words in `<g id="ocr">`).
+        This form is for the text layer. If the *picture* itself is wrong, use
+        **The picture in the SVG is wrong**; if Copy text or Copy link is wrong, use
+        **Copy text or Copy link gives the wrong result**.
+
+        Known limits that are not bugs (details in
+        [docs/details.md](https://github.com/bmmmm/snapii/blob/main/docs/details.md#limits)):
+        text inside cross-origin iframes, vertical writing modes, and text that exists only
+        as pixels while OCR is off.
+
+  - type: input
+    id: version
+    attributes:
+      label: snapii version line
+      description: >-
+        The line at the very bottom of snapii's menu (click the snapii toolbar button) or of
+        its settings page (`about:addons` → snapii → Preferences). Copy it whole — it names
+        the build and your Firefox version.
+      placeholder: "snapii 0.1.0 · 862b4ba · built 2026-10-01 15:45 UTC · Firefox 157.0"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "macOS 26.1 / Windows 11 / Ubuntu 24.04 (Wayland)"
+    validations:
+      required: true
+
+  - type: input
+    id: url
+    attributes:
+      label: Page URL
+      description: >-
+        A public page where it happens, so anyone can retry the same selection. Remove
+        tokens, session ids and personal data from the address first. If the page is
+        private, write "private" and describe its structure under "Steps".
+      placeholder: https://en.wikipedia.org/wiki/Scalable_Vector_Graphics
+    validations:
+      required: true
+
+  - type: dropdown
+    id: symptom
+    attributes:
+      label: What is wrong with the text
+      options:
+        - "Not sure, or several of these"
+        - "Missing — text I can see in the picture cannot be selected or found"
+        - "Wrong — different characters, words run together or split, wrong order"
+        - "Misplaced — the selection highlight does not sit on the words in the picture"
+        - "Duplicated — the same text is in the file twice"
+        - "Links — missing, not clickable, or pointing somewhere else"
+        - "Extra — text that is not visible in the picture can be selected"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: source
+    attributes:
+      label: Is the affected text real page text, or inside an image?
+      description: >-
+        Real page text can be selected on the web page itself. Text inside a picture, a
+        canvas or a CSS background only reaches the file through OCR ("Recognize text in
+        images", off by default).
+      options:
+        - "Not sure"
+        - "Real page text — I can select it on the web page"
+        - "Inside an image, canvas or background picture — OCR was on"
+        - "Inside an image, canvas or background picture — OCR was off"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: copy_text
+    attributes:
+      label: Does the same text appear when you use Copy text on the same selection?
+      description: >-
+        The most useful field in this form. Copy text reads the page the same way the SVG's
+        text layer does, so the answer splits the bug in two: if Copy text is wrong too,
+        snapii read the page wrongly (extraction); if Copy text is right, the file is
+        written or shown wrongly (renderer or viewer). Copy text never contains OCR words.
+      options:
+        - "Not checked"
+        - "No — Copy text is missing it or gets it wrong too (extraction)"
+        - "Yes — Copy text is right, only the SVG is wrong (renderer or viewer)"
+        - "Not applicable — the text is inside an image (OCR)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: viewer
+    attributes:
+      label: Which program did you open the SVG in?
+      description: >-
+        snapii's files are made for browsers; Firefox is the tested viewer. Inkscape cannot
+        click-select the invisible text, and macOS Preview and Quick Look show no text layer
+        at all.
+      options:
+        - "Not sure"
+        - "Firefox (the .svg opened directly)"
+        - "Chrome, Chromium, Edge or another Chromium browser"
+        - "Safari"
+        - "Inkscape"
+        - "macOS Preview or Quick Look"
+        - "Another program (name it under Steps)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      description: >-
+        How you selected (picked an element, walked up/down with ↑/↓, or dragged a
+        rectangle), which part of the page, the page zoom if it was not 100 %, and anything
+        you changed in snapii's settings.
+      placeholder: |
+        1. Opened the page above at 100 % zoom
+        2. Started snapii, picked the infobox on the right, pressed ↑ once
+        3. Save SVG, opened the file in Firefox
+    validations:
+      required: true
+
+  - type: textarea
+    id: result
+    attributes:
+      label: What you expected, and what you got
+      description: >-
+        Quote the exact text. "Text is wrong" is not actionable; "the picture shows
+        'Scalable Vector Graphics', selecting it in the SVG gives 'ScalableVectorGraphics'"
+        is.
+    validations:
+      required: true
+
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Attachments (optional)
+      description: >-
+        Drag files in here. The saved `.svg` is the best evidence, but it contains the
+        page's full URL (with query string), its title, the capture time and the text of
+        the selection — attach it only if all of that may be public (zip it if GitHub
+        refuses the file). Console output helps too: snapii's own errors are under
+        `about:debugging#/runtime/this-firefox` → snapii → Inspect → Console, the page's
+        under Ctrl+Shift+K (⌘+Option+K on macOS).
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I removed tokens, session ids and personal data from the URL and every attachment.
+          required: true
+        - label: I read the known limits in docs/details.md and this is not one of them.
+          required: true

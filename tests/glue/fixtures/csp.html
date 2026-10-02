@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>snapii glue csp</title>
+    <!--
+      Served by tests/glue/env.mjs with the HTTP header
+      Content-Security-Policy: style-src 'none'; script-src 'none'
+      (a header, not a meta tag, like github.com). Both elements below are
+      guards: if the header were missing, the page would turn red and the
+      title would change.
+    -->
+    <style>
+      html { background: rgb(255, 0, 0); }
+    </style>
+    <script>
+      document.title = "script ran";
+    </script>
+  </head>
+  <body>
+    <p id="block">First line<br />second line<br />third line<br />fourth line</p>
+  </body>
+</html>

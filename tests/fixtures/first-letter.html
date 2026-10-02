@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>first-letter</title>
+    <!--
+      A floated three-line initial: its glyph box overlaps the first two lines,
+      which must still come out as separate lines with the initial on the first.
+    -->
+    <style>
+      body { margin: 0; padding: 20px; }
+      #cap { font: 20px/1.5 monospace; width: 14ch; }
+      #cap p::first-letter { float: left; font-size: 3em; line-height: 1; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Lorem ipsum", "dolor sit", "amet", "consectetur", "adipiscing"],
+        "roundtripTolerance": { "Lorem ipsum": 22 },
+        "reason": "The run 'Lorem ipsum' includes the ::first-letter drop cap, so its box reaches below the line by an amount that depends on the platform's monospace metrics (16.75 px on macOS, 18 px on Linux CI; 22 px allows about one font size); the SVG draws the whole run at the paragraph's font size, which a TextRun cannot express otherwise."
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>
+        Lorem ipsum dolor sit
+        amet consectetur adipiscing
+      </p>
+    </main>
+  </body>
+</html>

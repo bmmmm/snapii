@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>drag &amp; &lt;order&gt;</title>
+    <!--
+      session.spec drag-mode text fragment. The host's shadow tree slots its
+      light children in reverse, so flat-tree order (the order runs come in)
+      is #beta, the shadow tree's own text, #alpha, while DOM order is #alpha
+      before #beta. The title and the page URL's query carry characters the
+      copy-link HTML has to escape.
+      Layout (document px): #beta y 60, shadow text y 124, #alpha y 188.
+    -->
+    <style>
+      html, body { margin: 0; }
+      body { font: 16px/1.5 serif; }
+      #host { display: block; margin: 60px 50px; width: 600px; }
+      p { margin: 0 0 40px; }
+    </style>
+  </head>
+  <body>
+    <div id="host"><p slot="a" id="alpha">Alpha paragraph comes first in the markup.</p><p slot="b" id="beta">Beta paragraph closes the slotted pair.</p></div>
+    <script>
+      document.getElementById("host").attachShadow({ mode: "open" }).innerHTML =
+        '<slot name="b"></slot><p style="margin: 0 0 40px">Shadow tree text between them.</p><slot name="a"></slot>';
+    </script>
+  </body>
+</html>

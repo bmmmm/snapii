@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>snapii OCR page</title>
+    <!--
+      Text that exists only as pixels, for the OCR glue test. The images are
+      drawn at load time into canvases (Helvetica/Arial, the same font on every
+      run on one machine) and shown as:
+        #img      an <img> with a data: PNG, dark text on light grey;
+        #banner   a <div> with a CSS background-image, light text on dark blue;
+        #photo    an <img> whose lower part is covered by #caption, a real DOM
+                  text caption: OCR must not add the caption a second time.
+      Fixed geometry (document CSS px): #cap 40,40 900x560.
+      <html data-ready="1"> once every image has decoded.
+    -->
+    <style>
+      html, body { margin: 0; background: #fff; }
+      body { font: 16px/1.4 sans-serif; color: #000; }
+      #cap { position: absolute; left: 40px; top: 40px; width: 900px; height: 560px; }
+      #img { position: absolute; left: 0; top: 0; width: 420px; height: 150px; }
+      #banner { position: absolute; left: 460px; top: 0; width: 420px; height: 150px; background: no-repeat 0 0 / 420px 150px; }
+      #figure { position: absolute; left: 0; top: 190px; width: 520px; height: 300px; margin: 0; }
+      #photo { display: block; width: 520px; height: 300px; }
+      #caption { position: absolute; left: 0; bottom: 0; width: 520px; box-sizing: border-box; padding: 10px 16px; margin: 0;
+        font: 22px/1.3 Helvetica, Arial, sans-serif; color: #fff; background: rgba(0, 0, 0, 0.55); }
+      #note { position: absolute; left: 560px; top: 200px; width: 320px; margin: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="cap">
+      <img id="img" alt="" />
+      <div id="banner"></div>
+      <figure id="figure">
+        <img id="photo" alt="" />
+        <figcaption id="caption">Photo taken near Hallstatt</figcaption>
+      </figure>
+      <p id="note">This paragraph is real DOM text next to the images.</p>
+    </div>
+    <script>
+      // Lines per image; the glue test checks the recognised words against these.
+      const IMG = ["Willkommen in Köln", "Die Straßenbahn fährt pünktlich", "Quick brown foxes jump"];
+      const BANNER = ["Summer Sale Today", "Alle Preise reduziert"];
+      const PHOTO = ["Mountain Lake Panorama"];
+
+      function draw(width, height, lines, { bg, fg, font, top, gap }) {
+        const c = document.createElement("canvas");
+        c.width = width;
+        c.height = height;
+        const ctx = c.getContext("2d");
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, width, height);
+        ctx.fillStyle = fg;
+        ctx.font = font;
+        ctx.textBaseline = "alphabetic";
+        lines.forEach((line, i) => ctx.fillText(line, 16, top + i * gap));
+        return c;
+      }
+
+      // A photo-like ground: soft gradients, so the text is not on a flat colour.
+      function photo(width, height) {
+        const c = draw(width, height, [], { bg: "#000", fg: "#000", font: "10px sans-serif", top: 0, gap: 0 });
+        const ctx = c.getContext("2d");
+        const g = ctx.createLinearGradient(0, 0, 0, height);
+        g.addColorStop(0, "#9ccfee");
+        g.addColorStop(0.55, "#e8f2f7");
+        g.addColorStop(1, "#5d7f4c");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, width, height);
+        ctx.fillStyle = "#1d2b3a";
+        ctx.font = "bold 30px Helvetica, Arial, sans-serif";
+        ctx.fillText(PHOTO[0], 20, 60);
+        return c;
+      }
+
+      const font = "26px Helvetica, Arial, sans-serif";
+      const img = document.getElementById("img");
+      img.src = draw(420, 150, IMG, { bg: "#f2f2f2", fg: "#202020", font, top: 40, gap: 42 }).toDataURL();
+      const banner = draw(420, 150, BANNER, { bg: "#123a6b", fg: "#ffffff", font: "bold 30px Helvetica, Arial, sans-serif", top: 55, gap: 50 });
+      document.getElementById("banner").style.backgroundImage = `url(${banner.toDataURL()})`;
+      const ph = document.getElementById("photo");
+      ph.src = photo(520, 300).toDataURL();
+
+      const bg = new Image();
+      bg.src = banner.toDataURL();
+      Promise.all([img.decode(), ph.decode(), bg.decode()]).then(() => {
+        document.documentElement.dataset.ready = "1";
+      });
+      window.OCR_WORDS = { img: IMG, banner: BANNER, photo: PHOTO };
+    </script>
+  </body>
+</html>

@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/bmmmm/snapii/security/policy
+    about: Do not open a public issue. Report privately — see SECURITY.md.
+  - name: How to use snapii
+    url: https://github.com/bmmmm/snapii#readme
+    about: Picking, saving, copying and the settings are described in the README.
+  - name: What is in the file, viewers and limits
+    url: https://github.com/bmmmm/snapii/blob/main/docs/details.md
+    about: The text layer, OCR, which viewers can select the text, known limits and permissions.

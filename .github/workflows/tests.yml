@@ -1,0 +1,30 @@
+# Unit + Playwright layout suites, extension build and web-ext lint.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      # Playwright's own Firefox build; the Marionette glue suite needs a
+      # release Firefox and stays a local gate (pnpm test:glue).
+      - run: pnpm exec playwright install --with-deps firefox
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm lint:ext

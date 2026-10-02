@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>snapii settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <form id="settings" autocomplete="off">
+        <fieldset>
+          <legend>Image format</legend>
+          <label><input type="radio" name="format" value="png" /> PNG (lossless)</label>
+          <label><input type="radio" name="format" value="jpeg" /> JPEG (smaller files)</label>
+          <div class="quality">
+            <label for="quality">JPEG quality</label>
+            <input id="quality" type="range" min="0" max="100" step="1" />
+            <output for="quality" id="quality-value"></output>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Behavior</legend>
+          <label><input type="checkbox" name="saveAs" /> Ask where to save each file</label>
+          <label
+            ><input type="checkbox" name="occlusionCheck" /> Skip text covered by other elements</label
+          >
+          <label
+            ><input type="checkbox" name="textFragment" /> Add a link to the selected text (text
+            fragment)</label
+          >
+          <label
+            ><input type="checkbox" name="ocr" aria-describedby="ocr-hint" /> Recognize text in images
+            (OCR)</label
+          >
+          <p id="ocr-hint" class="hint">Runs locally; adds a few seconds to saving.</p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Save location</legend>
+          <div class="folder-row">
+            <label for="folder">Folder inside Downloads</label>
+            <input
+              id="folder"
+              name="saveFolder"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="Downloads folder itself"
+              aria-describedby="folder-hint folder-error"
+            />
+          </div>
+          <p id="folder-hint" class="hint">
+            Firefox lets add-ons save only inside its Downloads folder, so this is a sub-folder name such
+            as snapii or Pages/snapii; it is created when needed. Leave it empty for the Downloads folder
+            itself.
+          </p>
+          <p id="folder-error" class="hint" role="alert" hidden></p>
+        </fieldset>
+
+        <div class="actions">
+          <button type="button" id="reset">Reset to defaults</button>
+          <p id="status" role="status" aria-live="polite"></p>
+        </div>
+      </form>
+
+      <!-- Not part of the form: the browser stores the shortcut itself (commands.update), not storage.sync. -->
+      <fieldset id="shortcut">
+        <legend>Keyboard shortcut</legend>
+        <div class="shortcut-row">
+          <label for="shortcut-input">Capture a region</label>
+          <input
+            id="shortcut-input"
+            type="text"
+            readonly
+            disabled
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="None"
+            aria-describedby="shortcut-hint"
+          />
+          <button type="button" id="shortcut-reset">Reset shortcut</button>
+        </div>
+        <p id="shortcut-hint" class="hint">
+          Click the field and press the new combination. Escape cancels; Backspace or Delete removes the
+          shortcut.
+        </p>
+        <p id="shortcut-status" role="status" aria-live="polite"></p>
+      </fieldset>
+
+      <footer id="about" class="hint"></footer>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>

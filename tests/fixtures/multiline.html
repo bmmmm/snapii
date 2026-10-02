@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>multiline</title>
+    <!-- Monospace and a width in ch make the wrap points font-independent. -->
+    <style>
+      body { margin: 0; padding: 20px; }
+      #cap { width: 17.5ch; font: 20px/1.5 monospace; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": [
+          "alpha beta gamma",
+          "delta epsilon",
+          "zeta eta theta",
+          "one two three",
+          "four five six",
+          "seven"
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>alpha beta gamma delta epsilon zeta eta theta</p>
+      <p>one <b>two three four five</b> six seven</p>
+    </main>
+  </body>
+</html>

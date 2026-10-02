@@ -1,0 +1,137 @@
+name: Copy text or Copy link gives the wrong result
+description: The copied text is missing, wrong or badly formatted, or the copied link does not lead to the passage
+title: "[copy] "
+labels: ["bug: copy", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Copy text** puts the selection on the clipboard twice: as plain text and as simple
+        HTML for rich editors. **Copy link** copies a text-fragment link (`#:~:text=…`) that
+        opens the page, scrolls to the start of the selection and highlights it — or the
+        plain page link when no unique text link is possible; the toast then says why.
+
+        Known and open on purpose: on a drag over half a paragraph the HTML flavour carries
+        the whole paragraph (the plain text is exact), and Copy text never contains OCR
+        words.
+
+  - type: input
+    id: version
+    attributes:
+      label: snapii version line
+      description: >-
+        The line at the very bottom of snapii's menu (click the snapii toolbar button) or of
+        its settings page (`about:addons` → snapii → Preferences). Copy it whole — it names
+        the build and your Firefox version.
+      placeholder: "snapii 0.1.0 · 862b4ba · built 2026-10-01 15:45 UTC · Firefox 157.0"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "macOS 26.1 / Windows 11 / Ubuntu 24.04 (Wayland)"
+    validations:
+      required: true
+
+  - type: input
+    id: url
+    attributes:
+      label: Page URL
+      description: >-
+        A public page where it happens. Remove tokens, session ids and personal data from
+        the address first.
+      placeholder: https://en.wikipedia.org/wiki/Scalable_Vector_Graphics
+    validations:
+      required: true
+
+  - type: dropdown
+    id: action
+    attributes:
+      label: Which action
+      options:
+        - "Both, or not sure"
+        - "Copy text"
+        - "Copy link"
+    validations:
+      required: true
+
+  - type: input
+    id: toast
+    attributes:
+      label: What did the toast say?
+      description: >-
+        Word for word; write "none" if no toast appeared. For Copy link it says whether you
+        got a text link or only the page link, and why.
+      placeholder: "Copied page link (no unique text match)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: firefox_link
+    attributes:
+      label: "Copy link: does Firefox's own Copy Link to Highlight work for the same passage?"
+      description: >-
+        The most useful field for a link problem. Select the same text on the page,
+        right-click → Copy Link to Highlight, and open that link in a new tab. If Firefox's
+        link fails or is not offered either, the page itself resists text links (dynamic
+        content, repeated text); if Firefox's works and snapii's does not, the fault is in
+        snapii's link.
+      options:
+        - "Not checked, or this is about Copy text"
+        - "No — Firefox's link fails too, or Firefox offers none (the page)"
+        - "Yes — Firefox's link works, snapii's does not (snapii)"
+    validations:
+      required: true
+
+  - type: input
+    id: paste_target
+    attributes:
+      label: "Copy text: where did you paste it?"
+      description: >-
+        Leave empty only for a Copy link problem — a Copy text report without it cannot be
+        triaged: rich editors receive the HTML flavour, plain text fields the plain one, so
+        the target decides which half is wrong. Name the program and its version, or the
+        web page and its kind of field.
+      placeholder: "LibreOffice Writer 25.2 (rich text) / a plain <textarea> / Obsidian / a terminal"
+
+  - type: textarea
+    id: result
+    attributes:
+      label: What you expected, and what you got
+      description: >-
+        Paste what arrived (for Copy link: the link itself, with any token in the URL
+        removed) and say what you expected instead.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      description: How you selected (picked an element, walked up/down with ↑/↓, or dragged a rectangle) and which part of the page.
+      placeholder: |
+        1. Opened the page above
+        2. Started snapii, dragged over the second paragraph of "History"
+        3. Copy link, pasted into a new tab
+    validations:
+      required: true
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console output (optional)
+      description: >-
+        snapii's own errors: `about:debugging#/runtime/this-firefox` → snapii → Inspect →
+        Console. The page's: Ctrl+Shift+K (⌘+Option+K on macOS) on the page.
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I removed tokens, session ids and personal data from the URL, the pasted result and the console output.
+          required: true

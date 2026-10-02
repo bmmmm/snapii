@@ -1,0 +1,131 @@
+name: snapii does not work on a site
+description: The button or shortcut does nothing, the menu says it cannot run, or the overlay is invisible or unusable
+title: "[site] "
+labels: ["bug: site", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a capture that works but produces a wrong file, use **The picture in the SVG is
+        wrong** or **Text in the SVG is missing, wrong or misplaced** instead.
+
+        Not bugs: Firefox does not let any extension run on its own pages (`about:` pages,
+        the PDF viewer, `view-source:`) or on addons.mozilla.org, and snapii works on HTML
+        pages only. On those, the menu says so, and the shortcut shows a short "×" on the
+        toolbar button.
+
+  - type: input
+    id: version
+    attributes:
+      label: snapii version line
+      description: >-
+        The line at the very bottom of snapii's menu (click the snapii toolbar button) or of
+        its settings page (`about:addons` → snapii → Preferences). Copy it whole — it names
+        the build and your Firefox version.
+      placeholder: "snapii 0.1.0 · 862b4ba · built 2026-10-01 15:45 UTC · Firefox 157.0"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "macOS 26.1 / Windows 11 / Ubuntu 24.04 (Wayland) / Android 15"
+    validations:
+      required: true
+
+  - type: input
+    id: url
+    attributes:
+      label: Page URL
+      description: >-
+        Remove tokens, session ids and personal data from the address first. If the page
+        needs a login or is private, write the site's address only and say so.
+      placeholder: https://example.com/some/page
+    validations:
+      required: true
+
+  - type: dropdown
+    id: symptom
+    attributes:
+      label: What happens
+      options:
+        - "Not sure, or several of these"
+        - "Nothing happens — no overlay, no message"
+        - "The menu says snapii cannot capture this page"
+        - "The toolbar button shows × after the shortcut"
+        - "The overlay does not appear, or is invisible"
+        - "The overlay appears, but I cannot pick an element or drag a rectangle"
+        - "The Save SVG / Copy text / Copy link toolbar is hidden or does not react"
+        - "An error toast after Save SVG, Copy text or Copy link"
+        - "The page breaks or changes after starting snapii"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: example_org
+    attributes:
+      label: Does snapii work on https://example.org/ ?
+      description: >-
+        The most useful field in this form. Open https://example.org/ in the same window and
+        start a capture the same way. If it fails there too, the problem is the
+        installation or your Firefox setup, not this site; if it works there, the problem
+        is specific to this site.
+      options:
+        - "Not checked"
+        - "No — it fails on example.org too (installation or environment)"
+        - "Yes — it works on example.org, fails only on this site (site-specific)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: start
+    attributes:
+      label: How did you start snapii?
+      options:
+        - "Not sure, or both"
+        - "Toolbar button → Capture region"
+        - "Keyboard shortcut"
+    validations:
+      required: true
+
+  - type: textarea
+    id: message
+    attributes:
+      label: Exact message
+      description: >-
+        Word for word, what snapii said: the line under "Capture region" in the menu, the
+        toast on the page, or the button's tooltip while it shows ×. Write "none" if
+        nothing appeared.
+      placeholder: "snapii cannot capture this page: …"
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Anything unusual about your Firefox (optional)
+      description: >-
+        Other add-ons that change pages (content blockers, dark-mode or translation
+        add-ons), a private window, enterprise policies, `privacy.resistFingerprinting`,
+        Firefox for Android. Name them even if they seem unrelated.
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console output (optional, very useful)
+      description: >-
+        snapii's own errors: `about:debugging#/runtime/this-firefox` → snapii → Inspect →
+        Console. The page's: Ctrl+Shift+K (⌘+Option+K on macOS) on the page. Start snapii
+        once more with the console open and paste what appears.
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I reloaded the tab and tried again (after an add-on update or reload, an open overlay stays dead until the page reloads).
+          required: true
+        - label: I removed tokens, session ids and personal data from the URL and the pasted output.
+          required: true

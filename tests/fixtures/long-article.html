@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>long-article</title>
+    <!--
+      1,500 generated paragraphs, 7 text nodes each; two of them are long and
+      wrap over about thirty lines, so splitting them into lines is expensive.
+      The capture covers three short paragraphs in the middle: the budget only
+      holds if nodes outside the capture are rejected before any of that.
+    -->
+    <style>
+      body { margin: 0; padding: 20px; }
+      article { width: 320px; font: 16px/1.5 serif; }
+      #target p { margin: 4px 0; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#target",
+        "lines": ["Target line one.", "Target line two with a link.", "Target line three."],
+        "links": [{ "text": "a link", "href": "/target-link" }],
+        "stats": { "textNodes": 10509 },
+        "maxMs": 500,
+        "roundtrip": false,
+        "reason": "Performance fixture; the content is generated filler."
+      }
+    </script>
+  </head>
+  <body>
+    <article id="article"></article>
+    <script>
+      const article = document.getElementById("article");
+      const words = (
+        "lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor " +
+        "incididunt ut labore et dolore magna aliqua enim ad minim veniam quis nostrud"
+      ).split(" ");
+      const sentence = (seed, n) =>
+        Array.from({ length: n }, (_, k) => words[(seed * 7 + k * 3) % words.length]).join(" ");
+      const el = (tag, text) => {
+        const e = document.createElement(tag);
+        e.textContent = text;
+        return e;
+      };
+      for (let i = 0; i < 1500; i++) {
+        if (i === 750) {
+          const target = document.createElement("section");
+          target.id = "target";
+          const link = el("a", "a link");
+          link.href = "/target-link";
+          const two = el("p", "Target line two with ");
+          two.append(link, ".");
+          target.append(el("p", "Target line one."), two, el("p", "Target line three."));
+          article.append(target);
+        }
+        const p = document.createElement("p");
+        const a = el("a", sentence(i + 1, 6));
+        a.href = `#p${i}`;
+        p.append(
+          `Paragraph ${i}: ${sentence(i, 200)} `,
+          el("em", sentence(i + 2, 12)),
+          ` ${sentence(i + 3, 200)} `,
+          a,
+          " ",
+          el("strong", sentence(i + 4, 8)),
+          ` ${sentence(i + 5, 25)}.`,
+        );
+        article.append(p);
+      }
+    </script>
+  </body>
+</html>

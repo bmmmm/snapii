@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="400" height="120" viewBox="0 0 400 120" xml:lang="en">
+  <title>Café &amp; "Menu" &lt;draft&gt;</title>
+  <desc>Region of https://example.com/menu?lang=fr&amp;id=7 captured 2026-10-01T12:00:00.000Z by snapii 0.1.0. Text is selectable; links are clickable.</desc>
+  <metadata>
+    <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/">
+      <rdf:Description rdf:about="">
+        <dc:title>Café &amp; "Menu" &lt;draft&gt;</dc:title>
+        <dc:source>https://example.com/menu?lang=fr&amp;id=7#:~:text=Hello-,world</dc:source>
+        <dc:relation>https://example.com/menu?lang=fr&amp;id=7</dc:relation>
+        <dc:date>2026-10-01T12:00:00.000Z</dc:date>
+        <dc:format>image/svg+xml</dc:format>
+        <dc:language>en</dc:language>
+      </rdf:Description>
+    </rdf:RDF>
+    <snapii:capture xmlns:snapii="urn:x-snapii:capture:1" content-type="application/json">{"schema":1,"extensionVersion":"0.1.0","url":"https://example.com/menu?lang=fr&amp;id=7","textFragmentURL":"https://example.com/menu?lang=fr&amp;id=7#:~:text=Hello-,world","textFragmentStatus":"SUCCESS","capturedAt":"2026-10-01T12:00:00.000Z","title":"Café &amp; \"Menu\" &lt;draft&gt;","lang":"en","viewport":{"width":1280,"height":720},"scroll":{"x":0,"y":250},"devicePixelRatio":2,"zoom":1,"scale":2,"selection":{"mode":"drag","x":100.5,"y":250,"width":400,"height":120},"tiles":[{"rect":{"x":0,"y":0,"width":400,"height":80},"pixelWidth":800,"pixelHeight":160,"format":"png"},{"rect":{"x":0,"y":80,"width":400,"height":40},"pixelWidth":800,"pixelHeight":80,"format":"jpeg"}],"runCount":4,"skippedFrames":0,"skippedVertical":1}</snapii:capture>
+  </metadata>
+  <image x="0" y="0" width="400" height="80" preserveAspectRatio="none" xlink:href="data:image/png;base64,iVBORw0KGgo="/>
+  <image x="0" y="80" width="400" height="40" preserveAspectRatio="none" xlink:href="data:image/jpeg;base64,/9j/4AAQ"/>
+  <g id="links">
+    <a href="https://example.com/world?a=1&amp;b=2" xlink:href="https://example.com/world?a=1&amp;b=2"><rect x="48.25" y="10" width="33.13" height="18" fill="#000" fill-opacity="0"><title>Open &lt;world&gt; &amp; more</title></rect></a>
+    <rect x="120" y="70" width="100" height="30" fill="#000" fill-opacity="0"><title>Tooltip only</title></rect>
+  </g>
+  <g id="text" xml:space="preserve" style="white-space:pre" fill="#000" fill-opacity="0"><g><text x="10" y="24.5" textLength="38.25" lengthAdjust="spacingAndGlyphs" font-family="&quot;Helvetica Neue&quot;, Arial, sans-serif" font-size="16" font-weight="400" font-style="normal" xml:lang="en">Hello </text><a href="https://example.com/world?a=1&amp;b=2" xlink:href="https://example.com/world?a=1&amp;b=2"><text x="48.25" y="24.5" textLength="33.13" lengthAdjust="spacingAndGlyphs" font-family="serif" font-size="16" font-weight="400" font-style="normal">world</text></a><text x="81.38" y="24.5"> </text></g><g><text x="10" y="52" textLength="60.33" lengthAdjust="spacingAndGlyphs" font-family="serif" font-size="16" font-weight="700" font-style="italic" xml:lang="fr">Bonjour</text><text x="359.5" y="52" textLength="59.5" lengthAdjust="spacingAndGlyphs" font-family="serif" font-size="16" font-weight="400" font-style="normal" direction="rtl" xml:lang="he">שלום</text><text x="359.5" y="52"> </text></g></g>
+</svg>

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>snapii</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <img src="icons/icon.svg" width="20" height="20" alt="" />
+        <h1>snapii</h1>
+      </header>
+
+      <!-- aria-busy until the page has been asked whether snapii can run there. -->
+      <button type="button" id="capture" class="primary" aria-busy="true">
+        <span>Capture region</span>
+        <kbd id="capture-shortcut" aria-hidden="true"></kbd>
+      </button>
+      <p id="status" role="status" aria-live="polite"></p>
+
+      <!-- Disabled until the stored values are shown, so a click cannot be overwritten by the load. -->
+      <fieldset id="toggles" disabled>
+        <legend>Quick settings</legend>
+        <label><input type="checkbox" name="ocr" /> Recognize text in images (OCR)</label>
+        <label><input type="checkbox" name="textFragment" /> Add a link to the selected text</label>
+        <label><input type="checkbox" name="saveAs" /> Ask where to save each file</label>
+        <label class="folder">
+          Save in a folder inside Downloads
+          <input
+            id="folder"
+            type="text"
+            name="saveFolder"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="Downloads folder itself"
+            aria-describedby="folder-error"
+          />
+        </label>
+        <p id="folder-error" role="alert" hidden></p>
+      </fieldset>
+
+      <button type="button" id="options" class="plain">All settings…</button>
+
+      <footer id="about"></footer>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,169 @@
+name: The picture in the SVG is wrong
+description: Blank, cut off, wrong area, snapii's own overlay or toast in the image, or blurry
+title: "[picture] "
+labels: ["bug: picture", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This form is for the **picture** in a saved SVG — the raster `<image>` under the
+        text layer. If the picture is right but the selectable text is wrong, use
+        **Text in the SVG is missing, wrong or misplaced**.
+
+        snapii takes the picture with Firefox's own capture API, so the first question below
+        settles whether the fault is in snapii or in how Firefox paints the page.
+
+  - type: input
+    id: version
+    attributes:
+      label: snapii version line
+      description: >-
+        The line at the very bottom of snapii's menu (click the snapii toolbar button) or of
+        its settings page (`about:addons` → snapii → Preferences). Copy it whole — it names
+        the build and your Firefox version.
+      placeholder: "snapii 0.1.0 · 862b4ba · built 2026-10-01 15:45 UTC · Firefox 157.0"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "macOS 26.1 / Windows 11 / Ubuntu 24.04 (Wayland)"
+    validations:
+      required: true
+
+  - type: input
+    id: url
+    attributes:
+      label: Page URL
+      description: >-
+        A public page where it happens. Remove tokens, session ids and personal data from
+        the address first. If the page is private, write "private" and describe it under
+        "Steps".
+      placeholder: https://example.org/
+    validations:
+      required: true
+
+  - type: dropdown
+    id: symptom
+    attributes:
+      label: What is wrong with the picture
+      options:
+        - "Not sure, or several of these"
+        - "Blank, black or transparent"
+        - "Cut off — part of the selection is missing"
+        - "Wrong area — shifted, or a different part of the page"
+        - "snapii's own overlay, toolbar or toast is visible in the picture"
+        - "Blurry — lower resolution than on screen"
+        - "Seams or repeated strips (large selections are captured in bands)"
+        - "Refused with \"This area is too large to capture\""
+    validations:
+      required: true
+
+  - type: dropdown
+    id: firefox_screenshot
+    attributes:
+      label: Does Firefox's own screenshot of the same area look right?
+      description: >-
+        The most useful field in this form. Take one with Ctrl+Shift+S (⌘+Shift+S on macOS)
+        or right-click → Take Screenshot, and select the same area. If Firefox's screenshot
+        shows the same fault, the page or Firefox paints it that way; if Firefox's is right,
+        the fault is in snapii's capture.
+      options:
+        - "Not checked"
+        - "No — Firefox's screenshot shows the same problem (page or Firefox rendering)"
+        - "Yes — Firefox's screenshot is right, snapii's is wrong (snapii capture)"
+    validations:
+      required: true
+
+  - type: input
+    id: zoom
+    attributes:
+      label: Page zoom
+      description: Shown in the address bar when it is not 100 %. Ctrl+0 (⌘+0) resets it.
+      placeholder: "100 %"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: display
+    attributes:
+      label: Display
+      description: >-
+        The capture is taken at the screen's device-pixel ratio, so scaled and Retina
+        displays take a different path than a plain one.
+      options:
+        - "Not sure"
+        - "One display without scaling (100 %)"
+        - "One HiDPI / Retina / scaled display (e.g. 150 % or 200 %)"
+        - "Several displays with different scaling"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: region
+    attributes:
+      label: Size of the selection
+      options:
+        - "Not sure"
+        - "Inside the visible part of the page"
+        - "Larger than the visible part (it reaches beyond the window)"
+        - "Very large — many screen heights"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      description: >-
+        How you selected (picked an element, walked up/down with ↑/↓, or dragged a
+        rectangle), whether you scrolled while selecting, and what was moving on the page
+        (animations, lazy-loaded images, sticky headers).
+      placeholder: |
+        1. Opened the page above, scrolled down to the second table
+        2. Dragged from the table's top-left corner to below the window's bottom edge
+        3. Save SVG, opened the file in Firefox
+    validations:
+      required: true
+
+  - type: textarea
+    id: result
+    attributes:
+      label: What you expected, and what you got
+      description: Screenshots of both — snapii's file and Firefox's screenshot — say more than a description.
+    validations:
+      required: true
+
+  - type: textarea
+    id: capture_record
+    attributes:
+      label: Capture record (optional, very useful)
+      description: >-
+        Open the saved `.svg` in a text editor and copy the JSON between
+        `<snapii:capture …>` and `</snapii:capture>`. It holds viewport, scroll,
+        device-pixel ratio, zoom, scale, the selection and the tile sizes — exactly what a
+        picture bug needs, without the picture. It also holds `url`, `textFragmentURL` and
+        `title`: replace those values with "removed" if they are private. (In the file it
+        is XML-escaped — `&amp;` stands for `&`; paste it as it is.)
+      render: json
+
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Attachments (optional)
+      description: >-
+        Drag files in here. The saved `.svg` contains the page's full URL (with query
+        string), its title, the capture time and the text of the selection — attach it only
+        if all of that may be public (zip it if GitHub refuses the file). Console output
+        helps too: snapii's own errors are under `about:debugging#/runtime/this-firefox` →
+        snapii → Inspect → Console, the page's under Ctrl+Shift+K (⌘+Option+K on macOS).
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I removed tokens, session ids and personal data from the URL, the capture record and every attachment.
+          required: true

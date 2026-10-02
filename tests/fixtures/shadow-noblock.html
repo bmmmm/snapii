@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>shadow noblock</title>
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; }
+      main { width: 760px; }
+    </style>
+    <!-- fragment.spec, session.spec: pickable text in a shadow tree with no
+         block element above it (the <a> is display:block, but not a block
+         element by tag), the case that hangs the text-fragment generator. -->
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["A paragraph before the card.", "Read more"]
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>A paragraph before the card.</p>
+      <my-card id="card">
+        <template shadowrootmode="open">
+          <a id="more" href="#more" style="display: block; width: 300px; height: 40px">Read more</a>
+        </template>
+      </my-card>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>icon-font</title>
+    <!--
+      Icon fonts put their glyphs in the Private Use Area; such text means
+      nothing outside that font. "Snap Icons" does not exist, the code points
+      render as boxes, which is irrelevant to extraction.
+    -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; }
+      .icon { font-family: "Snap Icons", sans-serif; font-style: normal; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Settings", "Home link"],
+        "absent": ["\ue001", "\ue002"],
+        "areas": [{ "alt": "Home", "href": "/home" }]
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p><i class="icon">&#xE001;</i> Settings</p>
+      <p><a href="/home" aria-label="Home"><i class="icon">&#xE002;</i></a> Home link</p>
+    </main>
+  </body>
+</html>
