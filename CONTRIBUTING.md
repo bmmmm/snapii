@@ -38,6 +38,7 @@ other environment variables and the interactive driver are in
 | `src/manifest.json` | Permissions, the shortcut command, add-on id |
 | `src/background/main.ts` | Event page: the popup's "Capture region" and the shortcut start a session; routes save and copy messages |
 | `src/background/start.ts` | Whether snapii can run in a tab, injecting the content script |
+| `src/background/flag.ts` | The shortcut's "cannot capture this page" notice on the toolbar button, title before badge |
 | `src/background/save.ts` | One save end to end: capture, hand the page back, OCR, render, download |
 | `src/background/capture.ts` | Region → raster tiles with `captureVisibleTab` |
 | `src/background/ocr.ts` | Tesseract in a worker over the image areas of one save |
