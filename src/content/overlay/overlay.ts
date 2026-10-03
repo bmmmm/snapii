@@ -110,10 +110,14 @@ export function startOverlay(opts: {
   }
 
   function render(): void {
-    blocked = state === "selected" && selection ? (opts.saveBlocked?.(selection) ?? null) : null;
-    toolbar.setSaveBlocked(blocked);
-    hint.textContent = blocked ?? HINT_TEXT;
-    hint.classList.toggle("notice", blocked !== null);
+    const next = state === "selected" && selection ? (opts.saveBlocked?.(selection) ?? null) : null;
+    // Hover renders on every pointer move; the notice changes far less often.
+    if (next !== blocked) {
+      blocked = next;
+      toolbar.setSaveBlocked(blocked);
+      hint.textContent = blocked ?? HINT_TEXT;
+      hint.classList.toggle("notice", blocked !== null);
+    }
     hint.hidden = blocked === null && (state === "selected" || state === "dragging");
     toolbar.el.hidden = state !== "selected";
     if (state === "selected" && selection) {
