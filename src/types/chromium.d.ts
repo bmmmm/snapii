@@ -11,6 +11,10 @@ declare namespace browser.offscreen {
   function closeDocument(): Promise<void>;
 }
 
+declare namespace browser.runtime {
+  function getContexts(filter: { contextTypes: Array<"OFFSCREEN_DOCUMENT"> }): Promise<ExtensionContext[]>;
+}
+
 declare namespace browser.dom {
   function openOrClosedShadowRoot(element: Element): ShadowRoot | null;
 }

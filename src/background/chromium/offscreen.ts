@@ -10,6 +10,7 @@ import type { OffscreenRequest } from "../../shared/offscreen.ts";
 export interface OffscreenDeps {
   /** Rejects when the document already exists. */
   create(): Promise<void>;
+  exists(): Promise<boolean>;
   close(): Promise<void>;
   send(request: OffscreenRequest): Promise<unknown>;
 }
@@ -26,7 +27,12 @@ export function createOffscreenClient(deps: OffscreenDeps): OffscreenClient {
     async ask(request) {
       users++;
       // After a close still under way, or the new document would go with it.
-      ready ??= closing.then(() => deps.create()).catch(() => {});
+      // A failure is only the left-behind document if there is one.
+      ready ??= closing
+        .then(() => deps.create())
+        .catch(async (e) => {
+          if (!(await deps.exists())) throw e;
+        });
       try {
         await ready;
         const answer = await deps.send(request);
@@ -51,6 +57,8 @@ export const offscreen = createOffscreenClient({
       reasons: ["WORKERS", "CLIPBOARD"],
       justification: "Text recognition runs in a Web Worker; copying text needs a document.",
     }),
+  exists: async () =>
+    (await browser.runtime.getContexts({ contextTypes: ["OFFSCREEN_DOCUMENT"] })).length > 0,
   close: () => browser.offscreen.closeDocument(),
   send: (request) => browser.runtime.sendMessage(request),
 });
