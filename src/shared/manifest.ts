@@ -15,7 +15,7 @@ const CHROMIUM_ICONS = {
 };
 
 /** The oldest Chromium the facts in spike.ts were measured on. */
-const MINIMUM_CHROME_VERSION = "151";
+export const MINIMUM_CHROME_VERSION = "151";
 
 export function manifestFor(target: BuildTarget, source: Manifest, version: string): Manifest {
   if (target === "firefox") return { ...source, version };

@@ -152,6 +152,8 @@ export type SaveResponse =
       detail?: string;
     };
 
+export type SaveError = Extract<SaveResponse, { ok: false }>["error"];
+
 export interface Settings {
   format: "png" | "jpeg";
   jpegQuality: number;

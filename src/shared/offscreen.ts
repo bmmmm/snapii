@@ -17,5 +17,7 @@ export function isOffscreenRequest(x: unknown, sender: { tab?: unknown }): x is 
   if (sender.tab !== undefined) return false;
   if (typeof x !== "object" || x === null) return false;
   const r = x as Record<string, unknown>;
-  return r.to === "offscreen" && (r.type === "ocr" || r.type === "copy");
+  if (r.to !== "offscreen") return false;
+  if (r.type === "copy") return typeof r.plain === "string" && typeof r.html === "string";
+  return r.type === "ocr" && Array.isArray(r.areas) && Array.isArray(r.tiles) && Array.isArray(r.runs);
 }

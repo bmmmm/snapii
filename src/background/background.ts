@@ -10,12 +10,12 @@ import { routeMessage } from "../shared/messages.ts";
 import { CAPTURE_COMMAND } from "../shared/shortcut.ts";
 import { rasterTextRenderer } from "../shared/svg/build.ts";
 import { flagTab } from "./flag.ts";
-import type { Platform } from "./platform.ts";
+import type { BrowserPlatform } from "./platform.ts";
 import { type SaveDeps, save } from "./save.ts";
 import { loadSettings } from "./settings.ts";
 import { startCapture } from "./start.ts";
 
-export function startBackground(platform: Platform): void {
+export function startBackground(platform: BrowserPlatform): void {
   const POPUP_URL = browser.runtime.getURL("popup.html");
 
   const saveDeps: SaveDeps = {

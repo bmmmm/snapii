@@ -8,7 +8,7 @@ import { copyFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promi
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
-import { manifestFor } from "../src/shared/manifest.ts";
+import { MINIMUM_CHROME_VERSION, manifestFor } from "../src/shared/manifest.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const test = process.argv.includes("--test");
@@ -49,10 +49,13 @@ function buildInfo() {
   }
 }
 
-// Chromium 151 is the oldest the Chromium facts in src/shared/spike.ts were measured on.
 const TARGETS = {
   firefox: { outdir: "dist", esbuild: "firefox140", background: "src/background/main.ts" },
-  chromium: { outdir: "dist-chromium", esbuild: "chrome151", background: "src/background/chromium/main.ts" },
+  chromium: {
+    outdir: "dist-chromium",
+    esbuild: `chrome${MINIMUM_CHROME_VERSION}`,
+    background: "src/background/chromium/main.ts",
+  },
 };
 
 if (test) {

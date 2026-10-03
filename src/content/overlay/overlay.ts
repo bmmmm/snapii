@@ -80,7 +80,6 @@ export function startOverlay(opts: {
   let press = { x: 0, y: 0 };
   let toolbarPress: ToolbarButton | null = null;
   let frame = 0;
-  /** The reason Save is unavailable for the current selection. */
   let blocked: string | null = null;
 
   const page = (): { x: number; y: number } => ({ x: pointer.x + scrollX, y: pointer.y + scrollY });

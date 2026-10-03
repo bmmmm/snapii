@@ -66,7 +66,9 @@ other environment variables and the interactive driver are in
 | `src/shared/manifest.ts`, `target.ts` | The manifest each browser gets; which browser a bundle was built for (`TARGET`, set by the build) |
 | `src/shared/viewport.ts` | Chromium only: whether a region fits the viewport and where it lies in the captured picture |
 | `src/popup/`, `src/options/` | The toolbar menu and the settings page |
-| `scripts/build.mjs` | The bundler; writes `dist/build-info.json` for the version line |
+| `scripts/build.mjs` | The bundler: `dist/` for Firefox, `dist-chromium/` for Chromium; writes `build-info.json` for the version line |
+| `scripts/icons.mjs` | Rasterises the icon into the PNGs Chromium needs; run by hand when `icon.svg` changes |
+| `tools/marionette/`, `tools/chromium/` | The drivers of the two glue suites |
 | `tools/marionette/`, `tools/drive/` | Marionette client and Firefox driver for the glue tests and `pnpm drive` |
 
 ## Filing an issue
@@ -145,13 +147,18 @@ Every behavioural change needs a test that fails without it.
   deterministic (same input, same bytes) and checked byte for byte against
   `tests/unit/golden/simple.svg`; a change to the output updates that file
   by hand, and every changed line needs a reason in the PR.
-- **Layout** (`tests/layout/*.spec.ts`, Playwright's Firefox) — extraction,
+- **Layout** (`tests/layout/*.spec.ts`, Playwright's Firefox and Chromium): extraction,
   overlay and round trip against the fixture pages in `tests/fixtures/`. A
   page that broke snapii usually becomes a new, minimal fixture here.
 - **Glue** (`tests/glue/*.test.mjs`, `pnpm test:glue`) — the built extension
   in the installed Firefox through Marionette: popup, shortcut, save, copy,
   OCR. Not run in CI (it needs a release Firefox); run it locally whenever you
   touch `src/background/`, `src/content/`, the popup or the options page.
+- **Chromium glue** (`tests/glue-chromium/*.test.mjs`, `pnpm test:glue:chromium`):
+  `dist-chromium/` in Playwright's Chromium, driven by `tools/chromium/driver.mjs`:
+  popup, save, copy, OCR through the offscreen document, the options page, a
+  service-worker restart. Local as well; run it for the same paths and for
+  `src/offscreen/`.
 - **Manual** — what no automation can check (real keyboard, real display,
   other apps' clipboards, other viewers) is in
   [tests/MANUAL-CHECKLIST.md](tests/MANUAL-CHECKLIST.md).

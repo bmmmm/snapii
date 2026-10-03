@@ -11,6 +11,7 @@ pnpm test:glue:chromium   # builds, then drives the real extension in Chromium
 pnpm build        # bundles into dist/ (Firefox) and dist-chromium/ (esbuild, unminified)
 pnpm lint:ext     # web-ext lint on dist/
 pnpm package      # web-ext build: web-ext-artifacts/snapii-<version>.zip
+pnpm package:chromium     # the same for dist-chromium/: snapii-chromium-<version>.zip
 pnpm start        # fresh Firefox profile with dist/ loaded (add --start-url <url>)
 ```
 
@@ -57,7 +58,9 @@ are the ones in `spike.ts`).
   that density without the zoom, as in Firefox.
 - **C-D3 Download from a `data:` URL.** A service worker has no object URLs;
   `downloads.download` takes the SVG as a `data:` URL, so there is nothing to
-  revoke and no state a worker restart could lose.
+  revoke and no state a worker restart could lose. `download()` resolves
+  before a Save-as dialog is answered there, so the save asks for the
+  download's state until it is complete or interrupted.
 - **C-D4 Offscreen document on demand.** The Tesseract worker and the
   clipboard write for non-secure pages need a document. It is created for a
   request and closed after the last one in flight.

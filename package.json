@@ -17,6 +17,7 @@
     "build": "node scripts/build.mjs",
     "lint:ext": "web-ext lint --source-dir dist",
     "package": "web-ext build --source-dir dist --artifacts-dir web-ext-artifacts --overwrite-dest",
+    "package:chromium": "web-ext build --source-dir dist-chromium --artifacts-dir web-ext-artifacts --filename snapii-chromium-{version}.zip --overwrite-dest",
     "start": "web-ext run --firefox=/Applications/Firefox.app/Contents/MacOS/firefox --source-dir dist",
     "drive": "node tools/drive/cli.mjs",
     "test:glue:chromium": "node scripts/build.mjs && node --test \"tests/glue-chromium/*.test.mjs\""

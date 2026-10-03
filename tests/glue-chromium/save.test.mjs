@@ -121,6 +121,26 @@ test("the folder and JPEG settings: the file lands in the sub-folder with a JPEG
   }
 });
 
+test("Ask where to save, dialog cancelled: the page says the SVG was not saved, and no file exists", async () => {
+  // Headless Chromium has no file dialog: every saveAs download ends as a
+  // cancelled one (C16 in src/shared/spike.ts), which is the case under test.
+  await g.setSettings({ saveAs: true });
+  try {
+    await g.open(PAGE);
+    const before = g.svgFiles();
+    await g.startOverlay();
+    await g.click(130, 150);
+    await g.key("Enter");
+    assert.equal(
+      await g.until(() => g.toast(), "the toast"),
+      "The SVG was not saved (download failed or was cancelled)",
+    );
+    assert.deepEqual(g.svgFiles(), before);
+  } finally {
+    await g.background(() => chrome.storage.sync.clear());
+  }
+});
+
 test("text in a closed shadow tree is in the text layer", async () => {
   await g.open(PAGE);
   await g.content(`

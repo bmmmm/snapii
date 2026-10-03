@@ -57,7 +57,9 @@ viewport and the save after scrolling, JPEG, closed shadow trees, Copy text on
 a secure and a non-secure origin and Copy link (read back from the
 clipboard), OCR through the offscreen document, the popup on a browser page,
 the read-only shortcut section, the folder rules against the real download
-API, a save across a service-worker restart, and the toolbar notice.
+API, a save across a service-worker restart, the toolbar notice, and a
+cancelled Save-as dialog (headless Chromium has no file dialog, so every
+"Ask where to save" download ends as a cancelled one).
 
 Human steps there (load `dist-chromium/` via `chrome://extensions` → Developer
 mode → Load unpacked):
@@ -67,8 +69,9 @@ mode → Load unpacked):
   only fire the command as an event). On `chrome://extensions` the toolbar
   button shows "×" and the reason for three seconds.
 - **C2h: Save-as dialog.** With "Ask where to save" on, save: the browser's
-  dialog opens; leave it open for a minute, then save: the file is complete.
-  Cancel it on a second try: the toast says the SVG was not saved.
+  dialog opens and no toast shows yet; leave it open for a minute, then save:
+  the toast names the file and the file is complete. Cancel it on a second
+  try: the toast says the SVG was not saved.
 - **C3h: real display.** On a HiDPI screen and at 100 % and 125 % zoom, save
   an element: text layer and picture line up in the opened file.
 - **C4h: toolbar icon.** The snapii icon shows in the toolbar and in

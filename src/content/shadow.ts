@@ -7,15 +7,13 @@
 
 type GeckoElement = Element & { openOrClosedShadowRoot?: ShadowRoot | null };
 type GeckoSlottable = (Element | Text) & { openOrClosedAssignedSlot?: HTMLSlotElement | null };
-type WithDomApi = typeof globalThis & {
-  browser?: { dom?: { openOrClosedShadowRoot(el: Element): ShadowRoot | null } };
-};
 
 export function shadowRootOf(el: Element): ShadowRoot | null {
   const gecko = (el as GeckoElement).openOrClosedShadowRoot;
   if (gecko !== undefined) return gecko;
   if (el.shadowRoot) return el.shadowRoot;
-  const dom = (globalThis as WithDomApi).browser?.dom;
+  // Page context has no `browser`, Firefox's has no `dom`.
+  const dom = typeof browser === "undefined" ? undefined : (browser.dom as typeof browser.dom | undefined);
   if (!dom) return null;
   try {
     return dom.openOrClosedShadowRoot(el);
@@ -28,8 +26,8 @@ export function shadowRootOf(el: Element): ShadowRoot | null {
 /** The slot `node` is assigned to, also inside a closed tree. */
 export function assignedSlotOf(node: Node): HTMLSlotElement | null {
   const slottable = node as GeckoSlottable;
-  const slot = slottable.openOrClosedAssignedSlot ?? slottable.assignedSlot;
-  if (slot) return slot;
+  if (slottable.openOrClosedAssignedSlot !== undefined) return slottable.openOrClosedAssignedSlot;
+  if (slottable.assignedSlot) return slottable.assignedSlot;
   // assignedSlot is null for a closed tree: there the slots are asked instead.
   const host = node.parentNode;
   if (host?.nodeType !== 1) return null;
