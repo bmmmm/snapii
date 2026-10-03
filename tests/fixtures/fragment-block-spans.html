@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <title>fragment block spans</title>
+    <style>
+      body { margin: 0; padding: 0 20px; font: 16px/1.5 serif; }
+      .spacer { height: 2500px; }
+      article { margin-bottom: 40px; }
+      a { color: inherit; text-decoration: none; }
+      .block { display: block; }
+      .headline { font-size: 22px; }
+    </style>
+    <!-- fragment-native.spec: news teasers whose kicker and headline are
+         <span>s laid out as blocks inside one link (spiegel.de, 2026-10-03).
+         By tag they are one run of inline text; to a browser's text-fragment
+         search they are two blocks, and an exact match never crosses a block.
+         #t1 has blanks between the two spans, as templates leave them; the
+         others have none, as a script-rendered page has. #t1 and #t2 have
+         kickers of their own, #t3 and #t4 share theirs. -->
+    <script type="application/json" id="expect">
+      {
+        "capture": "#t1",
+        "lines": ["CDU vs. Linke in Berlin", "Bratwurst-Wahlkampf am Stadtrand, Robin-Hood-Träume im Zentrum"],
+        "links": [
+          {
+            "text": "CDU vs. Linke in Berlin Bratwurst-Wahlkampf am Stadtrand, Robin-Hood-Träume im Zentrum",
+            "href": "/a"
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <div class="spacer"></div>
+    <article id="t1">
+      <a href="/a">
+        <span class="block">CDU vs. Linke in Berlin</span>
+        <span class="block headline">Bratwurst-Wahlkampf am Stadtrand, Robin-Hood-Träume im Zentrum</span>
+      </a>
+    </article>
+    <div class="spacer"></div>
+    <article id="t2">
+      <a href="/b"
+        ><span class="block">Lone-Star-Zecke</span
+        ><span class="block headline">Ein Stich kann Ihnen das Essen verderben</span></a
+      >
+    </article>
+    <div class="spacer"></div>
+    <article id="t3">
+      <a href="/c"
+        ><span class="block">Kommentar</span
+        ><span class="block headline">Warum der Herbst die beste Jahreszeit ist</span></a
+      >
+    </article>
+    <div class="spacer"></div>
+    <article id="t4">
+      <a href="/d"
+        ><span class="block">Kommentar</span
+        ><span class="block headline">Weshalb niemand mehr Briefe schreibt</span></a
+      >
+    </article>
+    <div class="spacer"></div>
+  </body>
+</html>
