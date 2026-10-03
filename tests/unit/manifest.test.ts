@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
+import { manifestFor } from "../../src/shared/manifest.ts";
 
 const manifest = JSON.parse(readFileSync(new URL("../../src/manifest.json", import.meta.url), "utf8"));
 
@@ -49,4 +50,57 @@ test("manifest: the toolbar button opens popup.html; the shortcut is its own com
   // Declared without a key, so a user can bind "open the popup" in about:addons.
   assert.deepEqual(manifest.commands._execute_action, { description: "Open the snapii menu" });
   assert.deepEqual(Object.keys(manifest.commands).sort(), ["_execute_action", "start-capture"]);
+});
+
+test("manifest for Firefox: the source manifest with the package version, nothing else changed", () => {
+  assert.deepEqual(manifestFor("firefox", manifest, "1.2.3"), { ...manifest, version: "1.2.3" });
+});
+
+test("manifest for Chromium: a service worker, the offscreen permission, no host access", () => {
+  const chromium = manifestFor("chromium", manifest, "1.2.3");
+  assert.equal(chromium.version, "1.2.3");
+  assert.deepEqual(chromium.background, { service_worker: "background.js" });
+  assert.deepEqual(chromium.permissions, [
+    "activeTab",
+    "scripting",
+    "downloads",
+    "clipboardWrite",
+    "storage",
+    "offscreen",
+  ]);
+  assert.equal(chromium.host_permissions, undefined);
+  assert.equal(chromium.optional_host_permissions, undefined);
+  assert.equal(chromium.content_scripts, undefined);
+});
+
+test("manifest for Chromium: no Gecko block, a minimum version, PNG icons", () => {
+  const chromium = manifestFor("chromium", manifest, "1.2.3");
+  assert.equal(chromium.browser_specific_settings, undefined);
+  // The Chromium facts in src/shared/spike.ts were measured on 151 and 153.
+  assert.equal(chromium.minimum_chrome_version, "151");
+  const icons = {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png",
+  };
+  assert.deepEqual(chromium.icons, icons);
+  assert.deepEqual(chromium.action, { ...manifest.action, default_icon: icons });
+  for (const file of Object.values(icons)) {
+    assert.ok(existsSync(new URL(`../../src/${file}`, import.meta.url)), `${file} exists`);
+  }
+});
+
+test("manifest for Chromium: commands, popup, options page and CSP are the Firefox ones", () => {
+  const chromium = manifestFor("chromium", manifest, "1.2.3");
+  for (const key of [
+    "manifest_version",
+    "name",
+    "description",
+    "commands",
+    "options_ui",
+    "content_security_policy",
+  ]) {
+    assert.deepEqual(chromium[key], manifest[key], key);
+  }
 });

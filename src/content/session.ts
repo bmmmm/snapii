@@ -26,11 +26,15 @@ import { createHtml, styleHost } from "./overlay/styles.ts";
 import { showToast } from "./overlay/toolbar.ts";
 
 type SaveError = Extract<SaveResponse, { ok: false }>["error"];
+/** Why Save is unavailable for a selection that is not wholly visible, where only the viewport can be captured. */
+export const VIEWPORT_ONLY_NOTICE =
+  "Only what is visible can be saved in this browser. Scroll the selection fully into view or select a smaller area";
 
 const ERROR_TOAST: Record<SaveError, string> = {
   "needs-host-permission": "snapii has no permission to capture this page",
   "capture-failed": "Capture failed. Try again or select another area",
   "too-large": "This area is too large to capture. Select a smaller one",
+  "outside-viewport": VIEWPORT_ONLY_NOTICE,
   "download-failed": "The SVG was not saved (download failed or was cancelled)",
 };
 

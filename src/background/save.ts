@@ -10,6 +10,7 @@ import type {
   DocRect,
   ImageArea,
   OcrOutput,
+  PageMeta,
   RasterTile,
   RenderInput,
   SaveResponse,
@@ -17,11 +18,18 @@ import type {
   TextRun,
   ToContent,
 } from "../shared/types.ts";
-import { type CaptureResult, TooLargeError } from "./capture.ts";
+import { type CaptureResult, OutsideViewportError, TooLargeError } from "./capture.ts";
 
 export interface SaveDeps {
   loadSettings(): Promise<Settings>;
-  captureRegion(tabId: number, windowId: number, region: DocRect, settings: Settings): Promise<CaptureResult>;
+  /** `page` is the viewport and density the content script saw (the Chromium capture needs them). */
+  captureRegion(
+    tabId: number,
+    windowId: number,
+    region: DocRect,
+    settings: Settings,
+    page: PageMeta,
+  ): Promise<CaptureResult>;
   /** Sends `message` to the tab's top frame (where content.js runs). */
   tellTab(tabId: number, message: ToContent): Promise<unknown>;
   recognize(
@@ -35,6 +43,12 @@ export interface SaveDeps {
 }
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+function captureError(e: unknown): Extract<SaveResponse, { ok: false }>["error"] {
+  if (e instanceof TooLargeError) return "too-large";
+  if (e instanceof OutsideViewportError) return "outside-viewport";
+  return "capture-failed";
+}
 
 export async function save(
   model: CaptureModel,
@@ -52,13 +66,9 @@ export async function save(
 
   let captured: CaptureResult;
   try {
-    captured = await deps.captureRegion(tab.id, tab.windowId, model.region, settings);
+    captured = await deps.captureRegion(tab.id, tab.windowId, model.region, settings, model.page);
   } catch (e) {
-    return {
-      ok: false,
-      error: e instanceof TooLargeError ? "too-large" : "capture-failed",
-      detail: errorText(e),
-    };
+    return { ok: false, error: captureError(e), detail: errorText(e) };
   }
 
   // The last tile is taken (captureRegion returns after it), so the page may

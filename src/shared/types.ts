@@ -143,7 +143,12 @@ export type SaveResponse =
   | { ok: true; filename: string }
   | {
       ok: false;
-      error: "needs-host-permission" | "capture-failed" | "too-large" | "download-failed";
+      error:
+        | "needs-host-permission"
+        | "capture-failed"
+        | "too-large"
+        | "outside-viewport"
+        | "download-failed";
       detail?: string;
     };
 
