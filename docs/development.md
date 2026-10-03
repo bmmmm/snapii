@@ -40,10 +40,7 @@ pnpm start        # fresh Firefox profile with dist/ loaded (add --start-url <ur
 
 The Chromium build is the same code on another platform adapter
 (`src/background/platform.ts`). Its decisions rest on the facts measured on
-Chromium 151 and 153 in `SPIKE_CHROMIUM` (`src/shared/spike.ts`);
-[chromium-port.md](chromium-port.md) has the research behind them, with
-sources (it numbers its own measurements C1 to C20; the C numbers in the code
-are the ones in `spike.ts`).
+Chromium 151 and 153 in `SPIKE_CHROMIUM` (`src/shared/spike.ts`).
 
 - **C-D1 Viewport only.** `captureVisibleTab` takes the viewport and nothing
   beyond it. A region that is wholly visible is saved from one capture,
