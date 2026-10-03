@@ -253,8 +253,8 @@ async function initShortcut(): Promise<void> {
   try {
     platform = (await browser.runtime.getPlatformInfo()).os === "mac" ? "mac" : "other";
     await readShortcut();
-    if (typeof browser.commands.update === "function") shortcutInput.disabled = false;
-    else showShortcutReadOnly();
+    if (TARGET === "chromium") showShortcutReadOnly();
+    else shortcutInput.disabled = false;
   } catch (e) {
     sayShortcut(`Could not read the shortcut: ${errorText(e)}`);
   }

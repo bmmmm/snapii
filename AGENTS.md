@@ -42,8 +42,9 @@ Read first: `src/shared/types.ts` (every data contract), then
   `src/background/platform.ts`: `main.ts` fills it for Firefox's event page,
   `chromium/main.ts` for Chromium's service worker. Pages and the content
   script are one source for both and read `TARGET` from
-  `src/shared/target.ts`. No browser sniffing anywhere else, and a change for
-  Chromium must leave what Firefox does untouched.
+  `src/shared/target.ts`, as do the modules they share with the background
+  (wording, folder rules). No probing for the browser at run time, and a
+  change for Chromium must leave what Firefox does untouched.
 - No host permissions and no `content_scripts`. The content script is
   injected on demand under `activeTab` (decision D1, `docs/development.md`); a feature
   that needs more is a design question, not an implementation detail.

@@ -13,6 +13,7 @@ import type {
   PageMeta,
   RasterTile,
   RenderInput,
+  SaveError,
   SaveResponse,
   Settings,
   TextRun,
@@ -44,7 +45,7 @@ export interface SaveDeps {
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
-function captureError(e: unknown): Extract<SaveResponse, { ok: false }>["error"] {
+function captureError(e: unknown): SaveError {
   if (e instanceof TooLargeError) return "too-large";
   if (e instanceof OutsideViewportError) return "outside-viewport";
   return "capture-failed";

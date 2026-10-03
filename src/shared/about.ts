@@ -3,6 +3,8 @@
 // tells builds apart when debugging (dist/build-info.json is written by
 // scripts/build.mjs).
 
+import { TARGET } from "./target.ts";
+
 export interface BuildInfo {
   commit: string | null;
   dirty: boolean;
@@ -45,12 +47,14 @@ export async function showAbout(el: HTMLElement): Promise<void> {
   } catch {
     // A build without the file (or a broken one) still shows the version.
   }
-  let label: string | null;
-  try {
-    label = `Firefox ${(await browser.runtime.getBrowserInfo()).version}`;
-  } catch {
-    // Not available outside Firefox.
-    label = chromiumLabel(navigator);
+  let label: string | null = null;
+  if (TARGET === "chromium") label = chromiumLabel(navigator);
+  else {
+    try {
+      label = `Firefox ${(await browser.runtime.getBrowserInfo()).version}`;
+    } catch {
+      // The version line is for debugging only: better without the browser than none.
+    }
   }
   el.textContent = aboutLine(version, build, label);
 }

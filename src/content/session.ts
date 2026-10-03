@@ -11,6 +11,7 @@ import type {
   CaptureModel,
   FragmentStatus,
   PageMeta,
+  SaveError,
   SaveResponse,
   Settings,
 } from "../shared/types.ts";
@@ -26,7 +27,6 @@ import { viewportSize, visibleViewport } from "./overlay/pick.ts";
 import { createHtml, styleHost } from "./overlay/styles.ts";
 import { showToast } from "./overlay/toolbar.ts";
 
-type SaveError = Extract<SaveResponse, { ok: false }>["error"];
 /** Why Save is unavailable for a selection that is not wholly visible, where only the viewport can be captured. */
 export const VIEWPORT_ONLY_NOTICE =
   "Only what is visible can be saved in this browser. Scroll the selection fully into view or select a smaller area";

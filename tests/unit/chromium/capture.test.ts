@@ -15,7 +15,10 @@ const PAGE = {
 const selected = { active: true, windowId: WINDOW };
 
 /** Stubbed browser: a 3000 × 2139 picture of the viewport (device scale factor 2 at zoom 1.5). */
-function deps(tabAt: (n: number) => { active: boolean; windowId?: number } = () => selected) {
+function deps(
+  tabAt: (n: number) => { active: boolean; windowId?: number } = () => selected,
+  scrollAfter = PAGE.scroll,
+) {
   const log: string[] = [];
   let gets = 0;
   const d: ViewportCaptureDeps = {
@@ -33,11 +36,15 @@ function deps(tabAt: (n: number) => { active: boolean; windowId?: number } = () 
     async getZoom() {
       return 1.5;
     },
+    async getScroll() {
+      log.push("scroll");
+      return scrollAfter;
+    },
     async crop(dataURL, plan, settings) {
       assert.equal(dataURL, "data:viewport");
       const crop = plan({ width: 3000, height: 2139 });
       log.push(`crop:${settings.format}:${JSON.stringify(crop.source)}`);
-      return { dataURL: "data:cropped", crop };
+      return { dataURL: "data:cropped", planned: crop };
     },
   };
   return { d, log };
@@ -51,6 +58,7 @@ test("captureViewportRegion: one capture of the viewport, cropped to the region"
     "get:ok",
     "capture",
     "get:ok",
+    "scroll",
     'crop:png:{"x":300,"y":600,"width":900,"height":600}',
   ]);
   assert.deepEqual(result.tiles, [
@@ -103,4 +111,18 @@ test("captureViewportRegion: the JPEG setting reaches the crop, which encodes th
   );
   assert.equal(result.tiles[0]?.format, "jpeg");
   assert.match(log.at(-1) ?? "", /^crop:jpeg:/);
+});
+
+test("captureViewportRegion: a page that scrolled between its measurement and the capture fails the capture", async () => {
+  // The crop would cut the pixels of another place out of the picture.
+  const { d, log } = deps(() => selected, { x: 0, y: 1040 });
+  const region = { x: 100, y: 1200, width: 300, height: 200 };
+  await assert.rejects(
+    captureViewportRegion(TAB, WINDOW, region, DEFAULT_SETTINGS, PAGE, d),
+    /the page scrolled during the capture/,
+  );
+  assert.equal(
+    log.some((l) => l.startsWith("crop")),
+    false,
+  );
 });

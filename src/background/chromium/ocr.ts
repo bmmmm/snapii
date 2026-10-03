@@ -7,7 +7,7 @@ import { MAX_AREAS, ocrInfo } from "../../shared/ocr.ts";
 import type { OffscreenRequest } from "../../shared/offscreen.ts";
 import type { ImageArea, OcrOutput, RasterTile, TextRun } from "../../shared/types.ts";
 
-const FAILED = { areas: 0, recognized: 0, truncated: false, words: 0 };
+const NOTHING = { areas: 0, recognized: 0, truncated: false, words: 0 };
 
 /** Never throws, like recognizeAreas: a failure is a status with no runs. */
 export async function recognizeInOffscreen(
@@ -17,7 +17,7 @@ export async function recognizeInOffscreen(
   ask: (request: OffscreenRequest) => Promise<unknown>,
 ): Promise<OcrOutput> {
   const t0 = performance.now();
-  if (areas.length === 0) return { runs: [], info: ocrInfo("no-areas", { ...FAILED, ms: 0 }) };
+  if (areas.length === 0) return { runs: [], info: ocrInfo("no-areas", { ...NOTHING, ms: 0 }) };
   try {
     return (await ask({
       to: "offscreen",
@@ -31,7 +31,7 @@ export async function recognizeInOffscreen(
     return {
       runs: [],
       info: ocrInfo("failed", {
-        ...FAILED,
+        ...NOTHING,
         areas: Math.min(areas.length, MAX_AREAS),
         truncated: areas.length > MAX_AREAS,
         ms: performance.now() - t0,

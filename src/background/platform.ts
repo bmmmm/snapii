@@ -5,7 +5,7 @@
 import type { FlagDeps } from "./flag.ts";
 import type { SaveDeps } from "./save.ts";
 
-export interface Platform {
+export interface BrowserPlatform {
   captureRegion: SaveDeps["captureRegion"];
   recognize: SaveDeps["recognize"];
   saveSvg: SaveDeps["saveSvg"];

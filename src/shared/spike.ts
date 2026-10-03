@@ -98,8 +98,15 @@ export const SPIKE_CHROMIUM = {
 
   // C11: commands.update, commands.reset and runtime.getBrowserInfo do not exist.
   shortcutChangeableByExtension: false,
+  // C12: content scripts have no openOrClosedShadowRoot on elements; the
+  // extension API dom.openOrClosedShadowRoot(element) reaches closed roots.
+  closedShadowRootsThrough: "dom-api",
   // C13: action.setTitle rejects a null title; a null badge text clears the badge.
   actionTitleNullable: false,
   // C14: downloads.download saved a 40 MB data: URL from the service worker.
   downloadPath: "data-url",
+  // C16: download() resolves as soon as the download exists, before a Save-as
+  // dialog is answered; a cancel is the state "interrupted" with the error
+  // USER_CANCELED (headless, where no dialog can open, every saveAs ends so).
+  downloadResolvesBeforeSaveAs: true,
 } as const;
