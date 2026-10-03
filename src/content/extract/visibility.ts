@@ -5,7 +5,8 @@
 // a page with thousands of text nodes reads each style once.
 import { intersect, translate, UNBOUNDED } from "../../shared/geometry.ts";
 import type { DocRect } from "../../shared/types.ts";
-import { closestComposed, type FrameContext, flatParent, shadowRootOf } from "./flat-tree.ts";
+import { shadowRootOf } from "../shadow.ts";
+import { closestComposed, type FrameContext, flatParent } from "./flat-tree.ts";
 
 /** Maps a frame's client coordinates to top-level document coordinates. */
 export interface FrameGeometry {

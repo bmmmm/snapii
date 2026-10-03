@@ -63,7 +63,7 @@ function sliceRect(s: RunSource): DocRect | null {
 /**
  * A5: the baseline at the start of a run, from a zero-size inline-block (an
  * empty inline-block sits on the baseline). It goes right after the run's
- * first character, wrapped together with it in a nowrap span: placed exactly
+ * first character, wrapped together with its word in a nowrap span: placed exactly
  * at a soft wrap point it would stay on the previous line, and placed before
  * the first character it would cancel ::first-letter. The text node is split
  * for the probe and joined again afterwards.
@@ -81,16 +81,21 @@ function probeBaseline(s: RunSource): number {
     return m.b * origin.x + m.d * origin.y + m.f + docOffset(doc).dy;
   }
   const first = s.node.splitText(s.start);
-  const rest = first.splitText(Math.min(first.length, (first.data.codePointAt(0) ?? 0) > 0xffff ? 2 : 1));
+  const word = first.splitText(Math.min(first.length, (first.data.codePointAt(0) ?? 0) > 0xffff ? 2 : 1));
+  // The rest of the first word goes into the nowrap span too: Chromium takes
+  // the probe (an atomic inline) as a wrap opportunity and would leave the
+  // first character alone at the end of the previous line.
+  const space = word.data.search(/\s/);
+  const rest = word.splitText(space < 0 ? word.length : space);
   const wrap = doc.createElement("snapii-probe");
   wrap.style.cssText = "text-wrap-mode:nowrap";
   const probe = doc.createElement("snapii-probe");
   probe.style.cssText = "display:inline-block;width:0;height:0;margin:0;padding:0;border:0";
   first.before(wrap);
-  wrap.append(first, probe);
+  wrap.append(first, probe, word);
   const y = probe.getBoundingClientRect().top + docOffset(doc).dy;
   wrap.remove();
-  s.node.appendData(first.data + rest.data);
+  s.node.appendData(first.data + word.data + rest.data);
   rest.remove();
   return y;
 }

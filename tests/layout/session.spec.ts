@@ -78,9 +78,14 @@ async function load(page: Page, fixture = "overlay.html"): Promise<void> {
   });
 }
 
-async function begin(page: Page, reply: Reply, settings: Settings = DEFAULT_SETTINGS): Promise<void> {
+async function begin(
+  page: Page,
+  reply: Reply,
+  settings: Settings = DEFAULT_SETTINGS,
+  viewportOnly = false,
+): Promise<void> {
   await page.evaluate(
-    ({ settings, reply, now }) => {
+    ({ settings, reply, now, viewportOnly }) => {
       const w = window as unknown as TestWindow;
       w.__calls = [];
       w.__clips = [];
@@ -101,6 +106,7 @@ async function begin(page: Page, reply: Reply, settings: Settings = DEFAULT_SETT
       const start = w.__snapii.startSession as typeof startSession;
       w.__session = start({
         settings,
+        viewportOnly,
         now: () => new Date(now),
         async sendSave(model, onCaptured) {
           w.__onCaptured = onCaptured;
@@ -125,7 +131,7 @@ async function begin(page: Page, reply: Reply, settings: Settings = DEFAULT_SETT
         },
       });
     },
-    { settings, reply, now: NOW },
+    { settings, reply, now: NOW, viewportOnly },
   );
 }
 
@@ -255,7 +261,11 @@ test("(d) an ok reply removes the host and shows the saved toast", async ({ page
 });
 
 /** Clicks a toolbar button and waits for its toast (none: does not wait). */
-async function clickButton(page: Page, action: "copy-text" | "copy-link", toast?: string): Promise<void> {
+async function clickButton(
+  page: Page,
+  action: "save" | "copy-text" | "copy-link",
+  toast?: string,
+): Promise<void> {
   const button = await page.evaluate((action) => {
     const b = document
       .querySelector("snapii-overlay")
@@ -975,4 +985,74 @@ test("save on an SVG document: the hover shield is an HTML element and the save 
     await page.evaluate(() => (window as unknown as TestWindow & { __shieldNs: string[] }).__shieldNs),
   ).toEqual(["http://www.w3.org/1999/xhtml"]);
   await expect.poll(() => shields(page)).toBe(0);
+});
+
+// Chromium captures the viewport and nothing else: there the session runs
+// with viewportOnly, and Save answers only for a selection that is wholly
+// visible.
+const NOTICE =
+  "Only what is visible can be saved in this browser. Scroll the selection fully into view or select a smaller area";
+
+/** What the toolbar's Save button and the overlay's hint say right now. */
+function saveState(page: Page): Promise<{ unavailable: boolean; title: string; hint: string | null }> {
+  return page.evaluate(() => {
+    const root = document.querySelector("snapii-overlay")?.shadowRoot;
+    const save = root?.querySelector<HTMLElement>('.toolbar button[data-action="save"]');
+    const hint = root?.querySelector<HTMLElement>(".hint");
+    return {
+      unavailable: save?.getAttribute("aria-disabled") === "true",
+      title: save?.title ?? "",
+      hint: hint && !hint.hidden ? hint.textContent : null,
+    };
+  });
+}
+
+/** Scrolls so #para (document y 220 to 300) is cut by the top of the viewport, then picks it. */
+async function pickCutParagraph(page: Page, viewportOnly: boolean): Promise<void> {
+  await load(page);
+  await page.evaluate(() => scrollTo(0, 250));
+  await begin(page, { ok: true, filename: "x.svg" }, DEFAULT_SETTINGS, viewportOnly);
+  await page.mouse.click(250, 30);
+  await expect.poll(() => toolbarRect(page)).not.toBeNull();
+}
+
+test("viewport-only: a selection reaching beyond the viewport cannot be saved, and the overlay says why", async ({
+  page,
+}) => {
+  await pickCutParagraph(page, true);
+  expect(await saveState(page)).toEqual({ unavailable: true, title: NOTICE, hint: NOTICE });
+  await page.keyboard.press("Enter");
+  await clickButton(page, "save");
+  // Long enough for a save to have reached sendSave (extraction plus two frames).
+  await page.waitForTimeout(300);
+  expect(await calls(page)).toEqual([]);
+  expect((await hostState(page)).display).not.toBe("none");
+});
+
+test("viewport-only: scrolling the selection into view makes Save available again", async ({ page }) => {
+  await pickCutParagraph(page, true);
+  await page.evaluate(() => scrollTo(0, 100));
+  await expect.poll(() => saveState(page)).toEqual({ unavailable: false, title: "", hint: null });
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await calls(page)).length).toBe(1);
+  const [call] = await calls(page);
+  expect(call?.model.region).toEqual({ x: 150, y: 220, width: 400, height: 80 });
+});
+
+test("viewport-only: Copy text needs no pixels and works for a selection beyond the viewport", async ({
+  page,
+}) => {
+  await pickCutParagraph(page, true);
+  await clickButton(page, "copy-text", "Copied text");
+  const clips = await page.evaluate(() => (window as unknown as TestWindow).__clips);
+  expect(clips.map((c) => c.plain)).toEqual(["Some paragraph text with a link inside."]);
+});
+
+test("without viewport-only the same selection is saved (Firefox captures beyond the viewport)", async ({
+  page,
+}) => {
+  await pickCutParagraph(page, false);
+  expect(await saveState(page)).toEqual({ unavailable: false, title: "", hint: null });
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await calls(page)).length).toBe(1);
 });

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { TooLargeError } from "../../src/background/capture.ts";
+import { OutsideViewportError, TooLargeError } from "../../src/background/capture.ts";
 import { type SaveDeps, save } from "../../src/background/save.ts";
 import { makeFilename } from "../../src/shared/filename.ts";
 import { OCR_DISABLED, ocrInfo } from "../../src/shared/ocr.ts";
@@ -106,6 +106,30 @@ test("save: a failed capture sends no `captured` (the overlay comes back for a r
     assert.equal(reply.ok, false);
     assert.deepEqual(log, ["capture:start"]);
   }
+});
+
+test("save: each capture failure reaches the content script under its own name", async () => {
+  for (const [error, name] of [
+    [new TooLargeError("too big"), "too-large"],
+    [new OutsideViewportError(), "outside-viewport"],
+    [new Error("tab changed during capture"), "capture-failed"],
+  ] as const) {
+    const { d } = deps({}, { capture: error });
+    const reply = await save(model(), TAB, d);
+    assert.deepEqual(reply, { ok: false, error: name, detail: error.message });
+  }
+});
+
+test("save: the capture gets the viewport and density the page reported", async () => {
+  const { d } = deps();
+  let seen: unknown;
+  d.captureRegion = async (_tabId, _windowId, _region, _settings, page) => {
+    seen = page;
+    return { tiles: [], scale: 1, zoom: 1 };
+  };
+  const m = model();
+  await save(m, TAB, d);
+  assert.deepEqual(seen, m.page);
 });
 
 test("save: a failed download after `captured` is still reported", async () => {

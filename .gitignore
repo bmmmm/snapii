@@ -2,6 +2,7 @@ node_modules/
 package-lock.json
 yarn.lock
 dist/
+dist-chromium/
 dist-test/
 web-ext-artifacts/
 test-results/

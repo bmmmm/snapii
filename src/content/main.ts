@@ -3,6 +3,7 @@
 // from registering a second listener; that injection's `start` message then
 // reaches the first one, which toggles the open session off.
 import { isToContent } from "../shared/messages.ts";
+import { VIEWPORT_ONLY } from "../shared/target.ts";
 import type { CapturedMessage, CaptureModel, SaveResponse, ToBackground } from "../shared/types.ts";
 import { writeClipboard } from "./clipboard.ts";
 import { sessionToggle } from "./session.ts";
@@ -27,6 +28,7 @@ function sendSave(model: CaptureModel, captured: (message: CapturedMessage) => v
 if (!scope[GUARD]) {
   scope[GUARD] = true;
   const toggle = sessionToggle({
+    viewportOnly: VIEWPORT_ONLY,
     sendSave,
     writeClipboard: (data) => writeClipboard(data),
     now: () => new Date(),
