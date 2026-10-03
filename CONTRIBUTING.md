@@ -157,8 +157,8 @@ Every behavioural change needs a test that fails without it.
 - **Chromium glue** (`tests/glue-chromium/*.test.mjs`, `pnpm test:glue:chromium`):
   `dist-chromium/` in Playwright's Chromium, driven by `tools/chromium/driver.mjs`:
   popup, save, copy, OCR through the offscreen document, the options page, a
-  service-worker restart. Local as well; run it for the same paths and for
-  `src/offscreen/`.
+  service-worker restart. Runs in CI; run it locally for the same paths and
+  for `src/offscreen/`.
 - **Manual** — what no automation can check (real keyboard, real display,
   other apps' clipboards, other viewers) is in
   [tests/MANUAL-CHECKLIST.md](tests/MANUAL-CHECKLIST.md).
