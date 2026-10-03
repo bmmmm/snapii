@@ -3,8 +3,9 @@
 <h1 align="center">snapii</h1>
 
 <p align="center"><b>Screenshots in which the text stays text.</b><br>
-A Firefox extension that saves a region of a web page as one SVG file —
-selectable, copyable, searchable text and clickable links on top of the picture.</p>
+A Firefox extension (Chromium: experimental) that saves a region of a web page
+as one SVG file — selectable, copyable, searchable text and clickable links on
+top of the picture.</p>
 
 Classic screenshots freeze text into pixels. snapii reads text, font, position
 and links straight from the page and lays them invisibly over the image; only
@@ -16,7 +17,7 @@ Status: **beta** (0.1.0) — see [Install](#install).
 ## Features
 
 - **Pick or drag** — hover an element and click, walk up/down with ↑/↓, or drag
-  any rectangle (also beyond the visible part of the page).
+  any rectangle (in Firefox also beyond the visible part of the page).
 - **Save SVG** — picture + invisible text layer + links + metadata (source URL,
   time) in one file.
 - **Copy text** — the selection as clean text and simple HTML, without hidden
@@ -27,7 +28,8 @@ Status: **beta** (0.1.0) — see [Install](#install).
   canvases become selectable too, recognised offline (German + English).
   Real page text always wins.
 - **Your shortcut** — Alt+Shift+S by default starts a capture at once,
-  changeable right in snapii's settings.
+  changeable right in snapii's settings (in Chromium: in the browser's
+  shortcut settings).
 - **A small menu on the button** — start a capture, switch OCR, the
   text-fragment link and the save-as dialog on or off, and pick the save
   folder, right there.
@@ -63,8 +65,8 @@ To update: `git pull && pnpm build`, then **Reload** in `about:debugging`.
 
 `pnpm build` also writes a build for Chromium-based browsers to
 `dist-chromium/`. Open `chrome://extensions`, switch on **Developer mode**,
-click **Load unpacked** and pick the `dist-chromium` folder. It is not in the
-Chrome Web Store.
+click **Load unpacked** and pick the `dist-chromium` folder. Needs Chromium 151
+or newer. It is not in the Chrome Web Store.
 
 What differs from Firefox:
 
@@ -123,5 +125,6 @@ GPL-3.0-or-later ([LICENSE](LICENSE), third-party code in [NOTICE](NOTICE)).
 pnpm install
 pnpm check && pnpm test   # types, lint, unit and layout tests
 pnpm test:glue            # end-to-end in the real Firefox (headless)
+pnpm test:glue:chromium   # end-to-end in Playwright's Chromium
 pnpm build && pnpm start  # try it in a fresh Firefox profile
 ```
