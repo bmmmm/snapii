@@ -22,9 +22,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
-      # Playwright's own Firefox build; the Marionette glue suite needs a
-      # release Firefox and stays a local gate (pnpm test:glue).
-      - run: pnpm exec playwright install --with-deps firefox
+      # Playwright's own Firefox and Chromium builds for the layout suite; the
+      # glue suites drive a real extension and stay local gates (pnpm
+      # test:glue, pnpm test:glue:chromium).
+      - run: pnpm exec playwright install --with-deps firefox chromium
       - run: pnpm test
       - run: pnpm build
       - run: pnpm lint:ext

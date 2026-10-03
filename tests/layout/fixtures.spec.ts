@@ -28,6 +28,8 @@
 //   roundtrip?    false: the fixture is unsuitable for the SVG round-trip spec.
 //   reason?       free text: why the block deviates from the defaults
 //                 (roundtrip:false, baselineTolerance).
+//   engines?      {browserName: partial expect}. Overrides for one engine
+//                 ("chromium", "firefox"), merged over the block.
 //
 // Fixture hook: if the page defines window.beforeCollect, it is awaited
 // immediately before collection, inside the same page task chain (webfont.html
@@ -63,6 +65,7 @@ interface Expect {
   baselineTolerance?: Record<string, number>;
   roundtrip?: boolean;
   reason?: string;
+  engines?: Record<string, Partial<Expect>>;
 }
 
 const DIR = new URL("../fixtures/", import.meta.url);
@@ -97,7 +100,7 @@ const fixtures = readdirSync(DIR)
   .filter((f) => f.endsWith(".html") && !NOT_FIXTURES.has(f))
   .sort();
 
-function readExpect(file: string): Expect {
+function readExpect(file: string, engine?: string): Expect {
   const html = readFileSync(new URL(file, DIR), "utf8");
   const m = /<script type="application\/json" id="expect">([\s\S]*?)<\/script>/.exec(html);
   if (!m?.[1]) throw new Error(`${file}: no <script type="application/json" id="expect"> block`);
@@ -105,7 +108,7 @@ function readExpect(file: string): Expect {
   if (!exp.capture || !Array.isArray(exp.lines) || exp.lines.length === 0) {
     throw new Error(`${file}: expect needs capture and a non-empty lines array`);
   }
-  return exp;
+  return { ...exp, ...(engine ? exp.engines?.[engine] : undefined) };
 }
 
 const near = (a: number, b: number, tol = TOL) => Math.abs(a - b) <= tol;
@@ -156,8 +159,8 @@ test("every fixture from the table is present", () => {
 });
 
 for (const file of fixtures) {
-  test(file, async ({ page }) => {
-    const exp = readExpect(file);
+  test(file, async ({ page, browserName }) => {
+    const exp = readExpect(file, browserName);
     await page.goto(`/fixtures/${file}`);
     await page.addScriptTag({ path: "dist-test/harness.js" });
     const res = await page.evaluate(

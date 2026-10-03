@@ -4,6 +4,8 @@
 // same-origin iframes entered in place. Node-type checks use nodeType and
 // localName because instanceof fails across iframe realms.
 
+import { assignedSlotOf, shadowRootOf } from "../shadow.ts";
+
 const ELEMENT = 1;
 const TEXT = 3;
 const FRAGMENT = 11;
@@ -31,23 +33,13 @@ export interface WalkOptions {
   onOpaqueFrame?: (frame: Element, ctx: FrameContext) => void;
 }
 
-// openOrClosed* exist only in Firefox content scripts; page context (the
-// layout harness) falls back to the open-only properties.
-type GeckoElement = Element & { openOrClosedShadowRoot?: ShadowRoot | null };
-type GeckoSlottable = (Element | Text) & { openOrClosedAssignedSlot?: HTMLSlotElement | null };
-
-export function shadowRootOf(el: Element): ShadowRoot | null {
-  return (el as GeckoElement).openOrClosedShadowRoot ?? el.shadowRoot;
-}
-
 function isShadowRoot(node: Node | null): node is ShadowRoot {
   return node?.nodeType === FRAGMENT && "host" in node;
 }
 
 /** Parent in the flat tree: the assigned slot, else the parent element or shadow host. */
 export function flatParent(node: Node): Element | null {
-  const slottable = node as GeckoSlottable;
-  const slot = slottable.openOrClosedAssignedSlot ?? slottable.assignedSlot;
+  const slot = assignedSlotOf(node);
   if (slot) return slot;
   const p = node.parentNode;
   if (p?.nodeType === ELEMENT) return p as Element;

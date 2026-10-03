@@ -59,6 +59,22 @@ Add-on From File…**. Signed builds will be attached to the GitHub releases.
 
 To update: `git pull && pnpm build`, then **Reload** in `about:debugging`.
 
+### Chromium (experimental)
+
+`pnpm build` also writes a build for Chromium-based browsers to
+`dist-chromium/`. Open `chrome://extensions`, switch on **Developer mode**,
+click **Load unpacked** and pick the `dist-chromium` folder. It is not in the
+Chrome Web Store.
+
+What differs from Firefox:
+
+- **Save SVG takes what is visible.** Chromium lets an extension capture the
+  viewport only, so a selection that reaches beyond it cannot be saved: the
+  overlay says so, and scrolling the selection fully into view makes Save
+  available again. Copy text and Copy link work for any selection.
+- **The shortcut is changed in the browser**, at `chrome://extensions/shortcuts`
+  (the settings page shows the current one and links there).
+
 ## Use
 
 1. Click the snapii button, then **Capture region** (it has the focus, so

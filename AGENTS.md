@@ -9,9 +9,10 @@ short, imperative one.
 ```console
 pnpm install --frozen-lockfile   # pnpm only; a preinstall guard blocks npm/yarn
 pnpm check                       # tsc (src + tests) + biome — must pass
-pnpm test                        # unit (node --test) + layout (Playwright Firefox) — must pass
+pnpm test                        # unit (node --test) + layout (Playwright Firefox and Chromium), must pass
 pnpm test:glue                   # real extension in the installed Firefox via Marionette
-pnpm build                       # dist/ (esbuild, unminified for AMO review)
+pnpm test:glue:chromium          # real extension (dist-chromium/) in Playwright's Chromium
+pnpm build                       # dist/ (Firefox) and dist-chromium/ (esbuild, unminified for store review)
 pnpm lint:ext                    # web-ext lint on dist/
 pnpm drive help                  # one persistent headless Firefox, one command per call
 ```
@@ -37,6 +38,12 @@ Read first: `src/shared/types.ts` (every data contract), then
   structure, the `<snapii:capture>` record (`schema: 1`), the permissions, the
   `storage.sync` settings keys, the add-on id `snapii@qmmq.de`, and no network
   requests. Additive is fine; removing, renaming or retyping is not.
+- Two browsers, one code base. What differs in the background sits behind
+  `src/background/platform.ts`: `main.ts` fills it for Firefox's event page,
+  `chromium/main.ts` for Chromium's service worker. Pages and the content
+  script are one source for both and read `TARGET` from
+  `src/shared/target.ts`. No browser sniffing anywhere else, and a change for
+  Chromium must leave what Firefox does untouched.
 - No host permissions and no `content_scripts`. The content script is
   injected on demand under `activeTab` (decision D1, `docs/development.md`); a feature
   that needs more is a design question, not an implementation detail.
@@ -86,13 +93,24 @@ Read first: `src/shared/types.ts` (every data contract), then
   against the real API, so re-run it when Firefox changes.
 - **CI retries Playwright specs twice** (`playwright.config.ts`). A spec that
   passes only on retry is a bug, not noise.
+- **Chromium captures the viewport and nothing else** (C2/C5 in
+  `src/shared/spike.ts`): one `captureVisibleTab`, cropped in the service
+  worker. A region beyond the viewport is refused (`outside-viewport`), and
+  the overlay disables Save for it before that. Do not reach for the API's
+  `rect`/`scale` there: undocumented, and not Firefox's semantics.
+- **Chromium's service worker keeps no state and has no DOM**: no object
+  URLs, no `Worker`, no clipboard, no `devicePixelRatio`. The download goes
+  out as a `data:` URL; OCR and the clipboard fallback run in the offscreen
+  document, which exists only while a request is in flight
+  (`src/background/chromium/offscreen.ts`).
 - **Never widen the diff beyond the task.** Adjacent problems go into the PR's
   "Out of scope" section or into a new issue.
 
 ## Definition of done
 
-1. `pnpm check` and `pnpm test` pass; `pnpm test:glue` too when
-   `src/background/`, `src/content/`, the popup or the options page changed.
+1. `pnpm check` and `pnpm test` pass; `pnpm test:glue` and
+   `pnpm test:glue:chromium` too when `src/background/`, `src/content/`,
+   `src/offscreen/`, the popup or the options page changed.
 2. A test exists that fails without the change. Verify that — break the code
    on purpose, see it go red, restore — and name the fault and the check that
    caught it in the PR.

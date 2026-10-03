@@ -15,9 +15,11 @@ fail without it and whose scope is bounded can be reviewed in minutes.
 $ pnpm install                            # pnpm only — a preinstall guard blocks npm and yarn
 $ pnpm exec playwright install firefox    # once, for the layout tests
 $ pnpm check                              # tsc (src and tests) + biome
-$ pnpm test                               # unit tests, then layout tests in Playwright's Firefox
+$ pnpm exec playwright install chromium   # once, for the layout and the Chromium glue tests
+$ pnpm test                               # unit tests, then layout tests in Playwright's Firefox and Chromium
 $ pnpm test:glue                          # builds, then drives the real extension in Firefox
-$ pnpm build                              # bundles into dist/ (esbuild, unminified)
+$ pnpm test:glue:chromium                 # builds, then drives the real extension in Chromium
+$ pnpm build                              # bundles into dist/ and dist-chromium/ (esbuild, unminified)
 ```
 
 Node 24 or newer. TypeScript runs through Node's type stripping and esbuild,
@@ -36,7 +38,11 @@ other environment variables and the interactive driver are in
 | Path | Responsibility |
 |---|---|
 | `src/manifest.json` | Permissions, the shortcut command, add-on id |
-| `src/background/main.ts` | Event page: the popup's "Capture region" and the shortcut start a session; routes save and copy messages |
+| `src/background/background.ts` | The background both browsers share: the popup's "Capture region" and the shortcut start a session; routes save and copy messages |
+| `src/background/platform.ts` | The one seam between the browsers: what an entry has to provide (capture, OCR, download, clipboard, toolbar notice) |
+| `src/background/main.ts` | Firefox's event page: the shared background on the Firefox platform |
+| `src/background/chromium/` | Chromium's service worker (`main.ts`): viewport capture, data: URL download, OCR and clipboard through the offscreen document |
+| `src/offscreen/` | Chromium's offscreen document: the Tesseract worker and the clipboard write a service worker cannot do |
 | `src/background/start.ts` | Whether snapii can run in a tab, injecting the content script |
 | `src/background/flag.ts` | The shortcut's "cannot capture this page" notice on the toolbar button, title before badge |
 | `src/background/save.ts` | One save end to end: capture, hand the page back, OCR, render, download |
@@ -50,12 +56,15 @@ other environment variables and the interactive driver are in
 | `src/content/overlay/` | The selection overlay, hover pick, toolbar and toast, styled to survive hostile pages |
 | `src/content/extract/` | DOM → text runs (`collect.ts`, `lines.ts`, `baseline.ts`, `visibility.ts`, `flat-tree.ts`), link and image areas, the clean clone for Copy text |
 | `src/content/fragment.ts`, `clipboard.ts` | Copy link's text-fragment URL; Copy text and Copy link on the clipboard |
+| `src/content/shadow.ts` | Shadow roots and assigned slots as a content script sees them, closed ones included, in either browser |
 | `src/shared/svg/` | The renderer (`build.ts`), the metadata block (`metadata.ts`), XML escaping (`xml.ts`) |
 | `src/shared/types.ts` | Data contracts between content script, background and renderer, `Settings` |
 | `src/shared/messages.ts` | Runtime validation of every message the background receives |
 | `src/shared/settings.ts` | `DEFAULT_SETTINGS` |
 | `src/shared/*.ts` (rest) | Pure helpers: geometry, tiling, capture strategy, pick heuristic, toolbar placement, links, whitespace and plain text, HTML sanitising for Copy text, text directives, OCR geometry, file name, save-folder rules, shortcut syntax, the version line (`about.ts`) |
-| `src/shared/spike.ts` | Platform facts measured on Firefox 157 (its header says how) — never edit by hand without a new measurement |
+| `src/shared/spike.ts` | Platform facts measured on Firefox 157 and on Chromium 151/153 (the headers say how); never edit by hand without a new measurement |
+| `src/shared/manifest.ts`, `target.ts` | The manifest each browser gets; which browser a bundle was built for (`TARGET`, set by the build) |
+| `src/shared/viewport.ts` | Chromium only: whether a region fits the viewport and where it lies in the captured picture |
 | `src/popup/`, `src/options/` | The toolbar menu and the settings page |
 | `scripts/build.mjs` | The bundler; writes `dist/build-info.json` for the version line |
 | `tools/marionette/`, `tools/drive/` | Marionette client and Firefox driver for the glue tests and `pnpm drive` |
@@ -116,6 +125,8 @@ bug:
 3. **The permissions** — `activeTab`, `scripting`, `downloads`,
    `clipboardWrite`, `storage`; no host permissions and no `content_scripts`
    (decision D1 in [docs/development.md](docs/development.md); the measured facts are in `src/shared/spike.ts`).
+   The Chromium build adds `offscreen` and nothing else: its service worker
+   cannot run the OCR worker or write the clipboard itself.
 4. **The settings in `storage.sync`** — the keys of `Settings` in
    `src/shared/types.ts` keep their names, types and meaning; a value stored
    by an older version must still load (`src/background/settings.ts` drops

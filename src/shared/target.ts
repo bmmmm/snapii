@@ -11,3 +11,9 @@ export const TARGET: BuildTarget = typeof SNAPII_TARGET === "string" ? SNAPII_TA
 
 /** Chromium saves only what is visible (captureVisibleTab takes nothing else there). */
 export const VIEWPORT_ONLY = TARGET === "chromium";
+
+/** How a message names the browser and what it calls its extensions. */
+export const browserWords = (target: BuildTarget = TARGET): { browser: string; extensions: string } =>
+  target === "firefox"
+    ? { browser: "Firefox", extensions: "add-ons" }
+    : { browser: "The browser", extensions: "extensions" };

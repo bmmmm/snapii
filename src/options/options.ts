@@ -6,7 +6,7 @@
 
 import { isValidSetting, loadSettings } from "../background/settings.ts";
 import { showAbout } from "../shared/about.ts";
-import { checkFolder, describeFolderProblem } from "../shared/folder.ts";
+import { checkFolder, describeFolderProblem, insideDownloads } from "../shared/folder.ts";
 import {
   CAPTURE_COMMAND,
   describeProblem,
@@ -16,6 +16,7 @@ import {
   type Platform,
   validateShortcut,
 } from "../shared/shortcut.ts";
+import { TARGET } from "../shared/target.ts";
 import type { Settings } from "../shared/types.ts";
 
 type FormKey = "format" | "jpegQuality" | "saveAs" | "saveFolder" | "occlusionCheck" | "textFragment" | "ocr";
@@ -152,6 +153,8 @@ byId("reset").addEventListener("click", async () => {
 // Keyboard shortcut. The browser keeps it (commands.update stores it in its own
 // settings store), so it is read back from commands.getAll rather than cached.
 const shortcutInput = byId<HTMLInputElement>("shortcut-input");
+// Chromium-based browsers map the chrome: scheme to their own.
+const SHORTCUT_SETTINGS_URL = "chrome://extensions/shortcuts";
 const shortcutStatus = byId<HTMLElement>("shortcut-status");
 let platform: Platform = "other";
 let shortcut = "";
@@ -229,11 +232,29 @@ byId("shortcut-reset").addEventListener("click", () => {
   );
 });
 
+/**
+ * Chromium keeps the shortcut in its own settings page and gives extensions
+ * no way to change it (C11 in src/shared/spike.ts): the field only shows it.
+ */
+function showShortcutReadOnly(): void {
+  byId("shortcut-reset").hidden = true;
+  byId("shortcut-hint").textContent =
+    "The browser keeps this shortcut. Change it on its shortcut settings page, then reopen this page.";
+  const settings = byId("shortcut-settings");
+  settings.hidden = false;
+  settings.addEventListener("click", () => {
+    browser.tabs
+      .create({ url: SHORTCUT_SETTINGS_URL })
+      .catch((e) => sayShortcut(`Could not open the browser's shortcut settings: ${errorText(e)}`));
+  });
+}
+
 async function initShortcut(): Promise<void> {
   try {
     platform = (await browser.runtime.getPlatformInfo()).os === "mac" ? "mac" : "other";
     await readShortcut();
-    shortcutInput.disabled = false;
+    if (typeof browser.commands.update === "function") shortcutInput.disabled = false;
+    else showShortcutReadOnly();
   } catch (e) {
     sayShortcut(`Could not read the shortcut: ${errorText(e)}`);
   }
@@ -246,5 +267,10 @@ browser.storage.onChanged.addListener((_changes, area) => {
   if (area === "sync") void loadSettings().then(render);
 });
 void initShortcut();
+if (TARGET !== "firefox") {
+  byId("folder-hint").textContent =
+    `${insideDownloads()}, so this is a sub-folder name such as snapii or Pages/snapii; ` +
+    "it is created when needed. Leave it empty for the Downloads folder itself.";
+}
 const about = document.getElementById("about");
 if (about) void showAbout(about);

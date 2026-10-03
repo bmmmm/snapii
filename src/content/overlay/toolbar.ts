@@ -21,6 +21,8 @@ export interface Toolbar {
    */
   buttonAt(x: number, y: number): ToolbarButton | null;
   setBusy(busy: boolean): void;
+  /** Marks Save as unavailable for the current selection (`reason` is its tooltip), or available again. */
+  setSaveBlocked(reason: string | null): void;
 }
 
 export function createToolbar(): Toolbar {
@@ -51,6 +53,14 @@ export function createToolbar(): Toolbar {
     setBusy(busy) {
       el.setAttribute("aria-busy", String(busy));
       for (const { b } of buttons) b.disabled = busy;
+    },
+    setSaveBlocked(reason) {
+      const save = buttons.find(({ action }) => action === "save")?.b;
+      if (!save) return;
+      // aria-disabled, not disabled: setBusy owns that one.
+      if (reason === null) save.removeAttribute("aria-disabled");
+      else save.setAttribute("aria-disabled", "true");
+      save.title = reason ?? "";
     },
   };
 }

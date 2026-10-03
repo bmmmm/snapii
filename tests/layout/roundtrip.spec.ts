@@ -40,6 +40,8 @@ interface Expect {
   roundtripTolerance?: Record<string, number>;
   /** Vertical R3 tolerance as a fraction of each run's fontSize (webfont fixtures). */
   roundtripVerticalTolerance?: number;
+  /** Overrides for one engine, see fixtures.spec.ts. */
+  engines?: Record<string, Partial<Expect>>;
 }
 
 const DIR = new URL("../fixtures/", import.meta.url);
@@ -48,11 +50,12 @@ const NOT_FIXTURES = new Set(["smoke.html", "overlay.html", "overlay-csp.html"])
 const X_TOL = 1;
 const V_TOL = 1;
 
-function readExpect(file: string): Expect {
+function readExpect(file: string, engine?: string): Expect {
   const html = readFileSync(new URL(file, DIR), "utf8");
   const m = /<script type="application\/json" id="expect">([\s\S]*?)<\/script>/.exec(html);
   if (!m?.[1]) throw new Error(`${file}: no <script type="application/json" id="expect"> block`);
-  return JSON.parse(m[1]) as Expect;
+  const exp = JSON.parse(m[1]) as Expect;
+  return { ...exp, ...(engine ? exp.engines?.[engine] : undefined) };
 }
 
 const fixtures = readdirSync(DIR)
@@ -79,8 +82,8 @@ test("at least one fixture takes part in the round trip", () => {
 });
 
 for (const file of fixtures) {
-  test(file, async ({ page }) => {
-    const exp = readExpect(file);
+  test(file, async ({ page, browserName }) => {
+    const exp = readExpect(file, browserName);
     await page.goto(`/fixtures/${file}`);
     await page.addScriptTag({ path: "dist-test/harness.js" });
     const col = await page.evaluate(
@@ -216,7 +219,11 @@ for (const file of fixtures) {
 
     // R1
     const lines = exp.lines.map((l) => (typeof l === "string" ? l : l.text));
-    expect.soft(norm(got.copied), "R1 select-all text").toBe(norm(lines.join(" ")));
+    // Chromium's Selection.toString() puts a line break between two <text>
+    // elements, also those of one line (measured in 153): there the copy is
+    // the run texts with a space between each two.
+    const expected = browserName === "chromium" ? runs.map((r) => r.text).join(" ") : lines.join(" ");
+    expect.soft(norm(got.copied), "R1 select-all text").toBe(norm(expected));
 
     // R2
     for (const a of [...got.textAnchors, ...got.linkAnchors])
@@ -249,6 +256,8 @@ for (const file of fixtures) {
     for (const [i, run] of runs.entries()) {
       const box = got.boxes[i];
       if (!box) continue;
+      // Chromium gives a <text> that holds only a space no extent at all.
+      if (browserName === "chromium" && run.text.trim() === "" && !Number.isFinite(box.x)) continue;
       const dx = Math.abs(box.x - run.x);
       const dw = Math.abs(box.width - run.width);
       const ref = refs[i];

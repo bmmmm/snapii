@@ -3,10 +3,13 @@
 // at all, then the injection of the content script and its `start` message.
 // Needs activeTab for the tab (the toolbar popup or the shortcut grants it).
 
+import { browserWords } from "../shared/target.ts";
 import type { StartResult, ToContent } from "../shared/types.ts";
 import { loadSettings } from "./settings.ts";
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+const NO_ACCESS = `${browserWords().browser} does not let extensions run on this page`;
 
 /**
  * Runs in the page. The overlay is HTML appended to the root element, and
@@ -37,7 +40,7 @@ export async function cannotRun(tabId: number): Promise<string | null> {
     // Firefox 157 resolves with [null] instead of rejecting on about:addons;
     // a start message there only fails with "Receiving end does not exist"
     // and an uncaught exception in Firefox's messaging code (measured).
-    if (probe == null) return "Firefox does not let extensions run on this page";
+    if (probe == null) return NO_ACCESS;
     if (probe.result === false) return "snapii works on HTML pages only";
     return null;
   } catch (e) {
@@ -51,8 +54,7 @@ export async function startCapture(tabId: number): Promise<StartResult> {
   if (reason !== null) return { ok: false, reason };
   try {
     const injected = await browser.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
-    if (!injected.some((r) => r != null))
-      return { ok: false, reason: "Firefox does not let extensions run on this page" };
+    if (!injected.some((r) => r != null)) return { ok: false, reason: NO_ACCESS };
     const message: ToContent = { type: "start", settings: await loadSettings() };
     await browser.tabs.sendMessage(tabId, message);
     return { ok: true };

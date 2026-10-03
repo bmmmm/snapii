@@ -109,8 +109,75 @@ test("checkFolder: the length limit counts the normalised path", () => {
 });
 
 test("describeFolderProblem: every problem has its own sentence", () => {
-  const problems: FolderProblem[] = ["absolute", "parent", "dot", "unsafe", "too-long"];
-  const texts = problems.map(describeFolderProblem);
+  const problems: FolderProblem[] = ["absolute", "parent", "dot", "unsafe", "reserved", "too-long"];
+  const texts = problems.map((problem) => describeFolderProblem(problem));
   assert.equal(new Set(texts).size, problems.length);
   for (const text of texts) assert.ok(text.length > 10, text);
+});
+
+// What Chromium's downloads.download refused as a folder on top of the rules
+// above (measured on Chromium 153, 2026-10-03; tests/glue-chromium pins it
+// against the real API).
+test("checkFolder for Chromium: names its download API reserves are refused", () => {
+  for (const name of [
+    "~a",
+    "a~",
+    "CON",
+    "con",
+    "prn",
+    "aux",
+    "nul",
+    "nul.txt",
+    "con.a.b",
+    "com1",
+    "LPT9",
+    "clock$",
+    "conin$",
+    "x.lnk",
+    "a.LNK",
+    "a.local",
+    "a.scf",
+    "a.url",
+    "desktop.ini",
+    "Desktop.ini",
+    "thumbs.db",
+    "a.{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}",
+  ]) {
+    assert.deepEqual(checkFolder(name, "chromium"), { ok: false, reason: "reserved" }, name);
+    assert.deepEqual(checkFolder(`Pages/${name}`, "chromium"), { ok: false, reason: "reserved" }, name);
+  }
+});
+
+test("checkFolder for Chromium: names that only look reserved are accepted", () => {
+  for (const name of [
+    "a~b",
+    "console",
+    "com0",
+    "com10",
+    "a.lnk.x",
+    "{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}",
+    "ünï",
+    "a b",
+  ]) {
+    assert.deepEqual(checkFolder(name, "chromium"), { ok: true, folder: name }, name);
+  }
+});
+
+test("checkFolder for Firefox: Chromium's reserved names stay accepted", () => {
+  for (const name of ["~a", "CON", "x.lnk", "desktop.ini"]) {
+    assert.deepEqual(checkFolder(name, "firefox"), { ok: true, folder: name }, name);
+    assert.deepEqual(checkFolder(name), { ok: true, folder: name }, name);
+  }
+});
+
+test("describeFolderProblem: each browser is named as itself", () => {
+  assert.match(
+    describeFolderProblem("absolute", "firefox"),
+    /^Firefox lets add-ons save only inside its Downloads folder/,
+  );
+  assert.match(
+    describeFolderProblem("absolute", "chromium"),
+    /^The browser lets extensions save only inside its Downloads folder/,
+  );
+  assert.match(describeFolderProblem("reserved", "chromium"), /reserved/);
 });
