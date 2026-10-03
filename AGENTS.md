@@ -18,10 +18,14 @@ pnpm drive help                  # one persistent headless Firefox, one command 
 ```
 
 `pnpm test:glue` and `pnpm drive` start a release Firefox (157+,
-`SNAPII_FIREFOX` overrides the macOS default path). **Firefox must run outside
-a sandbox** — inside one they fail like real bugs (ports, sockets, process
-launch). Glue ports 8460–8469 and 2960–2969; a second checkout running at the
-same time sets `SNAPII_GLUE_PORT_OFFSET=10`.
+`SNAPII_FIREFOX` overrides the macOS default path); `pnpm test:glue:chromium`
+starts Playwright's pinned Chromium (`SNAPII_CHROMIUM` names another binary;
+branded Chrome no longer loads unpacked extensions from the command line).
+**Both browsers must run outside a sandbox** — inside one the glue suites and
+`pnpm drive` fail like real bugs (ports, sockets, process launch). Glue ports:
+Firefox 8460–8469 and 2960–2969, Chromium 8470–8479 and 2970–2979; a second
+checkout running at the same time sets `SNAPII_GLUE_PORT_OFFSET=20` (10 would
+land the Firefox suite on the first checkout's Chromium ports).
 
 ## Module map
 

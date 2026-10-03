@@ -68,8 +68,9 @@ other environment variables and the interactive driver are in
 | `src/popup/`, `src/options/` | The toolbar menu and the settings page |
 | `scripts/build.mjs` | The bundler: `dist/` for Firefox, `dist-chromium/` for Chromium; writes `build-info.json` for the version line |
 | `scripts/icons.mjs` | Rasterises the icon into the PNGs Chromium needs; run by hand when `icon.svg` changes |
-| `tools/marionette/`, `tools/chromium/` | The drivers of the two glue suites |
-| `tools/marionette/`, `tools/drive/` | Marionette client and Firefox driver for the glue tests and `pnpm drive` |
+| `tools/marionette/` | Marionette client and Firefox driver for the Firefox glue suite and `pnpm drive`; its fixture server and SVG/PNG readers serve the Chromium suite too |
+| `tools/chromium/` | The Chromium driver (Playwright) for the Chromium glue suite |
+| `tools/drive/` | `pnpm drive`: one persistent headless Firefox, one command per call |
 
 ## Filing an issue
 

@@ -25,8 +25,9 @@ pnpm build && pnpm start --start-url http://127.0.0.1:8438/fixtures/inline-links
 
 `pnpm test:glue` needs no setup (each test file starts its own server and
 Firefox on one port pair within 8460–8469 and 2960–2969;
-`SNAPII_GLUE_PORT_OFFSET=10` shifts both, for a second checkout running at
-the same time). It must run outside a process sandbox.
+`SNAPII_GLUE_PORT_OFFSET=20` shifts both, for a second checkout running at
+the same time; 10 would collide with the Chromium suite's 8470–8479 and
+2970–2979). It must run outside a process sandbox.
 
 ## Items
 
