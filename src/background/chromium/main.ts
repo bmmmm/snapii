@@ -4,12 +4,11 @@
 // what it cannot do itself (C1 in src/shared/spike.ts) the offscreen document does.
 
 import { startBackground } from "../background.ts";
+import { chromiumAction } from "./action.ts";
 import { captureRegion } from "./capture.ts";
 import { saveSvg } from "./download.ts";
 import { recognizeInOffscreen } from "./ocr.ts";
 import { offscreen } from "./offscreen.ts";
-
-const defaultTitle = browser.runtime.getManifest().action?.default_title ?? "";
 
 startBackground({
   captureRegion,
@@ -19,9 +18,5 @@ startBackground({
     await offscreen.ask({ to: "offscreen", type: "copy", plain, html });
     return true;
   },
-  action: {
-    setBadgeText: (details) => browser.action.setBadgeText(details),
-    // Chromium rejects a null title (C13): the manifest's own is set again.
-    setTitle: ({ tabId, title }) => browser.action.setTitle({ tabId, title: title ?? defaultTitle }),
-  },
+  action: chromiumAction(browser.action, browser.runtime.getManifest().action?.default_title ?? ""),
 });

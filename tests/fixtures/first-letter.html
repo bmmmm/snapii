@@ -17,7 +17,13 @@
         "capture": "#cap",
         "lines": ["Lorem ipsum", "dolor sit", "amet", "consectetur", "adipiscing"],
         "roundtripTolerance": { "Lorem ipsum": 22 },
-        "reason": "The run 'Lorem ipsum' includes the ::first-letter drop cap, so its box reaches below the line by an amount that depends on the platform's monospace metrics (16.75 px on macOS, 18 px on Linux CI; 22 px allows about one font size); the SVG draws the whole run at the paragraph's font size, which a TextRun cannot express otherwise."
+        "reason": "The run 'Lorem ipsum' includes the ::first-letter drop cap, so its box reaches below the line by an amount that depends on the platform's monospace metrics (16.75 px on macOS, 18 px on Linux CI; 22 px allows about one font size); the SVG draws the whole run at the paragraph's font size, which a TextRun cannot express otherwise. Chromium reports the drop cap as a box of its own font's full height (68 px, Firefox 39 px), which overlaps the first line by less than half: there 'L' is a run of its own on that line, with the baseline of the float (26 px below the line's, where the probe sits) and a box 34 px taller than a 20 px glyph's.",
+        "engines": {
+          "chromium": {
+            "baselineTolerance": { "L": 27 },
+            "roundtripTolerance": { "L": 34 }
+          }
+        }
       }
     </script>
   </head>

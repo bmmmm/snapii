@@ -47,6 +47,8 @@ const PREVENT_EVENTS = ["selectstart", "dragstart"];
 export function startOverlay(opts: {
   onAction(action: ToolbarAction, selection: Selection): void | Promise<void>;
   onCancel(): void;
+  /** Why this selection cannot be saved right now, or null; asked again after every scroll and resize. */
+  saveBlocked?(selection: Selection): string | null;
 }): OverlayHandle {
   const host = createHtml("snapii-overlay");
   styleHost(host, { inset: "0" });
@@ -78,6 +80,8 @@ export function startOverlay(opts: {
   let press = { x: 0, y: 0 };
   let toolbarPress: ToolbarButton | null = null;
   let frame = 0;
+  /** The reason Save is unavailable for the current selection. */
+  let blocked: string | null = null;
 
   const page = (): { x: number; y: number } => ({ x: pointer.x + scrollX, y: pointer.y + scrollY });
 
@@ -107,7 +111,11 @@ export function startOverlay(opts: {
   }
 
   function render(): void {
-    hint.hidden = state === "selected" || state === "dragging";
+    blocked = state === "selected" && selection ? (opts.saveBlocked?.(selection) ?? null) : null;
+    toolbar.setSaveBlocked(blocked);
+    hint.textContent = blocked ?? HINT_TEXT;
+    hint.classList.toggle("notice", blocked !== null);
+    hint.hidden = blocked === null && (state === "selected" || state === "dragging");
     toolbar.el.hidden = state !== "selected";
     if (state === "selected" && selection) {
       drawBox(selection.rect, selection.mode === "drag");
@@ -166,6 +174,7 @@ export function startOverlay(opts: {
 
   function runAction(action: ToolbarAction): void {
     if (busy || !selection) return;
+    if (action === "save" && blocked !== null) return;
     const result = opts.onAction(action, { ...selection }) as PromiseLike<void> | undefined;
     if (result && typeof result.then === "function") {
       // Guards against a second click while the first action is in flight.

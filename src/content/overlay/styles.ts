@@ -98,6 +98,12 @@ export const OVERLAY_CSS = `
 .toolbar button.primary { background: ${ACCENT}; color: #fff; }
 .toolbar button.primary:hover { background: #0060df; }
 .toolbar button:disabled { opacity: 0.5; cursor: progress; }
+.toolbar button[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
+.hint.notice {
+  max-width: calc(100vw - 24px);
+  white-space: normal;
+  text-align: center;
+}
 `;
 
 export const TOAST_CSS = `

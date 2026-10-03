@@ -4,14 +4,7 @@
 // itself is the pure pickCandidate() in shared/pick.ts.
 import { type ChainEntry, pickCandidate } from "../../shared/pick.ts";
 import type { DocRect } from "../../shared/types.ts";
-
-// Content scripts see closed shadow roots through this Firefox-only
-// accessor; page scripts (the layout harness) only see open ones.
-type MaybeClosed = Element & { openOrClosedShadowRoot?: ShadowRoot | null };
-
-function shadowOf(el: Element): ShadowRoot | null {
-  return (el as MaybeClosed).openOrClosedShadowRoot ?? el.shadowRoot;
-}
+import { shadowRootOf } from "../shadow.ts";
 
 /** Parent in the composed tree: steps from a shadow root's top to its host. */
 export function composedParent(el: Element): Element | null {
@@ -23,12 +16,12 @@ export function composedParent(el: Element): Element | null {
 /**
  * Innermost page element under the client point, skipping our own host.
  * The host is skipped by identity (not by being on top): the
- * openOrClosedShadowRoot descent would otherwise walk into the overlay.
+ * closed-root descent would otherwise walk into the overlay.
  */
 export function hitTest(x: number, y: number, host: Element): Element | null {
   let el = document.elementsFromPoint(x, y).find((e) => e !== host) ?? null;
   while (el) {
-    const root = shadowOf(el);
+    const root = shadowRootOf(el);
     if (!root || el === host) break;
     // A shadow root's elementsFromPoint also lists light-DOM ancestors;
     // only a node inside this root is a step down.

@@ -19,7 +19,12 @@ export default defineConfig({
     baseURL: `http://127.0.0.1:${PORT}`,
     trace: "on-first-retry",
   },
-  projects: [{ name: "firefox", use: { ...devices["Desktop Firefox"] } }],
+  // The extraction, the overlay and the session are the same code in both
+  // browsers; Chromium runs as the pinned Chromium, not the headless shell.
+  projects: [
+    { name: "firefox", use: { ...devices["Desktop Firefox"] } },
+    { name: "chromium", use: { ...devices["Desktop Chrome"], channel: "chromium" } },
+  ],
   webServer: {
     command: `python3 -m http.server ${PORT} --bind 127.0.0.1 --directory tests`,
     url: `http://127.0.0.1:${PORT}/fixtures/smoke.html`,
