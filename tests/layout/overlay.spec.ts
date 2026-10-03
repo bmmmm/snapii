@@ -126,6 +126,35 @@ test("hover highlights the picked element (heading skipped, article preferred)",
   await expect.poll(() => box(page)).toBeNull();
 });
 
+test("pointer moves over the same element leave the hint and the Save button untouched", async ({ page }) => {
+  await start(page);
+  await page.mouse.move(200, 250); // on #para
+  await expect.poll(() => box(page)).toEqual(PARA);
+  await page.evaluate(() => {
+    const w = window as unknown as TestWindow & { __mutations: string[] };
+    const root = w.__roots["snapii-overlay"] as ShadowRoot;
+    w.__mutations = [];
+    new MutationObserver((records) => {
+      for (const r of records)
+        w.__mutations.push(`${(r.target as Element).className || r.target.nodeName} ${r.type}`);
+    }).observe(root.querySelector(".hint") as Node, {
+      childList: true,
+      characterData: true,
+      attributes: true,
+    });
+    new MutationObserver((records) => {
+      for (const r of records) w.__mutations.push(`save ${r.type} ${r.attributeName}`);
+    }).observe(root.querySelector('[data-action="save"]') as Node, { attributes: true });
+  });
+  for (const x of [210, 220, 230, 240, 250]) await page.mouse.move(x, 250);
+  // Two frames: the last move's hover update has run.
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+  expect(await box(page)).toEqual(PARA);
+  expect(await page.evaluate(() => (window as unknown as { __mutations: string[] }).__mutations)).toEqual([]);
+});
+
 test("ArrowUp gives the parent, ArrowDown goes back; Enter selects then saves", async ({ page }) => {
   await start(page);
   await page.mouse.move(200, 250);

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { type DataUrlDownloadDeps, saveSvgAsDataURL } from "../../../src/background/chromium/download.ts";
 
-type Item = { state: string; error?: string };
+type Item = { state: string; paused?: boolean; error?: string };
 
 /** Chromium's downloads API as measured (C16): download() resolves at once, the outcome comes later. */
 function deps(states: (Item | undefined)[]) {
@@ -58,6 +58,18 @@ test("saveSvgAsDataURL: any other interruption rejects with the browser's reason
     saveSvgAsDataURL("<svg/>", "x.svg", false, d),
     new Error("the download was interrupted: FILE_NO_SPACE"),
   );
+});
+
+test("saveSvgAsDataURL: a paused download ends the save instead of waiting for a resume", async () => {
+  const { d, log } = deps([{ state: "in_progress" }, { state: "in_progress", paused: true }]);
+  const sleep = d.sleep;
+  let sleeps = 0;
+  d.sleep = async (ms) => {
+    if (++sleeps > 3) throw new Error("still waiting for the paused download");
+    await sleep(ms);
+  };
+  await assert.rejects(saveSvgAsDataURL("<svg/>", "x.svg", true, d), new Error("the download was paused"));
+  assert.deepEqual(log.slice(1), ["find:in_progress", "sleep", "find:in_progress"]);
 });
 
 test("saveSvgAsDataURL: a download the browser no longer knows rejects", async () => {

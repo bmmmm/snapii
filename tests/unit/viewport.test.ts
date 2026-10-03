@@ -96,6 +96,17 @@ test("planViewportCrop: the scrollbar's width in the picture is no mismatch", ()
   assert.deepEqual(crop.source, { x: 1800, y: 0, width: 200, height: 200 });
 });
 
+test("planViewportCrop: at a fractional ratio a region ending at the viewport's edge ends at the picture's", () => {
+  // 1164 × 713 CSS px at 110 %: 1280.4 × 784.3 device px, captured as 1280 × 784.
+  const crop = planViewportCrop(
+    { x: 1064, y: 613, width: 100, height: 100 },
+    { viewport: { width: 1164, height: 713 }, scroll: { x: 0, y: 0 }, devicePixelRatio: 1.1 },
+    { width: 1280, height: 784 },
+    1e9,
+  );
+  assert.deepEqual(crop.source, { x: 1170, y: 674, width: 110, height: 110 });
+});
+
 test("planViewportCrop: a region outside the picture is refused", () => {
   assert.throws(
     () =>

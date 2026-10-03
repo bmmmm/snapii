@@ -5,6 +5,8 @@
 // lose. download() resolves as soon as the download exists, before a Save-as
 // dialog is answered (C16), so the outcome is asked for until there is one;
 // each of those calls also keeps the worker awake while the dialog is open.
+// A paused download has no outcome until someone resumes it, so the save
+// ends there instead of keeping the page busy.
 
 import { blobToDataURL } from "./data-url.ts";
 
@@ -15,7 +17,9 @@ export interface DataUrlDownloadDeps {
   toDataURL(svg: string): Promise<string>;
   download(options: { url: string; filename: string; saveAs: boolean }): Promise<number>;
   /** The download as the browser has it now, undefined once it no longer knows the id. */
-  find(id: number): Promise<{ state: string; error?: string | undefined } | undefined>;
+  find(
+    id: number,
+  ): Promise<{ state: string; paused?: boolean | undefined; error?: string | undefined } | undefined>;
   sleep(ms: number): Promise<void>;
 }
 
@@ -36,6 +40,7 @@ export async function saveSvgAsDataURL(
       if (item.error === "USER_CANCELED") throw new Error("Download canceled by the user");
       throw new Error(`the download was interrupted: ${item.error}`);
     }
+    if (item.paused) throw new Error("the download was paused");
     await deps.sleep(POLL_MS);
   }
 }
