@@ -11,16 +11,24 @@ const COPY: OffscreenRequest = { to: "offscreen", type: "copy", plain: "p", html
 
 /** A browser with at most one offscreen document, as Chromium allows. */
 function harness(
-  opts: { existing?: boolean; answer?: (request: OffscreenRequest) => Promise<unknown> } = {},
+  opts: {
+    existing?: boolean;
+    createFails?: Error;
+    answer?: (request: OffscreenRequest) => Promise<unknown>;
+  } = {},
 ) {
   const log: string[] = [];
   let open = opts.existing ?? false;
   const deps: OffscreenDeps = {
     async create() {
       if (open) throw new Error("Only a single offscreen document may be created.");
+      if (opts.createFails) throw opts.createFails;
       await sleep(1);
       open = true;
       log.push("create");
+    },
+    async exists() {
+      return open;
     },
     async close() {
       if (!open) throw new Error("No current offscreen document.");
@@ -62,6 +70,15 @@ test("offscreen client: a document left over from an earlier worker is used, the
   await createOffscreenClient(h.deps).ask(COPY);
   assert.deepEqual(h.log, ["send:copy", "close"]);
   assert.equal(h.isOpen(), false);
+});
+
+test("offscreen client: a document that cannot be created fails the request with the browser's reason", async () => {
+  const h = harness({ createFails: new Error("Invalid reason: WORKERS") });
+  const client = createOffscreenClient(h.deps);
+  await assert.rejects(client.ask(COPY), /Invalid reason: WORKERS/);
+  assert.deepEqual(h.log, []);
+  // The next request tries again.
+  await assert.rejects(client.ask(COPY), /Invalid reason: WORKERS/);
 });
 
 test("offscreen client: a failed request rejects and still closes the document", async () => {
