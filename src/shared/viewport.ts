@@ -53,20 +53,16 @@ export function planViewportCrop(
         `(${page.viewport.width}×${page.viewport.height} at ${dpr})`,
     );
   }
-  const left = Math.floor((region.x - page.scroll.x) * dpr + EPS);
-  const top = Math.floor((region.y - page.scroll.y) * dpr + EPS);
-  const right = Math.ceil((region.x + region.width - page.scroll.x) * dpr - EPS);
-  const bottom = Math.ceil((region.y + region.height - page.scroll.y) * dpr - EPS);
-  if (
-    left < 0 ||
-    top < 0 ||
-    right > picture.width ||
-    bottom > picture.height ||
-    right <= left ||
-    bottom <= top
-  ) {
+  if (!fitsViewport(region, visibleRect(page)))
     throw new Error("the region is outside the captured viewport");
-  }
+  // At a fractional ratio the viewport's CSS size times dpr lies between two
+  // device pixels and the capture has the lower one, so a region ending at the
+  // viewport's edge reaches a pixel past the picture.
+  const left = Math.max(0, Math.floor((region.x - page.scroll.x) * dpr + EPS));
+  const top = Math.max(0, Math.floor((region.y - page.scroll.y) * dpr + EPS));
+  const right = Math.min(picture.width, Math.ceil((region.x + region.width - page.scroll.x) * dpr - EPS));
+  const bottom = Math.min(picture.height, Math.ceil((region.y + region.height - page.scroll.y) * dpr - EPS));
+  if (right <= left || bottom <= top) throw new Error("the region is outside the captured viewport");
   const source = { x: left, y: top, width: right - left, height: bottom - top };
   const shrink = Math.min(1, Math.sqrt(maxPixels / (source.width * source.height)));
   return {
