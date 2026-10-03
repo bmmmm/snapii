@@ -8,6 +8,10 @@ import { after, before, test } from "node:test";
 import { checkFolder } from "../../src/shared/folder.ts";
 import { startGlue } from "./env.mjs";
 
+// What commands.getAll() reports for the default binding: Chromium on macOS
+// gives the key in its symbol form.
+const SHORTCUT = process.platform === "darwin" ? "⌥⇧S" : "Alt+Shift+S";
+
 let g;
 before(async () => {
   g = await startGlue(3);
@@ -22,7 +26,7 @@ test("popup on a web page: the capture button is ready, with the bound shortcut 
   const state = await g.popupState();
   assert.equal(state.captureDisabled, false);
   assert.equal(state.status, "");
-  assert.equal(state.shortcut, "Alt+Shift+S");
+  assert.equal(state.shortcut, SHORTCUT);
   assert.match(state.about, /^snapii \d+\.\d+\.\d+ · .* · Chromium \d+$/);
 });
 
@@ -53,7 +57,7 @@ test("options page: the shortcut is shown read-only with the way to the browser'
   `);
   assert.deepEqual(
     { value: shown.value, disabled: shown.disabled, reset: shown.resetHidden, settings: shown.settingsHidden },
-    { value: "Alt+Shift+S", disabled: true, reset: true, settings: false },
+    { value: SHORTCUT, disabled: true, reset: true, settings: false },
   );
   assert.match(shown.folderHint, /^The browser lets extensions save only inside its Downloads folder, so this is/);
   assert.match(shown.about, /Chromium \d+$/);
