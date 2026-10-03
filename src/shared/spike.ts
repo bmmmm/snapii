@@ -58,3 +58,55 @@ export const SPIKE = {
   clipboardFromContentScript: "secure-contexts-only",
   clipboardFromBackground: true,
 } as const;
+
+// Platform facts measured on Chromium 151.0.7922.173 and 153.0.8010.12
+// (headless, Linux, device scale factor 2) on 2026-10-03 with a throw-away
+// extension with host access that captured a calibration page whose pixels
+// encode their document position. Same rule: a value changes only with a new
+// measurement of that kind.
+export const SPIKE_CHROMIUM = {
+  measuredOn: "Chromium 151.0.7922.173 and 153.0.8010.12, headless, Linux, 2026-10-03",
+
+  // C1: a service worker has no URL.createObjectURL, navigator.clipboard,
+  // Worker or devicePixelRatio; OffscreenCanvas, createImageBitmap, FileReader
+  // and fetch() of a data: URL exist.
+  serviceWorkerHasObjectURLs: false,
+  serviceWorkerHasWorkers: false,
+  serviceWorkerHasClipboard: false,
+
+  // C2: captureVisibleTab returns the viewport (a classic scrollbar included)
+  // at device scale factor × zoom device px per CSS px, which is the page's
+  // devicePixelRatio: 1000 × 713 CSS px gave 2000 × 1426 at zoom 1, and
+  // 666 × 475 CSS px gave the same 2000 × 1426 at zoom 1.5.
+  captureDensityIsPageDevicePixelRatio: true,
+  // C4/C5: `scale` alone changes nothing; `rect` is a crop of the viewport
+  // (integers, viewport-relative), and one outside it rejects with "Failed to
+  // capture tab: image readback failed". Nothing beyond the viewport.
+  visibleTabOffViewport: "rejected",
+  // C3: tabs.MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND is 2; the third call
+  // within a second rejects. One call per 550 ms never did.
+  captureCallsPerSecond: 2,
+  captureIntervalMs: 550,
+
+  // C8/C10: an offscreen document runs the Tesseract worker under the
+  // extension CSP; its navigator.clipboard.write rejects ("Document is not
+  // focused."), document.execCommand("copy") with a copy-event handler works.
+  offscreenRunsWorkers: true,
+  offscreenAsyncClipboard: false,
+  // C9: runtime messages carry at most 64 MiB (48 MB passed, 80 MB did not).
+  maxMessageBytes: 64 * 1024 * 1024,
+
+  // C11: commands.update, commands.reset and runtime.getBrowserInfo do not exist.
+  shortcutChangeableByExtension: false,
+  // C12: content scripts have no openOrClosedShadowRoot on elements; the
+  // extension API dom.openOrClosedShadowRoot(element) reaches closed roots.
+  closedShadowRootsThrough: "dom-api",
+  // C13: action.setTitle rejects a null title; a null badge text clears the badge.
+  actionTitleNullable: false,
+  // C14: downloads.download saved a 40 MB data: URL from the service worker.
+  downloadPath: "data-url",
+  // C16: download() resolves as soon as the download exists, before a Save-as
+  // dialog is answered; a cancel is the state "interrupted" with the error
+  // USER_CANCELED (headless, where no dialog can open, every saveAs ends so).
+  downloadResolvesBeforeSaveAs: true,
+} as const;

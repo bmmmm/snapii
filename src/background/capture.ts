@@ -18,6 +18,13 @@ export interface CaptureResult {
 /** No tile plan exists within the per-call limits. */
 export class TooLargeError extends Error {}
 
+/** The region reaches beyond the viewport and this browser captures only what is visible. */
+export class OutsideViewportError extends Error {
+  constructor() {
+    super("the region is not wholly inside the viewport");
+  }
+}
+
 /** The options of one capture call; `quality` is 0–100 and only read for JPEG. */
 export function imageDetails(tile: PlannedTile, scale: number, settings: Settings) {
   return {

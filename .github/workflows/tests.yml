@@ -1,4 +1,5 @@
-# Unit + Playwright layout suites, extension build and web-ext lint.
+# Unit + Playwright layout suites, extension build, web-ext lint and the
+# Chromium glue suite.
 name: tests
 
 on:
@@ -22,9 +23,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
-      # Playwright's own Firefox build; the Marionette glue suite needs a
-      # release Firefox and stays a local gate (pnpm test:glue).
-      - run: pnpm exec playwright install --with-deps firefox
+      # Playwright's own Firefox and Chromium builds. The Marionette glue
+      # suite needs a release Firefox and stays a local gate (pnpm test:glue).
+      - run: pnpm exec playwright install --with-deps firefox chromium
       - run: pnpm test
       - run: pnpm build
       - run: pnpm lint:ext
+      # The real extension in that same Chromium, headless; builds dist-chromium/ itself.
+      - run: pnpm test:glue:chromium

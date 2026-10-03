@@ -2,7 +2,7 @@
   "name": "snapii",
   "version": "0.1.0",
   "private": true,
-  "description": "Firefox extension: save a page region as SVG with real, selectable text and clickable links.",
+  "description": "Browser extension (Firefox, Chromium): save a page region as SVG with real, selectable text and clickable links.",
   "type": "module",
   "license": "GPL-3.0-or-later",
   "engines": {
@@ -17,8 +17,10 @@
     "build": "node scripts/build.mjs",
     "lint:ext": "web-ext lint --source-dir dist",
     "package": "web-ext build --source-dir dist --artifacts-dir web-ext-artifacts --overwrite-dest",
+    "package:chromium": "web-ext build --source-dir dist-chromium --artifacts-dir web-ext-artifacts --filename snapii-chromium-{version}.zip --overwrite-dest",
     "start": "web-ext run --firefox=/Applications/Firefox.app/Contents/MacOS/firefox --source-dir dist",
-    "drive": "node tools/drive/cli.mjs"
+    "drive": "node tools/drive/cli.mjs",
+    "test:glue:chromium": "node scripts/build.mjs && node --test \"tests/glue-chromium/*.test.mjs\""
   },
   "packageManager": "pnpm@11.17.0+sha512.cca3cea332ad254bb84145f966d19f4879615210346fc92c79a047f23a0d7b3cca3c3792f0076ba1f1831d277efbcf0a9119b31a9a60eca7fb3d6231f331ef72",
   "devDependencies": {

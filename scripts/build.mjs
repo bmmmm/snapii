@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Bundles the extension into dist/ (and, with --test, the layout-test harness
-// into dist-test/). One IIFE per entry, unminified so AMO reviewers can read it.
+// Bundles the extension into dist/ (Firefox) and dist-chromium/ (and, with
+// --test, the layout-test harness into dist-test/). One IIFE per entry,
+// unminified so store reviewers can read it.
 import { execFileSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { copyFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
+import { MINIMUM_CHROME_VERSION, manifestFor } from "../src/shared/manifest.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const test = process.argv.includes("--test");
@@ -15,7 +17,6 @@ const common = {
   bundle: true,
   format: "iife",
   minify: false,
-  target: "firefox140",
   legalComments: "inline",
   logLevel: "warning",
 };
@@ -48,36 +49,67 @@ function buildInfo() {
   }
 }
 
+const TARGETS = {
+  firefox: { outdir: "dist", esbuild: "firefox140", background: "src/background/main.ts" },
+  chromium: {
+    outdir: "dist-chromium",
+    esbuild: `chrome${MINIMUM_CHROME_VERSION}`,
+    background: "src/background/chromium/main.ts",
+  },
+};
+
 if (test) {
   const outdir = join(root, "dist-test");
   await rm(outdir, { recursive: true, force: true });
-  await build({ ...common, entryPoints: { harness: join(root, "tests/harness/entry.ts") }, outdir });
+  await build({
+    ...common,
+    target: TARGETS.firefox.esbuild,
+    entryPoints: { harness: join(root, "tests/harness/entry.ts") },
+    outdir,
+  });
 } else {
-  const outdir = join(root, "dist");
+  const info = buildInfo();
+  for (const target of Object.keys(TARGETS)) await buildExtension(target, info);
+}
+
+async function buildExtension(target, info) {
+  const config = TARGETS[target];
+  const outdir = join(root, config.outdir);
   await rm(outdir, { recursive: true, force: true });
   await build({
     ...common,
+    target: config.esbuild,
+    // src/shared/target.ts reads it: the pages and the content script are the
+    // same source for both browsers.
+    define: { SNAPII_TARGET: JSON.stringify(target) },
     entryPoints: {
-      background: join(root, "src/background/main.ts"),
+      background: join(root, config.background),
       content: join(root, "src/content/main.ts"),
       options: join(root, "src/options/options.ts"),
       popup: join(root, "src/popup/popup.ts"),
+      // What a service worker cannot do runs in Chromium's offscreen document.
+      ...(target === "chromium" ? { offscreen: join(root, "src/offscreen/main.ts") } : {}),
     },
     outdir,
     plugins: [noRegenerator],
   });
   const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
-  const manifest = JSON.parse(await readFile(join(root, "src/manifest.json"), "utf8"));
-  manifest.version = pkg.version;
+  const source = JSON.parse(await readFile(join(root, "src/manifest.json"), "utf8"));
+  const manifest = manifestFor(target, source, pkg.version);
   await writeFile(join(outdir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
   // Shown at the bottom of the options page and the popup to tell builds apart. Data, not
   // code, so a rebuild from a source archive (no git) only differs here.
-  await writeFile(join(outdir, "build-info.json"), `${JSON.stringify(buildInfo(), null, 2)}\n`);
+  await writeFile(join(outdir, "build-info.json"), `${JSON.stringify(info, null, 2)}\n`);
   for (const f of ["options.html", "options.css"])
     await copyFile(join(root, "src/options", f), join(outdir, f));
   for (const f of ["popup.html", "popup.css"]) await copyFile(join(root, "src/popup", f), join(outdir, f));
+  if (target === "chromium") {
+    await copyFile(join(root, "src/offscreen/offscreen.html"), join(outdir, "offscreen.html"));
+  }
   await mkdir(join(outdir, "icons"), { recursive: true });
-  await copyFile(join(root, "src/icons/icon.svg"), join(outdir, "icons/icon.svg"));
+  for (const icon of new Set(Object.values(manifest.icons))) {
+    await copyFile(join(root, "src", icon), join(outdir, icon));
+  }
   for (const f of ["LICENSE", "NOTICE"]) await copyFile(join(root, f), join(outdir, f));
   // content.js bundles the polyfill's code; Apache-2.0 §4(a) wants its
   // license text shipped along.
@@ -95,7 +127,8 @@ if (test) {
  * Web Worker script, one Tesseract core (SIMD, LSTM-only: every Firefox
  * since 89 has WASM SIMD, and the LSTM-only build is the one the int
  * language models need) and the gzipped "best_int" language models.
- * background.js bundles tesseract.js's own (readable) source.
+ * background.js (in Chromium offscreen.js) bundles tesseract.js's own
+ * (readable) source.
  */
 async function copyOcr(outdir) {
   const nm = (p) => join(root, "node_modules", p);

@@ -11,9 +11,11 @@ import type {
   CaptureModel,
   FragmentStatus,
   PageMeta,
+  SaveError,
   SaveResponse,
   Settings,
 } from "../shared/types.ts";
+import { fitsViewport } from "../shared/viewport.ts";
 import type { ClipboardData } from "./clipboard.ts";
 import { cloneVisibleRange } from "./extract/clone.ts";
 import { collectTextRunsDetailed, type RunSource } from "./extract/collect.ts";
@@ -21,16 +23,19 @@ import { areasRelativeTo, collectImageAreas } from "./extract/image-areas.ts";
 import { collectLinkAreas } from "./extract/images.ts";
 import { anchorSources, textFragmentURL } from "./fragment.ts";
 import { type OverlayHandle, type Selection, startOverlay, type ToolbarAction } from "./overlay/overlay.ts";
-import { viewportSize } from "./overlay/pick.ts";
+import { viewportSize, visibleViewport } from "./overlay/pick.ts";
 import { createHtml, styleHost } from "./overlay/styles.ts";
 import { showToast } from "./overlay/toolbar.ts";
 
-type SaveError = Extract<SaveResponse, { ok: false }>["error"];
+/** Why Save is unavailable for a selection that is not wholly visible, where only the viewport can be captured. */
+export const VIEWPORT_ONLY_NOTICE =
+  "Only what is visible can be saved in this browser. Scroll the selection fully into view or select a smaller area";
 
 const ERROR_TOAST: Record<SaveError, string> = {
   "needs-host-permission": "snapii has no permission to capture this page",
   "capture-failed": "Capture failed. Try again or select another area",
   "too-large": "This area is too large to capture. Select a smaller one",
+  "outside-viewport": VIEWPORT_ONLY_NOTICE,
   "download-failed": "The SVG was not saved (download failed or was cancelled)",
 };
 
@@ -64,6 +69,8 @@ const LINK_TOAST: Record<FragmentStatus, string> = {
 
 export interface SessionDeps {
   settings: Settings;
+  /** This browser captures the viewport and nothing beyond it (Chromium): Save needs a wholly visible selection. */
+  viewportOnly?: boolean;
   /**
    * Hands the model to the background (runtime.sendMessage in main.ts).
    * `onCaptured` runs when the background's `captured` message arrives, i.e.
@@ -428,6 +435,12 @@ export function startSession(deps: SessionDeps): SessionHandle {
   const overlay = startOverlay({
     onAction,
     onCancel: cancel,
+    ...(deps.viewportOnly
+      ? {
+          saveBlocked: (selection: Selection) =>
+            fitsViewport(selection.rect, visibleViewport()) ? null : VIEWPORT_ONLY_NOTICE,
+        }
+      : {}),
   });
 
   return {

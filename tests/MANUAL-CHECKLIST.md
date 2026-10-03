@@ -48,6 +48,39 @@ the same time). It must run outside a process sandbox.
 | 14 | Revoke host permission in `about:addons` → hint | obsolete (D1) |
 | 15 | Informative: open the SVG in Chrome and Inkscape | human 15h |
 
+### Chromium
+
+`pnpm test:glue:chromium` covers, in Playwright's headless Chromium at device
+scale factor 2: popup → overlay → save (file name, sub-folder, picture pixels,
+text layer, record), zoom 150 %, the refusal of a selection beyond the
+viewport and the save after scrolling, JPEG, closed shadow trees, Copy text on
+a secure and a non-secure origin and Copy link (read back from the
+clipboard), OCR through the offscreen document, the popup on a browser page,
+the read-only shortcut section, the folder rules against the real download
+API, a save across a service-worker restart, the toolbar notice, and a
+cancelled Save-as dialog (headless Chromium has no file dialog, so every
+"Ask where to save" download ends as a cancelled one).
+
+Human steps there (load `dist-chromium/` via `chrome://extensions` → Developer
+mode → Load unpacked):
+
+- **C1h: real shortcut.** Press Alt+Shift+S on a web page: the overlay opens
+  without the popup (the key press itself grants `activeTab`; the tests can
+  only fire the command as an event). On `chrome://extensions` the toolbar
+  button shows "×" and the reason for three seconds.
+- **C2h: Save-as dialog.** With "Ask where to save" on, save: the browser's
+  dialog opens and no toast shows yet; leave it open for a minute, then save:
+  the toast names the file and the file is complete. Cancel it on a second
+  try: the toast says the SVG was not saved.
+- **C3h: real display.** On a HiDPI screen and at 100 % and 125 % zoom, save
+  an element: text layer and picture line up in the opened file.
+- **C4h: toolbar icon.** The snapii icon shows in the toolbar and in
+  `chrome://extensions` (PNG icons; the SVG one is Firefox's).
+- **C5h: PDF viewer and the Web Store.** The popup says why the page cannot
+  be captured, the button is disabled.
+- **C6h: another Chromium browser.** Repeat C1h and one save in Edge or
+  Brave.
+
 ### What the automated run cannot stand in for
 
 The glue run uses Firefox's own trigger paths (`triggerAction`, which opens

@@ -77,9 +77,12 @@ models ship in the add-on (8.3 MB of the unpacked add-on), nothing is downloaded
 
 The SVG is meant to be opened in a **browser**. In Firefox, opened directly,
 the text can be selected and copied and the links work (checked by
-`pnpm test` and `pnpm test:glue`). Chrome is expected to select text the same
-way (the research behind this project says so); we have not run it ourselves
-yet (item 15 of `tests/MANUAL-CHECKLIST.md`).
+`pnpm test` and `pnpm test:glue`). In Chromium the text is selectable and the
+links work too (the round-trip specs of `pnpm test` run there), with one
+difference: a selection copied from the file has a space between two pieces
+of text that follow each other without one on the page, for example between a
+link and the full stop after it. Chromium puts a line break between any two
+`<text>` elements when it turns a selection into a string.
 
 Other viewers fall short: Inkscape cannot click-select the transparent text
 (Tab or Ctrl+A reach it), and macOS Preview and Quick Look show the image
