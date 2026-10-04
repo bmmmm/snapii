@@ -26,6 +26,7 @@ const VALID: { [K in keyof Settings]: (x: unknown) => x is Settings[K] } = {
   occlusionCheck: isBool,
   textFragment: isBool,
   ocr: isBool,
+  output: (x): x is Settings["output"] => x === "raster" || x === "vector",
 };
 
 /** The per-field check loadSettings applies; the options page writes only what passes it. */

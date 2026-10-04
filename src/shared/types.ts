@@ -72,6 +72,102 @@ export interface ImageArea extends DocRect {
   kind: "img" | "canvas" | "svg-image" | "background";
 }
 
+/**
+ * A colour in sRGB as numbers: channels 0–255, alpha 0–1. A page's CSS colour
+ * is parsed into this before it reaches a vector SVG, so no colour string from
+ * the page is ever written into one.
+ */
+export interface Paint {
+  r: number;
+  g: number;
+  b: number;
+  a: number;
+}
+
+/** Corner radii as [horizontal, vertical]: top-left, top-right, bottom-right, bottom-left. */
+export type Radii = [[number, number], [number, number], [number, number], [number, number]];
+
+/** A clip rectangle, rounded where the clipping box has radii. */
+export interface SceneClip extends DocRect {
+  radii?: Radii;
+}
+
+/** One drawing operation of a vector capture; region-relative CSS px. */
+export type SceneOp =
+  | {
+      op: "rect";
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      radii?: Radii;
+      fill?: Paint;
+      /** A CSS border: painted inside the rect's edge, like the border box. */
+      stroke?: { width: number; paint: Paint };
+    }
+  | {
+      op: "image";
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      /** The visible part only, already cropped to the rect. */
+      dataURL: string;
+    }
+  | { op: "group"; clip?: SceneClip; opacity?: number; children: SceneOp[] };
+
+/** Why part of a vector capture is pixels (a patch) instead of shapes. */
+export type UnsupportedReason =
+  | "transform"
+  | "effect"
+  | "background-image"
+  | "gradient"
+  | "border"
+  | "box-shadow"
+  | "text-effect"
+  | "image"
+  | "canvas"
+  | "media"
+  | "frame"
+  | "form"
+  | "svg"
+  | "math"
+  | "pseudo"
+  | "marker"
+  | "icon-font"
+  | "vertical"
+  | "color"
+  | "budget";
+
+/** A part of the region taken as pixels from the screen (region-relative CSS px). */
+export interface Patch extends DocRect {
+  reason: UnsupportedReason;
+}
+
+/** How a run is painted in a vector capture; `clip` where its glyphs would overhang (region-relative). */
+export interface TextPaint {
+  fill: Paint;
+  clip?: DocRect;
+}
+
+/**
+ * The region as drawing operations, built by the content script and rendered
+ * by the background. Text stays in CaptureModel.runs: `text` says per run how
+ * it is painted, or null where a patch shows it or a later box hides it.
+ */
+export interface Scene {
+  /** The page's canvas colour, under everything. */
+  canvas: Paint;
+  /** Boxes in paint order. */
+  ops: SceneOp[];
+  /** Painted over all ops; the background fills them with pixels. */
+  patches: Patch[];
+  /** Parallel to CaptureModel.runs. */
+  text: (TextPaint | null)[];
+  /** Elements per reason that were not turned into shapes. */
+  unsupported: Partial<Record<UnsupportedReason, number>>;
+}
+
 export interface CaptureModel {
   region: DocRect;
   runs: TextRun[];
@@ -79,6 +175,8 @@ export interface CaptureModel {
   page: PageMeta;
   /** Sent only when the OCR setting is on. */
   imageAreas?: ImageArea[];
+  /** Sent only in vector output. */
+  scene?: Scene;
 }
 
 export interface RasterTile extends DocRect {
@@ -166,4 +264,6 @@ export interface Settings {
   textFragment: boolean;
   /** Recognise text in images (Tesseract, in the background page). */
   ocr: boolean;
+  /** "vector": shapes and visible text, pixels only where they cannot be had (beta); "raster": the screenshot. */
+  output: "raster" | "vector";
 }

@@ -18,6 +18,7 @@ const GOOD: Settings = {
   occlusionCheck: true,
   textFragment: false,
   ocr: true,
+  output: "vector",
 };
 
 test("loadSettings: valid stored values replace the defaults", async () => {
@@ -77,7 +78,22 @@ const BAD: Array<[keyof Settings, unknown]> = [
   ["ocr", "true"],
   ["ocr", 1],
   ["ocr", null],
+  ["output", "svg"],
+  ["output", "Vector"],
+  ["output", true],
+  ["output", null],
 ];
+
+test("loadSettings: a store written before vector output existed loads as raster", async () => {
+  const { output: _, ...older } = GOOD;
+  assert.deepEqual(await loadSettings(stored(older)), { ...GOOD, output: "raster" });
+  assert.equal(DEFAULT_SETTINGS.output, "raster");
+});
+
+test("isValidSetting: both outputs can be stored, so the options page can switch back to raster", () => {
+  assert.equal(isValidSetting("output", "raster"), true);
+  assert.equal(isValidSetting("output", "vector"), true);
+});
 
 test("loadSettings: a bad type or range falls back for that field only", async () => {
   for (const [key, value] of BAD) {

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { isToBackground, isToContent, routeMessage } from "../../src/shared/messages.ts";
 import { DEFAULT_SETTINGS } from "../../src/shared/settings.ts";
-import type { CaptureModel } from "../../src/shared/types.ts";
+import type { CaptureModel, Scene } from "../../src/shared/types.ts";
 
 const model = (): CaptureModel => ({
   region: { x: 10, y: 20, width: 300, height: 200 },
@@ -109,6 +109,153 @@ test("isToBackground: rejects a save whose model is malformed in any one field",
     mutate(m);
     assert.equal(isToBackground({ type: "save", model: m }), false, name);
   }
+});
+
+const PNG = "data:image/png;base64,iVBORw0KGgo=";
+
+/** A scene with one of each op, for the one-run model. */
+const scene = (): Scene => ({
+  canvas: { r: 255, g: 255, b: 255, a: 1 },
+  ops: [
+    {
+      op: "group",
+      clip: {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 50,
+        radii: [
+          [4, 4],
+          [4, 4],
+          [0, 0],
+          [0, 0],
+        ],
+      },
+      opacity: 0.5,
+      children: [
+        {
+          op: "rect",
+          x: 1,
+          y: 2,
+          width: 30,
+          height: 20,
+          radii: [
+            [2, 3],
+            [2, 3],
+            [2, 3],
+            [2, 3],
+          ],
+          fill: { r: 10, g: 20, b: 30, a: 0.25 },
+          stroke: { width: 1, paint: { r: 0, g: 0, b: 0, a: 1 } },
+        },
+        { op: "image", x: 0, y: 0, width: 16, height: 16, dataURL: PNG },
+      ],
+    },
+  ],
+  patches: [{ x: 5, y: 5, width: 10, height: 10, reason: "pseudo" }],
+  text: [{ fill: { r: 0, g: 0, b: 0, a: 1 }, clip: { x: 0, y: 0, width: 50, height: 20 } }],
+  unsupported: { pseudo: 1, budget: 0 },
+});
+
+/** n groups, each the only child of the one before. */
+function nested(n: number): Loose {
+  let op: Loose = { op: "rect", x: 0, y: 0, width: 1, height: 1 };
+  for (let i = 0; i < n; i++) op = { op: "group", children: [op] };
+  return op;
+}
+
+// Each mutation breaks exactly one field of an otherwise valid scene.
+const sceneMutations: Array<[string, (s: Loose) => void]> = [
+  ["canvas missing", (s) => delete s.canvas],
+  ["canvas a CSS string", (s) => (s.canvas = "white")],
+  ["canvas channel above 255", (s) => (s.canvas.r = 256)],
+  ["canvas channel NaN", (s) => (s.canvas.g = Number.NaN)],
+  ["canvas alpha above 1", (s) => (s.canvas.a = 1.5)],
+  ["canvas alpha negative", (s) => (s.canvas.a = -0.1)],
+  ["canvas channel negative", (s) => (s.canvas.b = -1)],
+  ["ops not an array", (s) => (s.ops = {})],
+  ["op unknown", (s) => (s.ops = [{ op: "path", d: "M0 0" }])],
+  ["op null", (s) => (s.ops = [null])],
+  ["rect x NaN", (s) => (s.ops[0].children[0].x = Number.NaN)],
+  ["rect width Infinity", (s) => (s.ops[0].children[0].width = Number.POSITIVE_INFINITY)],
+  ["rect negative height", (s) => (s.ops[0].children[0].height = -1)],
+  ["rect fill a string", (s) => (s.ops[0].children[0].fill = '"><script>alert(1)</script>')],
+  [
+    "rect radii three corners",
+    (s) =>
+      (s.ops[0].children[0].radii = [
+        [1, 1],
+        [1, 1],
+        [1, 1],
+      ]),
+  ],
+  ["rect radius negative", (s) => (s.ops[0].children[0].radii[2] = [-1, 0])],
+  ["rect radius NaN", (s) => (s.ops[0].children[0].radii[0] = [Number.NaN, 0])],
+  ["rect radius one value", (s) => (s.ops[0].children[0].radii[1] = [3])],
+  ["rect radii a string", (s) => (s.ops[0].children[0].radii = "4px ")],
+  ["stroke a CSS string", (s) => (s.ops[0].children[0].stroke = "1px solid red")],
+  ["stroke null", (s) => (s.ops[0].children[0].stroke = null)],
+  ["stroke width a string", (s) => (s.ops[0].children[0].stroke.width = "2")],
+  ["stroke width negative", (s) => (s.ops[0].children[0].stroke.width = -1)],
+  ["stroke paint missing", (s) => delete s.ops[0].children[0].stroke.paint],
+  ["image javascript: URL", (s) => (s.ops[0].children[1].dataURL = "javascript:alert(1)")],
+  ["image http: URL", (s) => (s.ops[0].children[1].dataURL = "http://example.com/a.png")],
+  [
+    "image SVG data URL",
+    (s) => (s.ops[0].children[1].dataURL = "data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+"),
+  ],
+  ["image data URL with a quote", (s) => (s.ops[0].children[1].dataURL = `${PNG}"onload="x`)],
+  ["image data URL not base64", (s) => (s.ops[0].children[1].dataURL = "data:image/png,abc")],
+  ["image dataURL missing", (s) => delete s.ops[0].children[1].dataURL],
+  ["image width NaN", (s) => (s.ops[0].children[1].width = Number.NaN)],
+  ["group opacity above 1", (s) => (s.ops[0].opacity = 2)],
+  ["group children not an array", (s) => (s.ops[0].children = null)],
+  ["group clip NaN", (s) => (s.ops[0].clip.y = Number.NaN)],
+  ["group clip radius negative", (s) => (s.ops[0].clip.radii[0] = [0, -2])],
+  ["groups nested too deep", (s) => (s.ops = [nested(33)])],
+  [
+    "too many ops",
+    (s) => (s.ops = Array.from({ length: 200_001 }, () => ({ op: "rect", x: 0, y: 0, width: 1, height: 1 }))),
+  ],
+  ["patch reason unknown", (s) => (s.patches[0].reason = "magic")],
+  ["patch width NaN", (s) => (s.patches[0].width = Number.NaN)],
+  ["patches not an array", (s) => (s.patches = s.patches[0])],
+  ["text shorter than runs", (s) => (s.text = [])],
+  ["text longer than runs", (s) => (s.text = [null, null])],
+  ["text entry a colour string", (s) => (s.text = ["#000"])],
+  ["text a string", (s) => (s.text = "x")],
+  ["text fill alpha NaN", (s) => (s.text[0].fill.a = Number.NaN)],
+  ["text clip negative width", (s) => (s.text[0].clip.width = -5)],
+  ["unsupported reason unknown", (s) => (s.unsupported = { magic: 1 })],
+  ["unsupported count negative", (s) => (s.unsupported = { pseudo: -1 })],
+  ["unsupported count fractional", (s) => (s.unsupported = { pseudo: 0.5 })],
+  ["unsupported missing", (s) => delete s.unsupported],
+];
+
+test("isToBackground: accepts a save with a well-formed scene", () => {
+  assert.equal(isToBackground({ type: "save", model: { ...model(), scene: scene() } }), true);
+  // A run hidden behind a box (null), no ops, no patches.
+  const bare: Scene = {
+    canvas: { r: 0, g: 0, b: 0, a: 0 },
+    ops: [],
+    patches: [],
+    text: [null],
+    unsupported: {},
+  };
+  assert.equal(isToBackground({ type: "save", model: { ...model(), scene: bare } }), true);
+  assert.equal(
+    isToBackground({ type: "save", model: { ...model(), scene: { ...scene(), ops: [nested(32)] } } }),
+    true,
+  );
+});
+
+test("isToBackground: rejects a save whose scene is malformed in any one field", () => {
+  for (const [name, mutate] of sceneMutations) {
+    const s = scene() as unknown as Loose;
+    mutate(s);
+    assert.equal(isToBackground({ type: "save", model: { ...model(), scene: s } }), false, name);
+  }
+  assert.equal(isToBackground({ type: "save", model: { ...model(), scene: null } }), false, "scene null");
 });
 
 test("isToBackground: accepts a copy message with plain and html strings", () => {
