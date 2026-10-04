@@ -35,6 +35,30 @@ export function unionAll(rects: readonly DocRect[]): DocRect | null {
   return out;
 }
 
+/** Area covered by rects, overlaps counted once: per vertical slab, the merged y-spans. */
+export function unionArea(rects: readonly DocRect[]): number {
+  const solid = rects.filter((r) => r.width > 0 && r.height > 0);
+  const xs = [...new Set(solid.flatMap((r) => [r.x, right(r)]))].sort((a, b) => a - b);
+  let area = 0;
+  for (let i = 0; i + 1 < xs.length; i++) {
+    const x0 = xs[i] as number;
+    const x1 = xs[i + 1] as number;
+    const spans = solid
+      .filter((r) => r.x <= x0 && right(r) >= x1)
+      .map((r) => [r.y, bottom(r)] as const)
+      .sort((a, b) => a[0] - b[0]);
+    let covered = 0;
+    let end = Number.NEGATIVE_INFINITY;
+    for (const [s, e] of spans) {
+      if (e <= end) continue;
+      covered += e - Math.max(s, end);
+      end = e;
+    }
+    area += covered * (x1 - x0);
+  }
+  return area;
+}
+
 export function translate(r: DocRect, dx: number, dy: number): DocRect {
   return { x: r.x + dx, y: r.y + dy, width: r.width, height: r.height };
 }

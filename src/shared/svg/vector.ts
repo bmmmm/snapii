@@ -1,0 +1,220 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// The vector renderer: the scene's boxes as SVG shapes, patches as <image>s
+// over them, link areas, and one text layer on top whose runs are visible
+// where the boxes leave them showing and invisible (but selectable) where a
+// patch or a later box shows or hides them. Pure and deterministic like the
+// raster renderer; clip ids are a counter, never anything from the page.
+//
+// Layer order, bottom to top: canvas, boxes, patches, links, text. Patches
+// lie over every box because a patch is a screenshot of its area: whatever
+// the boxes there would paint is already in its pixels.
+
+import { unionArea } from "../geometry.ts";
+import type {
+  DocRect,
+  Paint,
+  Radii,
+  RenderInput,
+  Scene,
+  SceneClip,
+  SceneOp,
+  TextPaint,
+  TextRun,
+} from "../types.ts";
+import { imageLine, linksLines, pad, TRANSPARENT, textLayerLines } from "./build.ts";
+import { metadataLines, type VectorRecord } from "./metadata.ts";
+import { fmt, xmlAttr, xmlText } from "./xml.ts";
+
+/** `tiles` are the patches' pixels, region-relative like the patches themselves. */
+export interface VectorRenderInput extends RenderInput {
+  scene: Scene;
+}
+
+// A viewer without the page's fonts keeps at least the kind of face.
+const FALLBACK_FAMILY = "sans-serif";
+// textLength pins each run's width; "spacing" reaches it by spacing the glyphs
+// as CSS letter-spacing does and keeps their shape. Measured 2026-10-04 (text
+// only, diffRatio vs the page, Playwright Firefox/Chromium): within 0.01 pt of
+// spacingAndGlyphs or better, letter-spacing.html 8.9 % vs 11.1 % and 7.0 % vs 9.4 %.
+const LENGTH_ADJUST = "spacing";
+
+const channel = (v: number): string =>
+  Number.isFinite(v) ? String(Math.round(Math.min(255, Math.max(0, v)))) : "0";
+
+/** `fill`/`stroke` and its opacity from numbers only; an opaque paint gets no opacity attribute. */
+function paintAttrs(p: Paint, prop: "fill" | "stroke"): string {
+  const rgb = `${prop}="rgb(${channel(p.r)},${channel(p.g)},${channel(p.b)})"`;
+  const a = Number.isFinite(p.a) ? Math.min(1, Math.max(0, p.a)) : 0;
+  return a >= 1 ? rgb : `${rgb} ${prop}-opacity="${fmt(a)}"`;
+}
+
+const NO_RADII: Radii = [
+  [0, 0],
+  [0, 0],
+  [0, 0],
+  [0, 0],
+];
+
+/**
+ * CSS shrinks all radii by one factor when two of them overlap along a side
+ * (css-backgrounds-3 § 5.5); an SVG <rect> would clamp rx and ry each on its
+ * own and make a pill's round ends elliptical.
+ */
+function fitRadii(w: number, h: number, radii: Radii): Radii {
+  // A corner with either radius zero is square (css-backgrounds-3 § 5.2).
+  const square = radii.map(([x, y]) => (x > 0 && y > 0 ? [x, y] : [0, 0])) as Radii;
+  const [tl, tr, br, bl] = square;
+  const f = Math.min(
+    1,
+    w / (tl[0] + tr[0]) || 1,
+    h / (tr[1] + br[1]) || 1,
+    w / (br[0] + bl[0]) || 1,
+    h / (bl[1] + tl[1]) || 1,
+  );
+  return f >= 1 ? square : (square.map(([x, y]) => [x * f, y * f]) as Radii);
+}
+
+const isZero = (r: Radii): boolean => r.every(([x]) => x === 0);
+const isUniform = (r: Radii): boolean => r.every(([x, y]) => x === r[0][0] && y === r[0][1]);
+
+/** A box outline: <rect> (rounded alike at every corner) or <path> with one arc per corner. */
+function shape(box: DocRect, radii: Radii | undefined, attrs: string): string {
+  const { x, y, width: w, height: h } = box;
+  const geo = `x="${fmt(x)}" y="${fmt(y)}" width="${fmt(w)}" height="${fmt(h)}"`;
+  const tail = attrs ? ` ${attrs}/>` : "/>";
+  const r = radii ? fitRadii(w, h, radii) : NO_RADII;
+  if (isZero(r)) return `<rect ${geo}${tail}`;
+  if (isUniform(r)) {
+    const [rx, ry] = r[0];
+    return `<rect ${geo} rx="${fmt(rx)}"${ry === rx ? "" : ` ry="${fmt(ry)}"`}${tail}`;
+  }
+  const [tl, tr, br, bl] = r;
+  // A square corner needs no segment: the side lines already meet there.
+  const arc = ([rx, ry]: [number, number], ex: number, ey: number) =>
+    rx > 0 ? `A${fmt(rx)} ${fmt(ry)} 0 0 1 ${fmt(ex)} ${fmt(ey)}` : "";
+  const d = [
+    `M${fmt(x + tl[0])} ${fmt(y)}`,
+    `H${fmt(x + w - tr[0])}`,
+    arc(tr, x + w, y + tr[1]),
+    `V${fmt(y + h - br[1])}`,
+    arc(br, x + w - br[0], y + h),
+    `H${fmt(x + bl[0])}`,
+    arc(bl, x, y + h - bl[1]),
+    `V${fmt(y + tl[1])}`,
+    arc(tl, x + tl[0], y),
+    "Z",
+  ].join("");
+  return `<path d="${d}"${tail}`;
+}
+
+/** Hands out clip ids in order of first use; one <clipPath> per distinct shape. */
+class Clips {
+  #ids = new Map<string, string>();
+  #defs: string[] = [];
+
+  id(clip: SceneClip): string {
+    const key = JSON.stringify([clip.x, clip.y, clip.width, clip.height, clip.radii ?? null]);
+    let id = this.#ids.get(key);
+    if (!id) {
+      id = `c${this.#ids.size}`;
+      this.#ids.set(key, id);
+      this.#defs.push(`<clipPath id="${id}">${shape(clip, clip.radii, "")}</clipPath>`);
+    }
+    return id;
+  }
+
+  lines(): string[] {
+    return this.#defs.length === 0 ? [] : ["<defs>", ...pad(this.#defs), "</defs>"];
+  }
+}
+
+/** A CSS border is painted inside the border box: a stroke centred half its width in. */
+function rectLines(op: Extract<SceneOp, { op: "rect" }>): string[] {
+  const out: string[] = [];
+  if (op.fill) out.push(shape(op, op.radii, paintAttrs(op.fill, "fill")));
+  const stroke = op.stroke;
+  if (stroke && stroke.width > 0) {
+    const w = stroke.width;
+    if (2 * w >= op.width || 2 * w >= op.height) {
+      // The border covers the whole box.
+      out.push(shape(op, op.radii, paintAttrs(stroke.paint, "fill")));
+    } else {
+      const outer = op.radii ? fitRadii(op.width, op.height, op.radii) : NO_RADII;
+      const inner = outer.map(([x, y]) => [Math.max(0, x - w / 2), Math.max(0, y - w / 2)]) as Radii;
+      const box = { x: op.x + w / 2, y: op.y + w / 2, width: op.width - w, height: op.height - w };
+      out.push(
+        shape(box, inner, `fill="none" ${paintAttrs(stroke.paint, "stroke")} stroke-width="${fmt(w)}"`),
+      );
+    }
+  }
+  return out;
+}
+
+function opLines(op: SceneOp, clips: Clips): string[] {
+  if (op.op === "rect") return rectLines(op);
+  if (op.op === "image") {
+    return [
+      `<image x="${fmt(op.x)}" y="${fmt(op.y)}" width="${fmt(op.width)}" height="${fmt(op.height)}" preserveAspectRatio="none" xlink:href="${xmlAttr(op.dataURL)}"/>`,
+    ];
+  }
+  const attrs = [
+    ...(op.clip ? [`clip-path="url(#${clips.id(op.clip)})"`] : []),
+    ...(op.opacity !== undefined && op.opacity < 1 ? [`opacity="${fmt(Math.max(0, op.opacity))}"`] : []),
+  ];
+  const children = op.children.flatMap((c) => opLines(c, clips));
+  return [`<g${attrs.length ? ` ${attrs.join(" ")}` : ""}>`, ...pad(children), "</g>"];
+}
+
+const countOps = (ops: readonly SceneOp[]): number =>
+  ops.reduce((n, op) => n + 1 + (op.op === "group" ? countOps(op.children) : 0), 0);
+
+/** The whole document: canvas, boxes, patches, link areas, text layer, metadata. */
+export function vectorRenderer(input: VectorRenderInput): string {
+  const { page, region, scene } = input;
+  const w = fmt(region.width);
+  const h = fmt(region.height);
+  const lang = page.lang ? ` xml:lang="${xmlAttr(page.lang)}"` : "";
+  const desc = `Region of ${page.url} captured ${page.capturedAt} by snapii ${input.extensionVersion}. Shapes and text are vector; parts that could not be converted are pixels. Text is selectable; links are clickable.`;
+  const clips = new Clips();
+  const shapes = scene.ops.flatMap((op) => opLines(op, clips));
+
+  const paints = new Map<TextRun, TextPaint | null>();
+  input.runs.forEach((run, i) => {
+    paints.set(run, scene.text[i] ?? null);
+  });
+  const paint = (run: TextRun): string => {
+    const p = paints.get(run);
+    if (!p) return TRANSPARENT;
+    return p.clip
+      ? `${paintAttrs(p.fill, "fill")} clip-path="url(#${clips.id(p.clip)})"`
+      : paintAttrs(p.fill, "fill");
+  };
+  const text = textLayerLines(input.runs, {
+    paint,
+    lengthAdjust: LENGTH_ADJUST,
+    fallbackFamily: FALLBACK_FAMILY,
+  });
+
+  const record: VectorRecord = {
+    ops: countOps(scene.ops),
+    patches: scene.patches.length,
+    patchArea: Number(unionArea(scene.patches).toFixed(2)),
+    unsupported: scene.unsupported,
+  };
+  const group = (id: string, lines: string[]) =>
+    lines.length === 0 ? [`<g id="${id}"></g>`] : [`<g id="${id}">`, ...pad(lines), "</g>"];
+  return `${[
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"${lang}>`,
+    `  <title>${xmlText(page.title)}</title>`,
+    `  <desc>${xmlText(desc)}</desc>`,
+    ...pad(metadataLines(input, record)),
+    ...pad(clips.lines()),
+    `  <rect id="canvas" width="${w}" height="${h}" ${paintAttrs(scene.canvas, "fill")}/>`,
+    ...pad(group("shapes", shapes)),
+    ...pad(group("patches", input.tiles.map(imageLine))),
+    ...pad(linksLines(input.links)),
+    ...pad(text),
+    "</svg>",
+  ].join("\n")}\n`;
+}

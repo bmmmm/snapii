@@ -12,14 +12,50 @@ import type { LinkArea, RasterTile, RenderInput, SvgRenderer, TextRun } from "..
 import { metadataLines } from "./metadata.ts";
 import { fmt, xmlAttr, xmlText } from "./xml.ts";
 
-const pad = (lines: string[]): string[] => lines.map((l) => `  ${l}`);
+export const pad = (lines: string[]): string[] => lines.map((l) => `  ${l}`);
 
 const anchor = (href: string, inner: string): string =>
   `<a href="${xmlAttr(href)}" xlink:href="${xmlAttr(href)}">${inner}</a>`;
 
 // Invisible, but still hit-testable: SVG 2 drops `fill="none"` text from
 // hit-testing, which would make it unselectable. Zero opacity keeps it.
-const TRANSPARENT = 'fill="#000" fill-opacity="0"';
+export const TRANSPARENT = 'fill="#000" fill-opacity="0"';
+
+/** How the text layer writes its runs; the defaults are the raster's. */
+export interface TextLayerOptions {
+  id?: string;
+  /**
+   * Attributes that paint one run (already escaped). Without it the layer
+   * is invisible as a whole, through the group.
+   */
+  paint?: (run: TextRun) => string;
+  lengthAdjust?: "spacing" | "spacingAndGlyphs";
+  /** Appended to a font-family list that names no generic family. */
+  fallbackFamily?: string;
+}
+
+const GENERIC_FAMILIES = new Set([
+  "serif",
+  "sans-serif",
+  "monospace",
+  "cursive",
+  "fantasy",
+  "system-ui",
+  "ui-serif",
+  "ui-sans-serif",
+  "ui-monospace",
+  "ui-rounded",
+  "math",
+  "emoji",
+  "fangsong",
+]);
+
+/** The computed list with `fallback` appended unless it already ends in a generic family. */
+function withFallback(family: string, fallback: string | undefined): string {
+  if (fallback === undefined) return family;
+  const names = family.split(",").map((n) => n.trim().toLowerCase());
+  return names.some((n) => GENERIC_FAMILIES.has(n)) ? family : `${family}, ${fallback}`;
+}
 
 // One <text> per run, not one <tspan> per run inside a <text> per line:
 // textLength has to pin each run's width so a viewer's other glyph metrics
@@ -29,22 +65,23 @@ const TRANSPARENT = 'fill="#000" fill-opacity="0"';
 // document order, and the line separator, being its own <text>, can never
 // join a run's text chunk (inside one <text> it shifted an RTL run that ended
 // a line by one space width).
-function runText(run: TextRun, visible: boolean): string {
+function runText(run: TextRun, opts: TextLayerOptions): string {
   const rtl = run.dir === "rtl";
   const attrs = [
     // text-anchor is "start", which for direction=rtl means the right edge.
     `x="${fmt(rtl ? run.x + run.width : run.x)}"`,
     `y="${fmt(run.y)}"`,
     `textLength="${fmt(run.width)}"`,
-    'lengthAdjust="spacingAndGlyphs"',
-    `font-family="${xmlAttr(run.fontFamily)}"`,
+    `lengthAdjust="${opts.lengthAdjust ?? "spacingAndGlyphs"}"`,
+    `font-family="${xmlAttr(withFallback(run.fontFamily, opts.fallbackFamily))}"`,
     `font-size="${fmt(run.fontSize)}"`,
     `font-weight="${fmt(run.fontWeight)}"`,
     `font-style="${xmlAttr(run.fontStyle)}"`,
   ];
   if (rtl) attrs.push('direction="rtl"');
   if (run.lang) attrs.push(`xml:lang="${xmlAttr(run.lang)}"`);
-  if (visible) attrs.push(`fill="${xmlAttr(run.color)}"`);
+  const paint = opts.paint?.(run);
+  if (paint) attrs.push(paint);
   const el = `<text ${attrs.join(" ")}>${xmlText(run.text)}</text>`;
   return run.href === null ? el : anchor(run.href, el);
 }
@@ -57,7 +94,7 @@ function lineSeparator(lineRuns: TextRun[]): string {
   return `<text x="${fmt(x)}" y="${fmt(y)}"> </text>`;
 }
 
-function textLayerLines(runs: TextRun[], visible: boolean, id = "text"): string[] {
+export function textLayerLines(runs: TextRun[], opts: TextLayerOptions = {}): string[] {
   const byLine = new Map<number, TextRun[]>();
   for (const run of runs) {
     const line = byLine.get(run.line);
@@ -71,16 +108,15 @@ function textLayerLines(runs: TextRun[], visible: boolean, id = "text"): string[
   const lines = [...byLine.entries()]
     .sort(([a], [b]) => a - b)
     .map(
-      ([, lineRuns]) =>
-        `<g>${lineRuns.map((r) => runText(r, visible)).join("")}${lineSeparator(lineRuns)}</g>`,
+      ([, lineRuns]) => `<g>${lineRuns.map((r) => runText(r, opts)).join("")}${lineSeparator(lineRuns)}</g>`,
     );
-  const open = `<g id="${id}" xml:space="preserve" style="white-space:pre"${visible ? "" : ` ${TRANSPARENT}`}>`;
+  const open = `<g id="${opts.id ?? "text"}" xml:space="preserve" style="white-space:pre"${opts.paint ? "" : ` ${TRANSPARENT}`}>`;
   return [`${open}${lines.join("")}</g>`];
 }
 
-/** The `<g id="text">` element. `visible: true` is the phase-2 seam. */
+/** The `<g id="text">` element. `visible: true` paints each run in its page colour. */
 export function renderTextLayer(runs: TextRun[], opts: { visible: boolean }): string {
-  return textLayerLines(runs, opts.visible).join("\n");
+  return textLayerLines(runs, opts.visible ? { paint: (r) => `fill="${xmlAttr(r.color)}"` } : {}).join("\n");
 }
 
 function linkLine(link: LinkArea): string {
@@ -90,7 +126,7 @@ function linkLine(link: LinkArea): string {
   return link.href === null ? rect : anchor(link.href, rect);
 }
 
-function linksLines(links: LinkArea[]): string[] {
+export function linksLines(links: LinkArea[]): string[] {
   return links.length === 0
     ? ['<g id="links"></g>']
     : ['<g id="links">', ...pad(links.map(linkLine)), "</g>"];
@@ -98,7 +134,7 @@ function linksLines(links: LinkArea[]): string[] {
 
 // Geometry is the tile's CSS rect; pixelWidth/pixelHeight go to metadata only,
 // so a wrong `scale` can cost sharpness but never position.
-const imageLine = (t: RasterTile): string =>
+export const imageLine = (t: RasterTile): string =>
   `<image x="${fmt(t.x)}" y="${fmt(t.y)}" width="${fmt(t.width)}" height="${fmt(t.height)}" preserveAspectRatio="none" xlink:href="${xmlAttr(t.dataURL)}"/>`;
 
 /** The whole document: tiles, link areas, invisible text layer, metadata. */
@@ -116,10 +152,10 @@ export const rasterTextRenderer: SvgRenderer = (input: RenderInput): string => {
     ...pad(metadataLines(input)),
     ...pad(input.tiles.map(imageLine)),
     ...pad(linksLines(input.links)),
-    ...pad(textLayerLines(input.runs, false)),
+    ...pad(textLayerLines(input.runs)),
     // Text read from the pixels by OCR: the same invisible layer, in a group
     // of its own so a reader can tell it from the page's own text.
-    ...(input.ocr && input.ocr.runs.length > 0 ? pad(textLayerLines(input.ocr.runs, false, "ocr")) : []),
+    ...(input.ocr && input.ocr.runs.length > 0 ? pad(textLayerLines(input.ocr.runs, { id: "ocr" })) : []),
     "</svg>",
   ].join("\n")}\n`;
 };
