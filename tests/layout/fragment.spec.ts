@@ -162,6 +162,28 @@ test("a range over repeated teasers: links the first headline, fast", async ({ p
   expect(found.inTarget).toBe(true);
 });
 
+// Every uniqueness check of the generator walks the whole document once per
+// occurrence of its candidate, without looking at the clock: on this page
+// one check outlasts the budget several times over (Chromium 141: 8.3-8.5 s
+// in all for a 2 s budget, 2.2 s with the guard), long enough for Firefox to
+// flag snapii as slowing it down. The budget has to hold within a check too.
+test("a range over a large page of recurring text: TIMEOUT within the budget", async ({ page }) => {
+  await load(page, "/fixtures/fragment-flood.html");
+  const gen = await page.evaluate(() => {
+    const more = document.querySelector("#t4000 a")?.firstChild;
+    const blurb = document.querySelector("#t4003 p")?.firstChild;
+    if (!(more instanceof Text) || !(blurb instanceof Text)) throw new Error("no teaser text");
+    const range = document.createRange();
+    range.setStart(more, 0);
+    range.setEnd(blurb, 10);
+    const t0 = performance.now();
+    const result = window.__snapii.textFragmentURL(range, location.href);
+    return { ...result, ms: performance.now() - t0, budget: window.__snapii.GENERATION_TIMEOUT_MS };
+  });
+  expect(gen).toMatchObject({ url: null, status: "TIMEOUT" });
+  expect(gen.ms).toBeLessThan(gen.budget + 500);
+});
+
 test("a drag that ends inside the first block: the link ends there too", async ({ page, browser }) => {
   await load(page, "/fixtures/fragment-unique.html");
   const gen = await page.evaluate(() => {

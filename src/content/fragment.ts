@@ -273,10 +273,39 @@ const rangesEqual = (a: Range, b: Range): boolean =>
 
 type Generated = ReturnType<typeof generateFragmentFromRange>;
 
-/** generateFragmentFromRange on a copy of range, within ms. */
+/** What the generator reads as its own timeout: it reports TIMEOUT for an error with isTimeout. */
+class GenerationTimeout extends Error {
+  readonly isTimeout = true;
+}
+
+/**
+ * generateFragmentFromRange on a copy of range, within ms. The generator
+ * looks at the clock only between its uniqueness checks, and one check walks
+ * the whole document once per occurrence of its candidate (polyfill 6.7.0):
+ * on a large page of recurring text a single check took seconds and Firefox
+ * flagged snapii as slowing it down. Every walk goes through
+ * document.createTreeWalker, so for this call each walker's filter checks the
+ * deadline at every node. The override is this script's own (an expando in
+ * Firefox's content-script world, an isolated world in Chromium); the page
+ * never sees it.
+ */
 function generate(range: Range, ms: number): Generated {
-  setGenerationTimeout(Math.max(ms, 1));
-  return generateFragmentFromRange(range.cloneRange());
+  const budget = Math.max(ms, 1);
+  const deadline = Date.now() + budget;
+  const native = document.createTreeWalker;
+  const guarded = (root: Node, whatToShow?: number, filter?: NodeFilter | null): TreeWalker =>
+    native.call(document, root, whatToShow, (node: Node) => {
+      if (Date.now() > deadline) throw new GenerationTimeout();
+      if (typeof filter === "function") return filter(node);
+      return filter ? filter.acceptNode(node) : NodeFilter.FILTER_ACCEPT;
+    });
+  Object.defineProperty(document, "createTreeWalker", { value: guarded, configurable: true, writable: true });
+  try {
+    setGenerationTimeout(budget);
+    return generateFragmentFromRange(range.cloneRange());
+  } finally {
+    Reflect.deleteProperty(document, "createTreeWalker");
+  }
 }
 
 /** The fragment URL for range on pageURL, or null with the generator's reason. */
