@@ -115,10 +115,14 @@ export class Driver {
    * Fires a command of the extension for the selected tab. There is no way to
    * press its key, so this is the event without the key press: it does not
    * grant activeTab the way the real shortcut does.
+   *
+   * The selected tab is the active one, not the one in the last focused
+   * window: on macOS, once Extensions.triggerAction has opened the popup,
+   * that query mostly finds no tab (headless). The browser has one window.
    */
   command(name) {
     return this.background(async (name) => {
-      const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      const [tab] = await chrome.tabs.query({ active: true });
       chrome.commands.onCommand.dispatch(name, tab);
     }, name);
   }
@@ -376,10 +380,10 @@ export class Driver {
     return { name, path, text, svg: parseSvg(text) };
   }
 
-  /** Text of the extension's toolbar badge and title for the selected tab. */
+  /** Text of the extension's toolbar badge and title for the selected tab (see `command`). */
   action() {
     return this.background(async () => {
-      const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      const [tab] = await chrome.tabs.query({ active: true });
       return {
         badge: await chrome.action.getBadgeText({ tabId: tab.id }),
         title: await chrome.action.getTitle({ tabId: tab.id }),
