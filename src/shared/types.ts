@@ -92,6 +92,17 @@ export interface SceneClip extends DocRect {
   radii?: Radii;
 }
 
+/**
+ * A linear gradient along the line `from` → `to` (relative to the rect it
+ * fills), padded with its end colours beyond; stop offsets 0–1, ascending,
+ * interpolated in sRGB.
+ */
+export interface LinearGradient {
+  from: [number, number];
+  to: [number, number];
+  stops: { offset: number; paint: Paint }[];
+}
+
 /** One drawing operation of a vector capture; region-relative CSS px. */
 export type SceneOp =
   | {
@@ -102,6 +113,8 @@ export type SceneOp =
       height: number;
       radii?: Radii;
       fill?: Paint;
+      /** A background gradient, painted over `fill`. */
+      gradient?: LinearGradient;
       /** A CSS border: painted inside the rect's edge, like the border box. */
       stroke?: { width: number; paint: Paint };
       /** A one-colour border of unequal widths (top, right, bottom, left): the ring between the box and its padding box. */

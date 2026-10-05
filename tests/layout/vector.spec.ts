@@ -4,6 +4,7 @@
 // region (what the background does with captureVisibleTab), render with
 // vectorRenderer, open the SVG in the same browser and check what a reader
 // of the file gets:
+//   V0 the save message (model with scene) passes the background's validator
 //   V1 (G2) diffRatio(page, SVG) <= vector.tolerance (default T) for the
 //      vector-* fixtures; the other fixtures report theirs
 //   V2 (G4) patch area / region <= vector.maxPatchArea and the scene's
@@ -14,7 +15,7 @@
 //      the text); vector.hidden runs are transparent, vector.visible ones
 //      painted
 //   V4 (G5) well-formed; no <script>, <foreignObject> or on* attribute;
-//      url() only for generated clip ids; images only as base64 png, jpeg,
+//      url() only for generated clip and gradient ids; images only as base64 png, jpeg,
 //      webp or gif data URLs
 //   V5 every picture the scene drew from an <img> or <canvas> has at most the
 //      pixels of its box at the page's density (+1 rounding): the part that
@@ -26,6 +27,7 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
 import { linksRelativeTo, runsRelativeTo, unionArea } from "../../src/shared/geometry.ts";
+import { isToBackground } from "../../src/shared/messages.ts";
 import type { DocRect, Patch, RasterTile, Scene } from "../../src/shared/types.ts";
 import { diffRatio } from "./diff.ts";
 
@@ -514,6 +516,48 @@ test("pictures over the data URL budget are patches", async ({ page }) => {
   expect(pictureOps(scene.ops)).toHaveLength(2);
 });
 
+test("gradients: the page's own body, its background not on the canvas (the root has one), is drawn", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.prepare = () => {
+      document.documentElement.style.background = "rgb(255, 255, 255)";
+      document.body.style.background = "linear-gradient(rgb(255, 0, 0), rgb(0, 0, 255))";
+    };
+  });
+  const scene = await sceneOf(page, '<main id="cap" style="width:200px;height:40px"></main>');
+  expect(scene.unsupported).toEqual({});
+  const find = (ops: Scene["ops"]): number =>
+    ops.reduce(
+      (n, op) => n + (op.op === "group" ? find(op.children) : op.op === "rect" && op.gradient ? 1 : 0),
+      0,
+    );
+  expect(find(scene.ops)).toBe(1);
+});
+
+test("gradients: laid out over the padding box (their origin), painted over the border box", async ({
+  page,
+}) => {
+  // Borders 4 (top) and 10 (left): the padding box is 100 x 40 at (10, 4) in the border box.
+  const scene = await sceneOf(
+    page,
+    '<main id="cap" style="width:200px"><div style="width:100px;height:40px;border:solid rgb(0,0,0);border-width:4px 0 0 10px;background:linear-gradient(to right, rgb(255, 0, 0), rgb(0, 0, 255))"></div></main>',
+  );
+  const find = (ops: Scene["ops"]): Scene["ops"][number][] =>
+    ops.flatMap((op) =>
+      op.op === "group" ? find(op.children) : op.op === "rect" && op.gradient ? [op] : [],
+    );
+  const [op] = find(scene.ops);
+  expect(op?.op === "rect" && [op.x, op.y, op.width, op.height, op.gradient?.from, op.gradient?.to]).toEqual([
+    0,
+    0,
+    110,
+    44,
+    [10, 24],
+    [110, 24],
+  ]);
+});
+
 /** Each patch's pixels, cut from the region's screenshot on whole pixels (DPR 1, CSS scale). */
 async function cropTiles(page: Page, png: Buffer, patches: Patch[]): Promise<RasterTile[]> {
   return page.evaluate(
@@ -606,24 +650,31 @@ for (const file of fixtures) {
     const ref = await page.screenshot({ clip: { ...capture, ...shotSize }, fullPage: true, scale: "css" });
     const tiles = await cropTiles(page, ref, scene.patches);
     const runs = runsRelativeTo(col.runs, capture);
+    const links = linksRelativeTo(col.links, capture);
+    const pageMeta = {
+      url: col.url,
+      title: col.title,
+      lang: col.lang,
+      textFragmentURL: null,
+      textFragmentStatus: "DISABLED" as const,
+      viewport: col.viewport,
+      scroll: col.scroll,
+      devicePixelRatio: col.devicePixelRatio,
+      capturedAt: "2026-10-01T00:00:00.000Z",
+      mode: "element" as const,
+      skippedFrames: col.stats.skippedFrames,
+      skippedVertical: col.stats.skippedVertical,
+    };
+    // V0: the background takes the content script's save message as it is.
+    expect(
+      isToBackground({ type: "save", model: { region: capture, runs, links, page: pageMeta, scene } }),
+      "V0 the save passes the background's validator",
+    ).toBe(true);
     const svg = await page.evaluate((input) => window.__snapii.renderVector(input), {
       region: capture,
       runs,
-      links: linksRelativeTo(col.links, capture),
-      page: {
-        url: col.url,
-        title: col.title,
-        lang: col.lang,
-        textFragmentURL: null,
-        textFragmentStatus: "DISABLED" as const,
-        viewport: col.viewport,
-        scroll: col.scroll,
-        devicePixelRatio: col.devicePixelRatio,
-        capturedAt: "2026-10-01T00:00:00.000Z",
-        mode: "element" as const,
-        skippedFrames: col.stats.skippedFrames,
-        skippedVertical: col.stats.skippedVertical,
-      },
+      links,
+      page: pageMeta,
       tiles,
       extensionVersion: "0.0.0-test",
       zoom: 1,
@@ -688,7 +739,7 @@ for (const file of fixtures) {
     expect.soft(/<script|<foreignObject/i.test(svg), "V4 no script, no foreignObject").toBe(false);
     expect.soft(got.eventAttrs, "V4 no event attributes").toEqual([]);
     for (const m of svg.matchAll(/url\(([^)]*)\)/g))
-      expect.soft(m[1], "V4 url() only for clip ids").toMatch(/^#c\d+$/);
+      expect.soft(m[1], "V4 url() only for clip and gradient ids").toMatch(/^#[cg]\d+$/);
     for (const m of svg.matchAll(/href="([^"]*)"/g)) {
       if (m[1]?.startsWith("data:"))
         expect.soft(m[1], "V4 image data URLs").toMatch(/^data:image\/(png|jpeg|webp|gif);base64,/);

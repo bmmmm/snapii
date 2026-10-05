@@ -23,6 +23,7 @@ import { intersect, union } from "../../shared/geometry.ts";
 import { fitRadii } from "../../shared/svg/vector.ts";
 import type {
   DocRect,
+  LinearGradient,
   Paint,
   Patch,
   Radii,
@@ -38,6 +39,7 @@ import { collapse, isIconText } from "../../shared/whitespace.ts";
 import { createHtml, setImportant } from "../overlay/styles.ts";
 import type { RunSource } from "./collect.ts";
 import { type FrameContext, flatParent, walkFlatTree } from "./flat-tree.ts";
+import { linearGradient } from "./gradient.ts";
 import { Layout } from "./visibility.ts";
 
 export interface SceneOptions {
@@ -92,6 +94,7 @@ class OverBudget extends Error {}
 // Client rects come in 1/60 px steps; this much counts as the same edge.
 const EPS = 0.5;
 const WHITE: Paint = { r: 255, g: 255, b: 255, a: 1 };
+const CLEAR: Paint = { r: 0, g: 0, b: 0, a: 0 };
 const SIDES = ["top", "right", "bottom", "left"] as const;
 const CORNERS = ["top-left", "top-right", "bottom-right", "bottom-left"] as const;
 
@@ -261,6 +264,8 @@ class Builder {
   readonly #rects = new Map<Box, DocRect>();
   /** The drawn part of each <img> and <canvas> that shows one; opaque ones hide text as fills do. */
   readonly #pictures = new Map<Box, { op: Extract<SceneOp, { op: "image" }>; opaque: boolean }>();
+  /** Background gradients that are drawn, over each box's origin box. */
+  readonly #gradients = new Map<Box, LinearGradient>();
   #picturePixels = 0;
   #pictureChars = 0;
   #seq = 0;
@@ -451,8 +456,10 @@ class Builder {
     const r = this.#rect(b);
     const reach = { x: r.x - m, y: r.y - m, width: r.width + 2 * m, height: r.height + 2 * m };
     if (name !== "html" && name !== "body" && !intersect(reach, this.region)) return null;
-    if (!b.propagated && cs.backgroundImage !== "none")
-      return cs.backgroundImage.includes("url(") ? "background-image" : "gradient";
+    if (!b.propagated && cs.backgroundImage !== "none") {
+      if (cs.backgroundImage.includes("url(")) return "background-image";
+      if (!this.#gradient(b)) return "gradient";
+    }
     if (cs.boxShadow !== "none") return "box-shadow";
     const text = b.kids.some((k) => !isBox(k) && k.data.trim() !== "");
     if (
@@ -589,6 +596,42 @@ class Builder {
     this.#pictureChars += dataURL.length;
     this.#pictures.set(b, { op: { op: "image", ...visible, dataURL }, opaque });
     return null;
+  }
+
+  /**
+   * b's background gradient over its origin box, when SVG draws it alike:
+   * one layer at its own size and place, on one box (not across an inline
+   * box's lines), scrolling with it, not blended or clipped to text.
+   */
+  #gradient(b: Box): LinearGradient | null {
+    const { cs } = b;
+    const frags = this.#fragments(b);
+    // There is always one.
+    const frag = frags[0] as DocRect;
+    // A frame's root or body may paint the frame's whole canvas: that is
+    // known only when the frame's canvas is painted, after this.
+    const doc = b.el.ownerDocument;
+    const frameCanvas = b.ctx.frame && (b.el === doc.documentElement || b.el === doc.body);
+    if (
+      frameCanvas ||
+      frags.length > 1 ||
+      !/^auto( auto)?$/.test(cs.backgroundSize) ||
+      cs.backgroundPosition !== "0% 0%" ||
+      cs.backgroundAttachment !== "scroll" ||
+      (cs.getPropertyValue("background-blend-mode") || "normal") !== "normal" ||
+      /text/.test(cs.backgroundClip)
+    )
+      return null;
+    const border = sides(cs).map((s) => (shown(s) ? s.width : 0)) as Quad;
+    const origin = this.#backgroundArea(cs, frag, border, cs.backgroundOrigin);
+    const area = this.#backgroundArea(cs, frag, border);
+    // Beyond its origin box CSS repeats the gradient and SVG pads it: alike
+    // only under borders that hide it.
+    const opaqueBorders = sides(cs).every((s) => !shown(s) || parseColor(s.color)?.a === 1);
+    if (!within(area, origin) && !(same(origin, inset(frag, ...border)) && opaqueBorders)) return null;
+    const g = linearGradient(cs.backgroundImage, origin.width, origin.height);
+    if (g) this.#gradients.set(b, g);
+    return g;
   }
 
   #bordersDrawable(b: Box): boolean {
@@ -899,6 +942,7 @@ class Builder {
     const borders = sides(cs);
     const [bt, br, bb, bl] = borders.map((s) => (shown(s) ? s.width : 0)) as [number, number, number, number];
     const bg = b.propagated ? null : parseColor(cs.backgroundColor);
+    const gradient = this.#gradients.get(b);
     for (const [i, frag] of frags.entries()) {
       const first = i === 0;
       const last = i === frags.length - 1;
@@ -910,11 +954,31 @@ class Builder {
       const rightEdge = rtl ? startEdge : endEdge;
       const all = this.#radii(cs, frag);
       const radii = all && (single ? all : this.#sliceRadii(all, leftEdge, rightEdge));
-      if (bg && bg.a > 0) {
-        const area = this.#backgroundArea(cs, frag, [bt, rightEdge ? br : 0, bb, leftEdge ? bl : 0]);
+      if ((bg && bg.a > 0) || gradient) {
+        const edges: Quad = [bt, rightEdge ? br : 0, bb, leftEdge ? bl : 0];
+        const area = this.#backgroundArea(cs, frag, edges);
         const r = area === frag ? radii : undefined;
-        ops.push({ op: "rect", ...area, ...(r ? { radii: r } : {}), fill: bg });
-        this.#opaque(area, clip, bg);
+        // The gradient is laid out over the origin box, the op is the painted area.
+        const origin = gradient && this.#backgroundArea(cs, frag, edges, cs.backgroundOrigin);
+        const dx = origin ? origin.x - area.x : 0;
+        const dy = origin ? origin.y - area.y : 0;
+        ops.push({
+          op: "rect",
+          ...area,
+          ...(r ? { radii: r } : {}),
+          ...(bg && bg.a > 0 ? { fill: bg } : {}),
+          ...(gradient
+            ? {
+                gradient: {
+                  ...gradient,
+                  from: [gradient.from[0] + dx, gradient.from[1] + dy],
+                  to: [gradient.to[0] + dx, gradient.to[1] + dy],
+                },
+              }
+            : {}),
+        });
+        const covers = (bg?.a ?? 0) >= 1 || (gradient?.stops.every((s) => s.paint.a >= 1) ?? false);
+        this.#opaque(area, clip, covers ? WHITE : CLEAR);
       }
       this.#borderOps(borders, frag, radii, leftEdge, rightEdge, ops);
     }
@@ -936,8 +1000,13 @@ class Builder {
     return out.some(([x, y]) => x > 0 && y > 0) ? out : undefined;
   }
 
-  #backgroundArea(cs: CSSStyleDeclaration, frag: DocRect, border: [number, number, number, number]): DocRect {
-    const clipTo = cs.backgroundClip;
+  /** The box a background is painted in (`background-clip`), or another of its boxes. */
+  #backgroundArea(
+    cs: CSSStyleDeclaration,
+    frag: DocRect,
+    border: [number, number, number, number],
+    clipTo = cs.backgroundClip,
+  ): DocRect {
     if (clipTo === "padding-box") return inset(frag, ...border);
     if (clipTo === "content-box") {
       const [t, r, b, l] = border;

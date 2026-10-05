@@ -114,6 +114,20 @@ const isRadii = (x: unknown): boolean =>
 const isClip = (x: unknown): boolean =>
   isRect(x) && ((x as Rec).radii === undefined || isRadii((x as Rec).radii));
 
+// A page's gradient has a handful of stops; the content script adds a few
+// for each change of alpha, and patches a gradient that would need more
+// (content/extract/gradient.ts).
+export const MAX_GRADIENT_STOPS = 2_048;
+const isPoint = (x: unknown): boolean => Array.isArray(x) && x.length === 2 && x.every(isNum);
+const isGradient = (x: unknown): boolean =>
+  isRec(x) &&
+  isPoint(x.from) &&
+  isPoint(x.to) &&
+  Array.isArray(x.stops) &&
+  x.stops.length >= 1 &&
+  x.stops.length <= MAX_GRADIENT_STOPS &&
+  x.stops.every((s) => isRec(s) && inRange(s.offset, 0, 1) && isPaint(s.paint));
+
 function isOp(x: unknown, depth: number, budget: { left: number }): boolean {
   if (!isRec(x) || --budget.left < 0) return false;
   if (x.op === "rect") {
@@ -122,6 +136,7 @@ function isOp(x: unknown, depth: number, budget: { left: number }): boolean {
       isRect(x) &&
       (x.radii === undefined || isRadii(x.radii)) &&
       (x.fill === undefined || isPaint(x.fill)) &&
+      (x.gradient === undefined || isGradient(x.gradient)) &&
       (stroke === undefined ||
         (isRec(stroke) && isNum(stroke.width) && stroke.width >= 0 && isPaint(stroke.paint))) &&
       (border === undefined ||

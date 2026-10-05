@@ -13,6 +13,7 @@ import { unionArea } from "../geometry.ts";
 import { SPIKE_VECTOR } from "../spike.ts";
 import type {
   DocRect,
+  LinearGradient,
   Paint,
   Radii,
   RenderInput,
@@ -138,31 +139,68 @@ function ringLine(
   return `<path d="${d}" fill-rule="evenodd" ${paintAttrs(paint, "fill")}/>`;
 }
 
-/** Hands out clip ids in order of first use; one <clipPath> per distinct shape. */
-class Clips {
+const unit = (v: number): number => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
+
+/** Hands out clip and gradient ids in order of first use; one definition per distinct one. */
+class Defs {
   #ids = new Map<string, string>();
+  #clips = 0;
+  #gradients = 0;
   #defs: string[] = [];
 
-  id(clip: SceneClip): string {
-    const key = JSON.stringify([clip.x, clip.y, clip.width, clip.height, clip.radii ?? null]);
-    let id = this.#ids.get(key);
+  clip(clip: SceneClip): string {
+    return this.#id(["clip", clip.x, clip.y, clip.width, clip.height, clip.radii ?? null], () => {
+      const id = `c${this.#clips++}`;
+      return [id, `<clipPath id="${id}">${shape(clip, clip.radii, "")}</clipPath>`];
+    });
+  }
+
+  /** A gradient over the rect at (x, y): its line is relative to that corner. */
+  gradient(g: LinearGradient, x: number, y: number): string {
+    const [x1, y1, x2, y2] = [x + g.from[0], y + g.from[1], x + g.to[0], y + g.to[1]];
+    return this.#id(["gradient", x1, y1, x2, y2, g.stops], () => {
+      const id = `g${this.#gradients++}`;
+      const stops = g.stops.map((s) => {
+        const p = s.paint;
+        const a = unit(p.a);
+        const opacity = a >= 1 ? "" : ` stop-opacity="${fmt(a)}"`;
+        return `<stop offset="${fmt(unit(s.offset))}" stop-color="rgb(${channel(p.r)},${channel(p.g)},${channel(p.b)})"${opacity}/>`;
+      });
+      return [
+        id,
+        [
+          `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${fmt(x1)}" y1="${fmt(y1)}" x2="${fmt(x2)}" y2="${fmt(y2)}">`,
+          ...pad(stops),
+          "</linearGradient>",
+        ].join("\n"),
+      ];
+    });
+  }
+
+  #id(key: unknown[], make: () => [string, string]): string {
+    const k = JSON.stringify(key);
+    let id = this.#ids.get(k);
     if (!id) {
-      id = `c${this.#ids.size}`;
-      this.#ids.set(key, id);
-      this.#defs.push(`<clipPath id="${id}">${shape(clip, clip.radii, "")}</clipPath>`);
+      const [made, def] = make();
+      id = made;
+      this.#ids.set(k, id);
+      this.#defs.push(def);
     }
     return id;
   }
 
   lines(): string[] {
-    return this.#defs.length === 0 ? [] : ["<defs>", ...pad(this.#defs), "</defs>"];
+    return this.#defs.length === 0
+      ? []
+      : ["<defs>", ...pad(this.#defs.flatMap((d) => d.split("\n"))), "</defs>"];
   }
 }
 
 /** A CSS border is painted inside the border box: a stroke centred half its width in. */
-function rectLines(op: Extract<SceneOp, { op: "rect" }>): string[] {
+function rectLines(op: Extract<SceneOp, { op: "rect" }>, defs: Defs): string[] {
   const out: string[] = [];
   if (op.fill) out.push(shape(op, op.radii, paintAttrs(op.fill, "fill")));
+  if (op.gradient) out.push(shape(op, op.radii, `fill="url(#${defs.gradient(op.gradient, op.x, op.y)})"`));
   const stroke = op.stroke;
   if (stroke && stroke.width > 0) {
     const w = stroke.width;
@@ -183,18 +221,18 @@ function rectLines(op: Extract<SceneOp, { op: "rect" }>): string[] {
   return out;
 }
 
-function opLines(op: SceneOp, clips: Clips): string[] {
-  if (op.op === "rect") return rectLines(op);
+function opLines(op: SceneOp, defs: Defs): string[] {
+  if (op.op === "rect") return rectLines(op, defs);
   if (op.op === "image") {
     return [
       `<image x="${fmt(op.x)}" y="${fmt(op.y)}" width="${fmt(op.width)}" height="${fmt(op.height)}" preserveAspectRatio="none" xlink:href="${xmlAttr(op.dataURL)}"/>`,
     ];
   }
   const attrs = [
-    ...(op.clip ? [`clip-path="url(#${clips.id(op.clip)})"`] : []),
+    ...(op.clip ? [`clip-path="url(#${defs.clip(op.clip)})"`] : []),
     ...(op.opacity !== undefined && op.opacity < 1 ? [`opacity="${fmt(Math.max(0, op.opacity))}"`] : []),
   ];
-  const children = op.children.flatMap((c) => opLines(c, clips));
+  const children = op.children.flatMap((c) => opLines(c, defs));
   return [`<g${attrs.length ? ` ${attrs.join(" ")}` : ""}>`, ...pad(children), "</g>"];
 }
 
@@ -213,8 +251,8 @@ export function vectorRenderer(input: VectorRenderInput): string {
   const h = fmt(Math.ceil(region.height - 0.005));
   const lang = page.lang ? ` xml:lang="${xmlAttr(page.lang)}"` : "";
   const desc = `Region of ${page.url} captured ${page.capturedAt} by snapii ${input.extensionVersion}. Shapes and text are vector; parts that could not be converted are pixels. Text is selectable; links are clickable.`;
-  const clips = new Clips();
-  const shapes = scene.ops.flatMap((op) => opLines(op, clips));
+  const defs = new Defs();
+  const shapes = scene.ops.flatMap((op) => opLines(op, defs));
 
   const paints = new Map<TextRun, TextPaint | null>();
   input.runs.forEach((run, i) => {
@@ -229,7 +267,7 @@ export function vectorRenderer(input: VectorRenderInput): string {
     if (!p) return `${edge}${TRANSPARENT}`;
     const attrs = [paintAttrs(p.fill, "fill")];
     if (p.letterSpacing) attrs.push(`letter-spacing="${fmt(p.letterSpacing)}"`);
-    if (p.clip) attrs.push(`clip-path="url(#${clips.id(p.clip)})"`);
+    if (p.clip) attrs.push(`clip-path="url(#${defs.clip(p.clip)})"`);
     return `${edge}${attrs.join(" ")}`;
   };
   const text = textLayerLines(input.runs, {
@@ -252,7 +290,7 @@ export function vectorRenderer(input: VectorRenderInput): string {
     `  <title>${xmlText(page.title)}</title>`,
     `  <desc>${xmlText(desc)}</desc>`,
     ...pad(metadataLines(input, record)),
-    ...pad(clips.lines()),
+    ...pad(defs.lines()),
     `  <rect id="canvas" width="${w}" height="${h}" ${paintAttrs(scene.canvas, "fill")}/>`,
     ...pad(group("shapes", shapes)),
     ...pad(group("patches", input.tiles.map(imageLine))),

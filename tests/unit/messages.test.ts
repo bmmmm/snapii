@@ -146,6 +146,14 @@ const scene = (): Scene => ({
             [2, 3],
           ],
           fill: { r: 10, g: 20, b: 30, a: 0.25 },
+          gradient: {
+            from: [0, -5],
+            to: [30, 25],
+            stops: [
+              { offset: 0, paint: { r: 255, g: 0, b: 0, a: 1 } },
+              { offset: 1, paint: { r: 0, g: 0, b: 255, a: 0 } },
+            ],
+          },
           stroke: { width: 1, paint: { r: 0, g: 0, b: 0, a: 1 } },
           border: { widths: [1, 4, 1, 0], paint: { r: 9, g: 9, b: 9, a: 1 } },
         },
@@ -194,6 +202,21 @@ const sceneMutations: Array<[string, (s: Loose) => void]> = [
   ["rect radius NaN", (s) => (s.ops[0].children[0].radii[0] = [Number.NaN, 0])],
   ["rect radius one value", (s) => (s.ops[0].children[0].radii[1] = [3])],
   ["rect radii a string", (s) => (s.ops[0].children[0].radii = "4px ")],
+  ["gradient a CSS string", (s) => (s.ops[0].children[0].gradient = "linear-gradient(red, blue)")],
+  ["gradient from one number", (s) => (s.ops[0].children[0].gradient.from = [0])],
+  ["gradient to NaN", (s) => (s.ops[0].children[0].gradient.to = [0, Number.NaN])],
+  ["gradient without stops", (s) => (s.ops[0].children[0].gradient.stops = [])],
+  [
+    "gradient with too many stops",
+    (s) => {
+      const g = s.ops[0].children[0].gradient;
+      g.stops = Array.from({ length: 2_049 }, () => ({ ...g.stops[0] }));
+    },
+  ],
+  ["gradient stop offset above 1", (s) => (s.ops[0].children[0].gradient.stops[1].offset = 1.5)],
+  ["gradient stop offset negative", (s) => (s.ops[0].children[0].gradient.stops[0].offset = -0.1)],
+  ["gradient stop offset missing", (s) => delete s.ops[0].children[0].gradient.stops[0].offset],
+  ["gradient stop paint a string", (s) => (s.ops[0].children[0].gradient.stops[0].paint = "red")],
   ["stroke a CSS string", (s) => (s.ops[0].children[0].stroke = "1px solid red")],
   ["stroke null", (s) => (s.ops[0].children[0].stroke = null)],
   ["border widths three", (s) => (s.ops[0].children[0].border = { widths: [1, 2, 3], paint: s.canvas })],

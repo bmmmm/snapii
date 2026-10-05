@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { unionArea } from "../../src/shared/geometry.ts";
 import { rasterTextRenderer } from "../../src/shared/svg/build.ts";
 import { type VectorRenderInput, vectorRenderer } from "../../src/shared/svg/vector.ts";
-import type { RasterTile, Scene, SceneOp, TextRun } from "../../src/shared/types.ts";
+import type { LinearGradient, RasterTile, Scene, SceneOp, TextRun } from "../../src/shared/types.ts";
 import {
   attr,
   byId,
@@ -576,6 +576,95 @@ test("vector: clip ids are a counter in order of first use, one clipPath per dis
   const shared = render({ scene: twice });
   assert.equal([...shared.matchAll(/<clipPath /g)].length, 1);
   assert.equal([...shared.matchAll(/clip-path="url\(#c0\)"/g)].length, 3);
+});
+
+const RED_TO_BLUE: LinearGradient = {
+  from: [0, 0],
+  to: [0, 10],
+  stops: [
+    { offset: 0, paint: { r: 255, g: 0, b: 0, a: 1 } },
+    { offset: 1, paint: { r: 0, g: 0, b: 255, a: 0.5 } },
+  ],
+};
+
+test("vector: a gradient is a <linearGradient> on the rect's own line, over its colour; ids count apart from clips", () => {
+  const root = parseXml(
+    render({
+      scene: {
+        ...makeScene(),
+        ops: [
+          {
+            op: "group",
+            clip: { x: 1, y: 1, width: 5, height: 5 },
+            children: [box({ x: 20, y: 30, gradient: RED_TO_BLUE })],
+          },
+          // The same line at the same place: the same gradient.
+          box({ x: 20, y: 30, gradient: RED_TO_BLUE, fill: undefined }),
+          // Elsewhere: a gradient of its own, its line moved along.
+          box({ x: 50, y: 30, gradient: RED_TO_BLUE }),
+        ],
+      },
+    }),
+  );
+  const gradients = named(root, "linearGradient");
+  assert.deepEqual(
+    gradients.map((g) => ["id", "gradientUnits", "x1", "y1", "x2", "y2"].map((k) => attr(g, k))),
+    [
+      ["g0", "userSpaceOnUse", "20", "30", "20", "40"],
+      ["g1", "userSpaceOnUse", "50", "30", "50", "40"],
+    ],
+  );
+  assert.deepEqual(
+    named(gradients[0] as XEl, "stop").map((s) => [
+      attr(s, "offset"),
+      attr(s, "stop-color"),
+      s.attrs.get("stop-opacity") ?? null,
+    ]),
+    [
+      ["0", "rgb(255,0,0)", null],
+      ["1", "rgb(0,0,255)", "0.5"],
+    ],
+  );
+  assert.deepEqual(
+    named(byId(root, "shapes"), "rect").map((r) => attr(r, "fill")),
+    ["rgb(0,0,0)", "url(#g0)", "url(#g0)", "rgb(0,0,0)", "url(#g1)"],
+  );
+  assert.equal(attr(named(root, "clipPath")[0] as XEl, "id"), "c0");
+});
+
+test("vector: gradient stops are numbers only: offsets and alpha clamped to 0-1, channels to bytes", () => {
+  const root = parseXml(
+    render({
+      scene: {
+        ...makeScene(),
+        ops: [
+          box({
+            gradient: {
+              from: [0, 0],
+              to: [10, 0],
+              stops: [
+                { offset: -1, paint: { r: 300, g: -5, b: Number.NaN, a: 2 } },
+                { offset: Number.NaN, paint: { r: 1, g: 2, b: 3, a: -1 } },
+                { offset: 7, paint: { r: 1, g: 2, b: 3, a: 0.25 } },
+              ],
+            },
+          }),
+        ],
+      },
+    }),
+  );
+  assert.deepEqual(
+    named(root, "stop").map((s) => [
+      attr(s, "offset"),
+      attr(s, "stop-color"),
+      s.attrs.get("stop-opacity") ?? null,
+    ]),
+    [
+      ["0", "rgb(255,0,0)", null],
+      ["0", "rgb(1,2,3)", "0"],
+      ["1", "rgb(1,2,3)", "0.25"],
+    ],
+  );
 });
 
 test("vector: output is deterministic and ends in a single newline", () => {
