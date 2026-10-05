@@ -385,7 +385,8 @@ class Builder {
       // A see-through background is painted over the system canvas.
       if (bg && bg.a > 0) {
         const under = this.#systemCanvas();
-        const mix = (c: number, u: number) => c * bg.a + u * (1 - bg.a);
+        // Rounding can leave the sum a hair above 255, which the background refuses.
+        const mix = (c: number, u: number) => Math.min(255, c * bg.a + u * (1 - bg.a));
         return { r: mix(bg.r, under.r), g: mix(bg.g, under.g), b: mix(bg.b, under.b), a: 1 };
       }
     }

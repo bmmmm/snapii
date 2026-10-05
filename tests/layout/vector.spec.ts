@@ -516,6 +516,29 @@ test("pictures over the data URL budget are patches", async ({ page }) => {
   expect(pictureOps(scene.ops)).toHaveLength(2);
 });
 
+test("canvas: a see-through root or body background mixed over the system canvas stays within 0-255", async ({
+  page,
+}) => {
+  // 255 * 0.46 + 255 * 0.54 is a hair above 255 in floating point, and the background refuses that.
+  for (const [root, body] of [
+    ["rgba(255, 255, 255, 0.46)", "transparent"],
+    ["transparent", "rgba(255, 0, 0, 0.08)"],
+  ]) {
+    await page.addInitScript(
+      ([root, body]) => {
+        window.prepare = () => {
+          document.documentElement.style.background = root as string;
+          document.body.style.background = body as string;
+        };
+      },
+      [root, body],
+    );
+    const { canvas } = await sceneOf(page, '<main id="cap" style="width:100px;height:20px"></main>');
+    for (const k of ["r", "g", "b"] as const)
+      expect(canvas[k] >= 0 && canvas[k] <= 255, `${root} / ${body}: ${k} ${canvas[k]}`).toBe(true);
+  }
+});
+
 test("outlines: a negative offset shrinks the box down to its centre at most, as both browsers paint it", async ({
   page,
 }) => {
