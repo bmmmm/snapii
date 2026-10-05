@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>vector canvas tint</title>
+    <!--
+      A see-through body background propagates to the canvas and is painted
+      over the system colour Canvas: a tenth of blue over white.
+    -->
+    <style>
+      body { margin: 20px; font: 16px/1.5 serif; background: rgba(0, 0, 200, 0.1); }
+      #cap { width: 300px; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Text on a tinted canvas"],
+        "vector": { "tolerance": 0.005, "maxPatchArea": 0, "unsupported": {}, "canvas": "rgb(230,230,250)" }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap"><p>Text on a tinted canvas</p></main>
+  </body>
+</html>

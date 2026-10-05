@@ -110,3 +110,23 @@ export const SPIKE_CHROMIUM = {
   // USER_CANCELED (headless, where no dialog can open, every saveAs ends so).
   downloadResolvesBeforeSaveAs: true,
 } as const;
+
+// Vector output: how SVG text renders, measured on Playwright's Firefox
+// (build 1543) and Chromium (build 1243), headless, macOS, DPR 1, on
+// 2026-10-04 by rendering the layout fixtures' runs as visible vector text
+// and comparing with the page (diffRatio, tests/layout/diff.ts). Imported by
+// the pure vectorRenderer(). Same rule: a value changes only with a new
+// measurement of that kind.
+export const SPIKE_VECTOR = {
+  measuredOn: "Playwright Firefox build 1543 and Chromium build 1243, headless, macOS, 2026-10-04 (V1, V2)",
+
+  // V1: with textLength, lengthAdjust "spacing" came within 0.03 pt of
+  // "spacingAndGlyphs" or better on five fixtures and kept the glyphs' shape
+  // (letter-spacing.html without letter-spacing written: 8.85 % vs 11.13 %
+  // Firefox, 7.04 % vs 9.39 % Chromium).
+  visibleTextLengthAdjust: "spacing",
+  // V2: Chromium drops a <text>'s leading and trailing space unless the
+  // element itself has xml:space="preserve" or white-space: pre; inherited
+  // from a <g> it does not count. Firefox keeps it either way.
+  edgeSpaceNeedsOwnPreserve: true,
+} as const;

@@ -298,6 +298,7 @@ export class Driver {
         status: document.getElementById("status").textContent,
         shortcut: document.getElementById("capture-shortcut").textContent,
         about: document.getElementById("about")?.textContent ?? null,
+        ocrDisabled: document.querySelector('input[name="ocr"]').disabled,
       })`),
     );
   }

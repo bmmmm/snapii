@@ -139,6 +139,17 @@ export class Layout {
     return clip;
   }
 
+  /** The area in which el's own box (background, border) can be seen: the clip of what contains it. */
+  boxClip(el: Element, ctx: FrameContext): DocRect | null {
+    const container = this.#containerOf(el, this.style(el).position);
+    return container ? this.clip(container, ctx) : this.frame(ctx).clip;
+  }
+
+  /** The element whose content area el's box lies in, following the containing-block chain. */
+  container(el: Element): Element | null {
+    return this.#containerOf(el, this.style(el).position);
+  }
+
   // Overflow clipping follows the containing-block chain: an absolutely
   // positioned box escapes overflow:hidden on static ancestors, a fixed one
   // escapes everything up to a transformed ancestor.

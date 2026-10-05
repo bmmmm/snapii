@@ -148,3 +148,21 @@ export function planTiles(rect: DocRect, scale: number, limits: TileLimits): Pla
   }
   return tiles;
 }
+
+/**
+ * The capture calls for a vector capture's patches (region-relative): each
+ * patch planned like a region of its own, with `rel` made relative to the
+ * capture region again.
+ */
+export function planPatches(
+  region: DocRect,
+  patches: readonly DocRect[],
+  scale: number,
+  limits: TileLimits,
+): PlannedTile[] {
+  return patches.flatMap((p) =>
+    planTiles({ x: region.x + p.x, y: region.y + p.y, width: p.width, height: p.height }, scale, limits).map(
+      (t) => ({ ...t, rel: { ...t.rel, x: t.rel.x + p.x, y: t.rel.y + p.y } }),
+    ),
+  );
+}

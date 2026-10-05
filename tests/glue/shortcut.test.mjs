@@ -153,6 +153,8 @@ test("Reset shortcut -> Alt+Shift+S again, on the <key> element and in the field
   await g.until(async () => /^Shortcut saved/.test(await statusText()), "the saved status");
   assert.equal(await shortcut(), "Alt+Shift+Y");
 
+  // The page is taller than the viewport: the click goes to where the button is on screen.
+  await g.content(`document.getElementById("shortcut-reset").scrollIntoView({ block: "center" });`);
   const r = await g.rect("#shortcut-reset");
   await g.click(r.x + r.width / 2, r.y + r.height / 2);
   await g.until(async () => /^Default restored/.test(await statusText()), "the restored status");

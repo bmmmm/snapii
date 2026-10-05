@@ -17,6 +17,7 @@ import {
   type RunSource,
 } from "../../src/content/extract/collect.ts";
 import { collectLinkAreas } from "../../src/content/extract/images.ts";
+import { buildScene } from "../../src/content/extract/scene.ts";
 import { GENERATION_TIMEOUT_MS, textFragmentURL } from "../../src/content/fragment.ts";
 import { startOverlay } from "../../src/content/overlay/overlay.ts";
 import { showToast } from "../../src/content/overlay/toolbar.ts";
@@ -24,6 +25,7 @@ import { sessionToggle, startSession } from "../../src/content/session.ts";
 import { runsToPlainText } from "../../src/shared/plaintext.ts";
 import { fragmentToCleanHtml, toSNodes } from "../../src/shared/sanitize.ts";
 import { rasterTextRenderer } from "../../src/shared/svg/build.ts";
+import { vectorRenderer } from "../../src/shared/svg/vector.ts";
 import type { DocRect } from "../../src/shared/types.ts";
 
 /** Client -> top-level document coordinates for doc, via the frameElement chain. */
@@ -118,6 +120,9 @@ const harness = {
   sessionToggle,
   /** The SVG renderer, run in the browser by the round-trip spec. */
   render: rasterTextRenderer,
+  /** Vector output: the scene of a region and its renderer (vector.spec.ts). */
+  buildScene,
+  renderVector: vectorRenderer,
   debug: { collectTextRunsDetailed, sliceRect, probeBaseline, captureRect },
   textFragmentURL,
   GENERATION_TIMEOUT_MS,

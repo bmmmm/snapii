@@ -230,6 +230,74 @@ test("Reset to defaults -> PNG again and the text fragment is back", async () =>
   assert.equal(file.svg.capture.textFragmentStatus, "SUCCESS");
 });
 
+/**
+ * Element pick inside the first match of `selector` on `path` (a paragraph
+ * below the 30 px minimum picks its container), then Enter; the parsed file
+ * and the ms from Enter to the file.
+ */
+async function saveAt(path, selector) {
+  await g.open(path);
+  const r = await g.rect(selector);
+  const before = g.svgFiles();
+  await g.startOverlay();
+  await g.move(r.x + 10, r.y + r.height / 2);
+  await g.click(r.x + 10, r.y + r.height / 2);
+  const t0 = Date.now();
+  await g.key("Enter");
+  const file = await g.newDownload(before);
+  return { file, ms: Date.now() - t0 };
+}
+
+test("output Vector in the options page: stored, OCR switched off, and the card saves as shapes and visible text", async () => {
+  await openWith({ ocr: true });
+  await clickOn('input[name="output"][value="vector"]');
+  await saved();
+  assert.deepEqual(await stored(), { ocr: true, output: "vector" });
+  assert.equal(await g.content(`return document.querySelector('input[name="ocr"]').disabled;`), true);
+  // Back to raster: OCR can be switched again.
+  await clickOn('input[name="output"][value="raster"]');
+  await g.until(async () => (await stored()).output === "raster", "raster to be stored");
+  assert.equal(await g.content(`return document.querySelector('input[name="ocr"]').disabled;`), false);
+  await clickOn('input[name="output"][value="vector"]');
+  await g.until(async () => (await stored()).output === "vector", "vector to be stored again");
+
+  const file = await saveCard();
+  const { capture } = file.svg;
+  assert.equal(capture.output, "vector");
+  // The overlay was still on screen while the scene was built (its box has a
+  // shadow): left out, it adds no patch.
+  assert.deepEqual(capture.scene, { ops: capture.scene.ops, patches: 0, patchArea: 0, unsupported: {} });
+  assert.deepEqual(capture.tiles, []);
+  assert.equal(capture.zoom, 1);
+  assert.equal(capture.scale, 2);
+  assert.equal("ocr" in capture, false);
+  assert.match(file.text, /<rect id="canvas" width="500" height="200" fill="rgb\(255,255,255\)"\/>/);
+  // The text is painted, in the page's black.
+  assert.match(file.text, /<text [^>]*lengthAdjust="spacing"[^>]*fill="rgb\(0,0,0\)"[^>]*>First glue paragraph with a <\/text>/);
+  assert.equal(file.svg.images.length, 0);
+});
+
+test("vector output with images: each image is a patch with the page's pixels; raster beside it for the time", async () => {
+  await openWith({ output: "vector" });
+  // Loaded with vector output stored, not switched to it: the OCR switch is off too.
+  assert.equal(await g.content(`return document.querySelector('input[name="ocr"]').disabled;`), true);
+  const vector = await saveAt("/fixtures/images.html", "#cap p");
+  const { capture } = vector.file.svg;
+  assert.equal(capture.output, "vector");
+  assert.equal(capture.scene.unsupported.image, 3);
+  assert.equal(capture.tiles.length, capture.scene.patches);
+  // Two device px per CSS px, as a raster capture of the same region would have.
+  for (const t of capture.tiles) assert.equal(t.pixelWidth, Math.floor(Math.ceil(t.rect.width) * 2));
+  for (const im of vector.file.svg.images) assert.match(im.href, /^data:image\/png;base64,/);
+
+  await openWith({});
+  const raster = await saveAt("/fixtures/images.html", "#cap p");
+  assert.equal("output" in raster.file.svg.capture, false);
+  console.log(
+    `vector save with ${capture.tiles.length} patch captures: ${vector.ms} ms; raster save of the same region: ${raster.ms} ms`,
+  );
+});
+
 test("folder inside Downloads, typed with real keys: stored normalised, and the next save lands in it", async () => {
   await openWith({});
   assert.deepEqual(await folderState(), { value: "", invalid: false });

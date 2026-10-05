@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>vector marker</title>
+    <!--
+      List markers have no box in the DOM: each becomes a strip patch beside
+      its item's first line, not a patch of the whole item (whose text stays
+      vector). A list without markers gets none.
+    -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; background: rgb(255, 255, 255); }
+      #cap { width: 360px; }
+      ul, ol { margin: 0 0 8px; }
+      .plain { list-style: none; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["First item", "Second item", "One", "Two", "No marker"],
+        "vector": {
+          "maxPatchArea": 0.15,
+          "unsupported": { "marker": 4 },
+          "visible": ["First item", "Second item", "One", "Two", "No marker"]
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <ul><li>First item</li><li>Second item</li></ul>
+      <ol><li>One</li><li>Two</li></ol>
+      <ul class="plain"><li>No marker</li></ul>
+    </main>
+  </body>
+</html>

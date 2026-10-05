@@ -3,7 +3,7 @@
 // runs inside an arbitrary page, so a message is checked field by field
 // against the types before any of it reaches capture, rendering or metadata.
 
-import type { FromPopup, SaveResponse, ToBackground, ToContent } from "./types.ts";
+import type { FromPopup, SaveResponse, ToBackground, ToContent, UnsupportedReason } from "./types.ts";
 
 type Rec = Record<string, unknown>;
 
@@ -66,6 +66,113 @@ const isImageKind = isOneOf("img", "canvas", "svg-image", "background");
 
 const isImageArea = (x: unknown): boolean => isRect(x) && isImageKind((x as Rec).kind);
 
+// Every reason, so a new one cannot be added to the type and forgotten here.
+const REASONS: Record<UnsupportedReason, true> = {
+  transform: true,
+  effect: true,
+  "background-image": true,
+  gradient: true,
+  border: true,
+  "box-shadow": true,
+  "text-effect": true,
+  image: true,
+  canvas: true,
+  media: true,
+  frame: true,
+  form: true,
+  svg: true,
+  math: true,
+  pseudo: true,
+  marker: true,
+  "icon-font": true,
+  vertical: true,
+  color: true,
+  budget: true,
+};
+const isReason = (x: unknown): x is UnsupportedReason => isStr(x) && Object.hasOwn(REASONS, x);
+
+// Nesting and size a real page needs by far less of; beyond them the scene is
+// not ours, and walking it would cost the background more than it is worth.
+const MAX_SCENE_DEPTH = 32;
+const MAX_SCENE_OPS = 200_000;
+// The content script merges patches beyond 2 000 (content/extract/scene.ts).
+const MAX_SCENE_PATCHES = 10_000;
+// The only images a scene may carry; everything else (http:, javascript:,
+// image/svg+xml with its scripts) never reaches an href.
+const IMAGE_DATA_URL = /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/]*={0,2}$/;
+
+const inRange = (x: unknown, lo: number, hi: number): boolean => isNum(x) && x >= lo && x <= hi;
+
+const isPaint = (x: unknown): boolean =>
+  isRec(x) && inRange(x.r, 0, 255) && inRange(x.g, 0, 255) && inRange(x.b, 0, 255) && inRange(x.a, 0, 1);
+
+const isRadii = (x: unknown): boolean =>
+  Array.isArray(x) &&
+  x.length === 4 &&
+  x.every((c) => Array.isArray(c) && c.length === 2 && c.every((v) => isNum(v) && v >= 0));
+
+const isClip = (x: unknown): boolean =>
+  isRect(x) && ((x as Rec).radii === undefined || isRadii((x as Rec).radii));
+
+function isOp(x: unknown, depth: number, budget: { left: number }): boolean {
+  if (!isRec(x) || --budget.left < 0) return false;
+  if (x.op === "rect") {
+    const { stroke, border } = x;
+    return (
+      isRect(x) &&
+      (x.radii === undefined || isRadii(x.radii)) &&
+      (x.fill === undefined || isPaint(x.fill)) &&
+      (stroke === undefined ||
+        (isRec(stroke) && isNum(stroke.width) && stroke.width >= 0 && isPaint(stroke.paint))) &&
+      (border === undefined ||
+        (isRec(border) &&
+          Array.isArray(border.widths) &&
+          border.widths.length === 4 &&
+          border.widths.every((w) => isNum(w) && w >= 0) &&
+          isPaint(border.paint)))
+    );
+  }
+  if (x.op === "image") return isRect(x) && isStr(x.dataURL) && IMAGE_DATA_URL.test(x.dataURL);
+  if (x.op === "group") {
+    return (
+      depth < MAX_SCENE_DEPTH &&
+      (x.clip === undefined || isClip(x.clip)) &&
+      (x.opacity === undefined || inRange(x.opacity, 0, 1)) &&
+      Array.isArray(x.children) &&
+      x.children.every((c) => isOp(c, depth + 1, budget))
+    );
+  }
+  return false;
+}
+
+const isPatch = (x: unknown): boolean => isRect(x) && isReason((x as Rec).reason);
+
+const isTextPaint = (x: unknown): boolean =>
+  x === null ||
+  (isRec(x) &&
+    isPaint(x.fill) &&
+    (x.clip === undefined || isRect(x.clip)) &&
+    (x.letterSpacing === undefined || isNum(x.letterSpacing)));
+
+/** `runs`: the model's run count; the scene says how each run is painted, one entry per run. */
+const isScene = (x: unknown, runs: number): boolean => {
+  if (!isRec(x)) return false;
+  const budget = { left: MAX_SCENE_OPS };
+  return (
+    isPaint(x.canvas) &&
+    Array.isArray(x.ops) &&
+    x.ops.every((op) => isOp(op, 0, budget)) &&
+    Array.isArray(x.patches) &&
+    x.patches.length <= MAX_SCENE_PATCHES &&
+    x.patches.every(isPatch) &&
+    Array.isArray(x.text) &&
+    x.text.length === runs &&
+    x.text.every(isTextPaint) &&
+    isRec(x.unsupported) &&
+    Object.entries(x.unsupported).every(([k, n]) => isReason(k) && Number.isInteger(n) && (n as number) >= 0)
+  );
+};
+
 const isCaptureModel = (x: unknown): boolean =>
   isRec(x) &&
   isRect(x.region) &&
@@ -74,7 +181,8 @@ const isCaptureModel = (x: unknown): boolean =>
   x.runs.every(isTextRun) &&
   Array.isArray(x.links) &&
   x.links.every(isLinkArea) &&
-  isPageMeta(x.page);
+  isPageMeta(x.page) &&
+  (x.scene === undefined || isScene(x.scene, x.runs.length));
 
 /** True only for a well-formed `ToBackground`; the router drops everything else. */
 export function isToBackground(x: unknown): x is ToBackground {

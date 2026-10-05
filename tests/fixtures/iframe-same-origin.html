@@ -19,7 +19,13 @@
         "lines": ["Parent before.", "Child heading", "Child text with a link.", "Parent after."],
         "absent": ["Sandboxed secret"],
         "links": [{ "text": "a link", "href": "/child-target" }],
-        "stats": { "skippedFrames": 1 }
+        "stats": { "skippedFrames": 1 },
+        "vector": {
+          "tolerance": 0.005,
+          "maxPatchArea": 0.08,
+          "unsupported": { "frame": 1 },
+          "visible": ["Parent before.", "Child heading", "Parent after."]
+        }
       }
     </script>
   </head>

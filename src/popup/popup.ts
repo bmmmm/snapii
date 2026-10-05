@@ -126,6 +126,10 @@ let storedFolder = "";
 async function showToggles(): Promise<void> {
   const settings = await loadSettings();
   for (const key of TOGGLES) checkbox(key).checked = settings[key];
+  // Vector output has no OCR (the options page says why).
+  const vector = settings.output === "vector";
+  checkbox("ocr").disabled = vector;
+  checkbox("ocr").title = vector ? "Off for the Shapes and text output (see All settings)" : "";
   storedFolder = settings.saveFolder;
   folder.value = storedFolder;
   toggles.disabled = false;

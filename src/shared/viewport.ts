@@ -43,6 +43,41 @@ export function planViewportCrop(
   picture: { width: number; height: number },
   maxPixels: number,
 ): ViewportCrop {
+  const { source, rel } = cropSource(region, page, picture);
+  return {
+    source,
+    output: shrunk(source, Math.min(1, Math.sqrt(maxPixels / (source.width * source.height)))),
+    rel,
+  };
+}
+
+/**
+ * Several regions cut from one viewport capture (a vector capture's
+ * patches), all shrunk by one factor: the pixel budget is the sum of theirs,
+ * and each keeps the density of the others.
+ */
+export function planViewportCrops(
+  regions: readonly DocRect[],
+  page: Pick<PageMeta, "viewport" | "scroll" | "devicePixelRatio">,
+  picture: { width: number; height: number },
+  maxPixels: number,
+): ViewportCrop[] {
+  const parts = regions.map((r) => cropSource(r, page, picture));
+  const total = parts.reduce((n, { source }) => n + source.width * source.height, 0);
+  const shrink = Math.min(1, Math.sqrt(maxPixels / total));
+  return parts.map(({ source, rel }) => ({ source, output: shrunk(source, shrink), rel }));
+}
+
+const shrunk = (source: DocRect, shrink: number): { width: number; height: number } => ({
+  width: Math.max(1, Math.floor(source.width * shrink)),
+  height: Math.max(1, Math.floor(source.height * shrink)),
+});
+
+function cropSource(
+  region: DocRect,
+  page: Pick<PageMeta, "viewport" | "scroll" | "devicePixelRatio">,
+  picture: { width: number; height: number },
+): Omit<ViewportCrop, "output"> {
   const dpr = page.devicePixelRatio;
   if (
     picture.width < Math.floor(page.viewport.width * dpr) - 1 ||
@@ -64,13 +99,8 @@ export function planViewportCrop(
   const bottom = Math.min(picture.height, Math.ceil((region.y + region.height - page.scroll.y) * dpr - EPS));
   if (right <= left || bottom <= top) throw new Error("the region is outside the captured viewport");
   const source = { x: left, y: top, width: right - left, height: bottom - top };
-  const shrink = Math.min(1, Math.sqrt(maxPixels / (source.width * source.height)));
   return {
     source,
-    output: {
-      width: Math.max(1, Math.floor(source.width * shrink)),
-      height: Math.max(1, Math.floor(source.height * shrink)),
-    },
     rel: {
       x: left / dpr - (region.x - page.scroll.x),
       y: top / dpr - (region.y - page.scroll.y),

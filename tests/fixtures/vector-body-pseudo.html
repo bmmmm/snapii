@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>vector body pseudo</title>
+    <!--
+      body's own ::before paints a bar: a pseudo-element of body is one like
+      any other, so body becomes a patch (the whole region) instead of the
+      bar silently missing from the file.
+    -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; background: rgb(255, 255, 255); }
+      body::before { content: ""; display: block; height: 6px; background: rgb(200, 0, 0); }
+      #cap { width: 300px; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": { "x": 0, "y": 0, "width": 340, "height": 60 },
+        "lines": ["Text under a body bar"],
+        "vector": { "tolerance": 0.005, "maxPatchArea": 1, "unsupported": { "pseudo": 1 }, "hidden": ["Text under a body bar"] }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap"><p>Text under a body bar</p></main>
+  </body>
+</html>

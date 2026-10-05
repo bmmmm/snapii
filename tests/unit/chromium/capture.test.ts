@@ -2,7 +2,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { OutsideViewportError, TAB_CHANGED } from "../../../src/background/capture.ts";
-import { captureViewportRegion, type ViewportCaptureDeps } from "../../../src/background/chromium/capture.ts";
+import {
+  captureViewportPatches,
+  captureViewportRegion,
+  type ViewportCaptureDeps,
+} from "../../../src/background/chromium/capture.ts";
 import { DEFAULT_SETTINGS } from "../../../src/shared/settings.ts";
 
 const TAB = 7;
@@ -42,9 +46,9 @@ function deps(
     },
     async crop(dataURL, plan, settings) {
       assert.equal(dataURL, "data:viewport");
-      const crop = plan({ width: 3000, height: 2139 });
-      log.push(`crop:${settings.format}:${JSON.stringify(crop.source)}`);
-      return { dataURL: "data:cropped", planned: crop };
+      const crops = plan({ width: 3000, height: 2139 });
+      for (const crop of crops) log.push(`crop:${settings.format}:${JSON.stringify(crop.source)}`);
+      return crops.map((planned, i) => ({ dataURL: `data:cropped${i}`, planned }));
     },
   };
   return { d, log };
@@ -67,7 +71,7 @@ test("captureViewportRegion: one capture of the viewport, cropped to the region"
       y: 0,
       width: 300,
       height: 200,
-      dataURL: "data:cropped",
+      dataURL: "data:cropped0",
       pixelWidth: 900,
       pixelHeight: 600,
       format: "png",
@@ -125,4 +129,97 @@ test("captureViewportRegion: a page that scrolled between its measurement and th
     log.some((l) => l.startsWith("crop")),
     false,
   );
+});
+
+// A vector capture's patches, region-relative; the region starts in the viewport.
+const VREGION = { x: 100, y: 1200, width: 600, height: 2000 };
+
+test("captureViewportPatches: one capture for all patches, each cut out and placed region-relative", async () => {
+  const { d, log } = deps();
+  const patches = [
+    { x: 0, y: 0, width: 100, height: 50 },
+    { x: 200, y: 100, width: 50, height: 20 },
+  ];
+  const result = await captureViewportPatches(TAB, WINDOW, VREGION, patches, DEFAULT_SETTINGS, PAGE, d);
+  assert.deepEqual(log, [
+    "get:ok",
+    "capture",
+    "get:ok",
+    "scroll",
+    'crop:png:{"x":300,"y":600,"width":300,"height":150}',
+    'crop:png:{"x":900,"y":900,"width":150,"height":60}',
+  ]);
+  assert.deepEqual(
+    result.tiles.map(({ x, y, width, height, dataURL }) => ({ x, y, width, height, dataURL })),
+    [
+      { x: 0, y: 0, width: 100, height: 50, dataURL: "data:cropped0" },
+      { x: 200, y: 100, width: 50, height: 20, dataURL: "data:cropped1" },
+    ],
+  );
+  assert.equal(result.scale, 2);
+  assert.equal(result.zoom, 1.5);
+});
+
+test("captureViewportPatches: over the pixel budget, every patch shrinks by the same factor", async () => {
+  const { d } = deps();
+  const patches = [
+    { x: 0, y: 0, width: 100, height: 100 },
+    { x: 200, y: 0, width: 100, height: 50 },
+  ];
+  // 300x300 + 300x150 device px = 135 000; a quarter of that budget halves each side.
+  const settings = { ...DEFAULT_SETTINGS, maxTotalPixels: 135_000 / 4 };
+  const result = await captureViewportPatches(TAB, WINDOW, VREGION, patches, settings, PAGE, d);
+  const factors = result.tiles.map((t) => t.pixelWidth / (t.width * PAGE.devicePixelRatio));
+  assert.deepEqual(factors, [0.5, 0.5]);
+});
+
+test("captureViewportPatches: the recorded scale is the shared shrink, not that of a one-pixel crop", async () => {
+  const { d } = deps();
+  const patches = [
+    // One device px wide at dpr 3: it keeps its pixel whatever the shrink.
+    { x: 0, y: 0, width: 1 / 3, height: 100 },
+    { x: 200, y: 0, width: 100, height: 100 },
+  ];
+  const settings = { ...DEFAULT_SETTINGS, maxTotalPixels: (300 + 90_000) / 4 };
+  const result = await captureViewportPatches(TAB, WINDOW, VREGION, patches, settings, PAGE, d);
+  // Half of 3 device px per CSS px, of which 1.5 is zoom.
+  assert.equal(result.scale, 1);
+});
+
+test("captureViewportPatches: a patch beyond the viewport is refused before any capture", async () => {
+  const { d, log } = deps();
+  const patches = [
+    { x: 0, y: 0, width: 100, height: 50 },
+    { x: 0, y: 600, width: 100, height: 50 },
+  ];
+  await assert.rejects(
+    captureViewportPatches(TAB, WINDOW, VREGION, patches, DEFAULT_SETTINGS, PAGE, d),
+    OutsideViewportError,
+  );
+  assert.deepEqual(log, []);
+});
+
+test("captureViewportPatches: a patch of no device pixel (rounding noise at a zoom) is left out, not a failed save", async () => {
+  const { d } = deps();
+  const patches = [
+    { x: 0, y: 0, width: 100, height: 50 },
+    // At the region's right edge, as the scene builder leaves a neighbour's 1-ulp overlap.
+    { x: 300, y: 0, width: 2.8e-14, height: 50 },
+    // And one along an edge below.
+    { x: 0, y: 300, width: 50, height: 3e-14 },
+  ];
+  const result = await captureViewportPatches(TAB, WINDOW, VREGION, patches, DEFAULT_SETTINGS, PAGE, d);
+  assert.deepEqual(
+    result.tiles.map(({ x, y, width, height }) => ({ x, y, width, height })),
+    [{ x: 0, y: 0, width: 100, height: 50 }],
+  );
+});
+
+test("captureViewportPatches: no patches, no capture, and still a finite scale (the region may leave the viewport)", async () => {
+  const { d, log } = deps();
+  const result = await captureViewportPatches(TAB, WINDOW, VREGION, [], DEFAULT_SETTINGS, PAGE, d);
+  assert.deepEqual(log, []);
+  assert.deepEqual(result.tiles, []);
+  assert.equal(result.zoom, 1.5);
+  assert.equal(result.scale, 2);
 });

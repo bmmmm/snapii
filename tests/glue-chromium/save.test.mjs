@@ -141,6 +141,95 @@ test("Ask where to save, dialog cancelled: the page says the SVG was not saved, 
   }
 });
 
+const VECTOR_NOTICE =
+  "Parts of this selection that are saved as pixels are outside the visible area. Scroll them into view or select a smaller area";
+const IMG = `data:image/svg+xml,${encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='40' height='30'><rect width='40' height='30' fill='#c00'/></svg>")}`;
+
+/** Puts a 40 x 30 image (a patch in vector output) at the start of `selector`. */
+async function addImage(selector) {
+  await g.content(`
+    const img = document.createElement("img");
+    img.src = ${JSON.stringify(IMG)};
+    img.width = 40;
+    img.height = 30;
+    img.style.cssText = "display:block";
+    document.querySelector(${JSON.stringify(selector)}).prepend(img);
+    return img.decode();
+  `);
+  await g.frames();
+}
+
+test("vector output: shapes and visible text, no patch, and the overlay (closed shadow root, shadowed box) left out", async () => {
+  await g.setSettings({ output: "vector" });
+  try {
+    await g.open(PAGE);
+    const file = await saveElementAt(130, 150);
+    const { capture } = file.svg;
+    assert.equal(capture.output, "vector");
+    assert.deepEqual(capture.scene, { ops: capture.scene.ops, patches: 0, patchArea: 0, unsupported: {} });
+    assert.deepEqual(capture.tiles, []);
+    assert.equal(capture.scale, 2);
+    assert.equal(file.svg.images.length, 0);
+    assert.match(file.text, /<text [^>]*fill="rgb\(0,0,0\)"[^>]*>First glue paragraph with a <\/text>/);
+  } finally {
+    await g.background(() => chrome.storage.sync.clear());
+  }
+});
+
+test("vector output beyond the viewport: without patches the selection saves (Save is not held back)", async () => {
+  await g.setSettings({ output: "vector" });
+  try {
+    await g.open(PAGE);
+    await g.scrollTo(3200);
+    const before = g.svgFiles();
+    await g.startOverlay();
+    await g.click(400, 100);
+    const save = (await g.toolbar()).find((b) => b.action === "save");
+    assert.equal(save.unavailable, false);
+    await g.key("Enter");
+    const file = await g.newDownload(before);
+    assert.deepEqual(file.svg.capture.selection, { mode: "element", x: 100, y: 3000, width: 600, height: 400 });
+    assert.equal(file.svg.capture.scene.patches, 0);
+    assert.ok(file.svg.tspans.join("").includes("Below the fold text."));
+  } finally {
+    await g.background(() => chrome.storage.sync.clear());
+  }
+});
+
+test("vector output with a patch beyond the viewport: the toast says so and nothing is saved; in view, one capture", async () => {
+  await g.setSettings({ output: "vector" });
+  try {
+    await g.open(PAGE);
+    await addImage("#below");
+    // The image sits at the top of #below (document y 3000), above the viewport.
+    await g.scrollTo(3200);
+    const before = g.svgFiles();
+    await g.startOverlay();
+    await g.click(400, 100);
+    await g.key("Enter");
+    assert.equal(await g.until(() => g.toast(), "the toast"), VECTOR_NOTICE);
+    assert.equal(await g.overlayPresent(), true);
+    assert.deepEqual(g.svgFiles(), before);
+    await g.key("Escape");
+
+    await g.scrollTo(2900);
+    // #below in client px now: 100,100 to 700,500.
+    await g.startOverlay();
+    await g.drag(100, 100, 700, 500);
+    await g.clickToolbar("save");
+    const file = await g.newDownload(before);
+    const { capture, images } = file.svg;
+    assert.deepEqual(capture.selection, { mode: "drag", x: 100, y: 3000, width: 600, height: 400 });
+    assert.equal(capture.scene.unsupported.image, 1);
+    assert.equal(capture.tiles.length, 1);
+    assert.equal(capture.tiles[0].pixelWidth, 80);
+    const tile = await decodeDataUrl(images[0].href);
+    assert.deepEqual(tile.at(40, 30).slice(0, 3), [204, 0, 0]);
+  } finally {
+    await g.background(() => chrome.storage.sync.clear());
+  }
+});
+
 test("text in a closed shadow tree is in the text layer", async () => {
   await g.open(PAGE);
   await g.content(`

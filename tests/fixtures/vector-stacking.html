@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>vector stacking</title>
+    <!--
+      One overlap per step of CSS 2.1 Appendix E, each a different colour so
+      a wrong order shows in the pixels:
+        .pos/.static   a positioned z-index:auto box (step 6) over a later
+                       static sibling (step 3)
+        .float/.inl    an inline box's background (step 5) over a float (4);
+                       the negative margin pulls the inline box over it
+        .ctx           in a stacking context: the z-index:-1 child (2) over
+                       the context's own background (1), under a block child (3)
+        .z             z-index:2 (7) over a later positioned z-index:auto box (6)
+        .hide          "covered words" lie under a later positioned box: the
+                       run stays selectable, but invisible
+    -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; background: rgb(255, 255, 255); }
+      /* Not positioned: .static has to be a block of the root context, .pos a positioned box of it. */
+      #cap { width: 420px; }
+      p { margin: 0 0 6px; }
+      .pos { position: relative; width: 200px; height: 40px; margin-bottom: -20px; background: rgb(200, 0, 0); }
+      .static { width: 300px; height: 40px; background: rgb(0, 0, 200); }
+      .row { margin: 8px 0; height: 40px; }
+      .float { float: left; width: 120px; height: 40px; background: rgb(0, 160, 0); }
+      .inl { margin-left: -60px; background: rgb(240, 200, 0); }
+      .ctx { position: relative; z-index: 0; height: 50px; margin: 8px 0; background: rgb(220, 220, 220); }
+      .neg { position: absolute; z-index: -1; left: 0; top: 0; width: 160px; height: 50px; background: rgb(150, 0, 150); }
+      .blockchild { margin-left: 80px; width: 160px; height: 50px; background: rgb(0, 150, 150); }
+      .hide { position: relative; margin: 8px 0; }
+      .cover { position: absolute; left: 0; top: 0; width: 300px; height: 24px; background: rgb(60, 60, 60); }
+      .z { margin: 8px 0; }
+      .zpos { position: relative; z-index: 2; width: 200px; height: 30px; background: rgb(255, 140, 0); }
+      .zauto { position: relative; width: 300px; height: 30px; margin-top: -15px; background: rgb(0, 128, 128); }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Stacking", "Inline over float", "covered words"],
+        "vector": { "tolerance": 0.005, "maxPatchArea": 0, "unsupported": {}, "hidden": ["covered words"] },
+        "reason": "tolerance: each overlap is about 1 % of the region and this page renders within 0.02 % (2026-10-04), so a wrong order has to show."
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>Stacking</p>
+      <div class="pos"></div>
+      <div class="static"></div>
+      <div class="row"><div class="float"></div><span class="inl">Inline over float</span></div>
+      <div class="ctx"><div class="neg"></div><div class="blockchild"></div></div>
+      <div class="hide"><p>covered words</p><div class="cover"></div></div>
+      <div class="z"><div class="zpos"></div><div class="zauto"></div></div>
+    </main>
+  </body>
+</html>

@@ -3,7 +3,7 @@
 // capture record as JSON for anything that wants to reproduce or audit the
 // capture. Deterministic: no clocks, `capturedAt` comes from the caller.
 
-import type { OcrInfo, RenderInput } from "../types.ts";
+import type { OcrInfo, RenderInput, UnsupportedReason } from "../types.ts";
 import { xmlText } from "./xml.ts";
 
 const RDF_NS = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
@@ -22,13 +22,38 @@ const ocrRecord = (o: OcrInfo): OcrInfo => ({
 });
 
 /**
+ * What a vector capture adds to the record: counts only, never the shapes
+ * (they would carry the images' data URLs into the JSON). `patchArea` is in
+ * CSS px², overlaps counted once.
+ */
+export interface VectorRecord {
+  ops: number;
+  patches: number;
+  patchArea: number;
+  unsupported: Partial<Record<UnsupportedReason, number>>;
+}
+
+const vectorRecord = (v: VectorRecord) => ({
+  output: "vector",
+  scene: {
+    ops: v.ops,
+    patches: v.patches,
+    patchArea: v.patchArea,
+    // Sorted, so the same counts always serialise alike.
+    unsupported: Object.fromEntries(
+      Object.entries(v.unsupported).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+    ),
+  },
+});
+
+/**
  * The capture record. `selection` is the region in document CSS px as given;
  * tile rects are region-relative CSS px like everything else in `RenderInput`.
  * Pixel sizes live here only — `<image>` geometry is always the CSS rect.
  * Fields are copied one by one so extra properties on the input can never
  * leak into the file.
  */
-function captureRecord(input: RenderInput) {
+function captureRecord(input: RenderInput, vector: VectorRecord | undefined) {
   const { page, region } = input;
   return {
     schema: 1,
@@ -55,6 +80,8 @@ function captureRecord(input: RenderInput) {
     skippedFrames: page.skippedFrames,
     skippedVertical: page.skippedVertical,
     ...(input.ocr ? { ocr: ocrRecord(input.ocr.info) } : {}),
+    // Only the vector renderer passes it: the raster record stays as it was.
+    ...(vector ? vectorRecord(vector) : {}),
   };
 }
 
@@ -62,7 +89,7 @@ function captureRecord(input: RenderInput) {
  * The element as one string per structural line, so the document builder can
  * indent without ever splitting a value that contains a newline.
  */
-export function metadataLines(input: RenderInput): string[] {
+export function metadataLines(input: RenderInput, vector?: VectorRecord): string[] {
   const { page } = input;
   const dc = (name: string, value: string) => `      <dc:${name}>${xmlText(value)}</dc:${name}>`;
   return [
@@ -80,7 +107,7 @@ export function metadataLines(input: RenderInput): string[] {
     "  </rdf:RDF>",
     // JSON.stringify escapes control characters and lone surrogates itself;
     // xmlText only has to protect the markup characters.
-    `  <snapii:capture xmlns:snapii="${SNAPII_NS}" content-type="application/json">${xmlText(JSON.stringify(captureRecord(input)))}</snapii:capture>`,
+    `  <snapii:capture xmlns:snapii="${SNAPII_NS}" content-type="application/json">${xmlText(JSON.stringify(captureRecord(input, vector)))}</snapii:capture>`,
     "</metadata>",
   ];
 }
