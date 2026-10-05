@@ -40,6 +40,13 @@ const ERROR_TOAST: Record<SaveError, string> = {
   "download-failed": "The SVG was not saved (download failed or was cancelled)",
 };
 
+/**
+ * Vector output can save beyond the viewport there, except the parts it
+ * takes as pixels: those have to be on screen.
+ */
+export const VECTOR_OUTSIDE_NOTICE =
+  "Parts of this selection that are saved as pixels are outside the visible area. Scroll them into view or select a smaller area";
+
 /** Shown when extraction or messaging throws before the background could answer. */
 const UNEXPECTED_TOAST = "Capture failed unexpectedly. Try again";
 
@@ -334,8 +341,8 @@ export function startSession(deps: SessionDeps): SessionHandle {
       if (deps.settings.output === "vector") {
         model.scene = buildScene(document, region, { runs, sources, skip: overlay.host });
       }
-      // Only with OCR on: the background recognises text in these areas.
-      if (deps.settings.ocr) {
+      // Only with OCR on (raster output): the background recognises text in these areas.
+      if (deps.settings.ocr && !model.scene) {
         model.imageAreas = areasRelativeTo(
           collectImageAreas(document, region, { skip: overlay.host }),
           region,
@@ -368,7 +375,8 @@ export function startSession(deps: SessionDeps): SessionHandle {
       return;
     }
     if (open) overlay.show();
-    notify(ERROR_TOAST[reply.error] ?? UNEXPECTED_TOAST);
+    const vectorOutside = reply.error === "outside-viewport" && deps.settings.output === "vector";
+    notify(vectorOutside ? VECTOR_OUTSIDE_NOTICE : (ERROR_TOAST[reply.error] ?? UNEXPECTED_TOAST));
   }
 
   /** text/plain as the capture shows it; text/html from the visible part of the selected DOM. */
@@ -440,7 +448,9 @@ export function startSession(deps: SessionDeps): SessionHandle {
   const overlay = startOverlay({
     onAction,
     onCancel: cancel,
-    ...(deps.viewportOnly
+    // Vector output needs a capture only for its patches, which the background
+    // checks against the viewport itself.
+    ...(deps.viewportOnly && deps.settings.output !== "vector"
       ? {
           saveBlocked: (selection: Selection) =>
             fitsViewport(selection.rect, visibleViewport()) ? null : VIEWPORT_ONLY_NOTICE,

@@ -5,13 +5,14 @@
 
 import { startBackground } from "../background.ts";
 import { chromiumAction } from "./action.ts";
-import { captureRegion } from "./capture.ts";
+import { capturePatches, captureRegion } from "./capture.ts";
 import { saveSvg } from "./download.ts";
 import { recognizeInOffscreen } from "./ocr.ts";
 import { offscreen } from "./offscreen.ts";
 
 startBackground({
   captureRegion,
+  capturePatches,
   recognize: (areas, tiles, runs) => recognizeInOffscreen(areas, tiles, runs, offscreen.ask),
   saveSvg,
   copyToClipboard: async (plain, html) => {

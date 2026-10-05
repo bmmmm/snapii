@@ -7,6 +7,7 @@ import type { SaveDeps } from "./save.ts";
 
 export interface BrowserPlatform {
   captureRegion: SaveDeps["captureRegion"];
+  capturePatches: SaveDeps["capturePatches"];
   recognize: SaveDeps["recognize"];
   saveSvg: SaveDeps["saveSvg"];
   /** Clipboard write for a page without a secure origin; resolves true once written. */

@@ -21,6 +21,20 @@
         </fieldset>
 
         <fieldset>
+          <legend>Output</legend>
+          <label><input type="radio" name="output" value="raster" /> Picture of the page with selectable text</label>
+          <label
+            ><input type="radio" name="output" value="vector" aria-describedby="output-hint" /> Shapes and
+            text (beta)</label
+          >
+          <p id="output-hint" class="hint">
+            Boxes and text become SVG shapes, so the file stays sharp at any zoom and can be edited. What
+            cannot be drawn as shapes (images, shadows, effects) is kept as pixels. Text recognition is off
+            in this mode.
+          </p>
+        </fieldset>
+
+        <fieldset>
           <legend>Behavior</legend>
           <label><input type="checkbox" name="saveAs" /> Ask where to save each file</label>
           <label
@@ -31,7 +45,7 @@
             fragment)</label
           >
           <label
-            ><input type="checkbox" name="ocr" aria-describedby="ocr-hint" /> Recognize text in images
+            ><input type="checkbox" name="ocr" aria-describedby="ocr-hint output-hint" /> Recognize text in images
             (OCR)</label
           >
           <p id="ocr-hint" class="hint">Runs locally; adds a few seconds to saving.</p>

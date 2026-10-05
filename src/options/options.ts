@@ -19,7 +19,15 @@ import {
 import { TARGET } from "../shared/target.ts";
 import type { Settings } from "../shared/types.ts";
 
-type FormKey = "format" | "jpegQuality" | "saveAs" | "saveFolder" | "occlusionCheck" | "textFragment" | "ocr";
+type FormKey =
+  | "format"
+  | "jpegQuality"
+  | "saveAs"
+  | "saveFolder"
+  | "occlusionCheck"
+  | "textFragment"
+  | "ocr"
+  | "output";
 const FORM_KEYS: FormKey[] = [
   "format",
   "jpegQuality",
@@ -28,6 +36,7 @@ const FORM_KEYS: FormKey[] = [
   "occlusionCheck",
   "textFragment",
   "ocr",
+  "output",
 ];
 
 function byId<T extends HTMLElement>(id: string): T {
@@ -43,7 +52,9 @@ const folder = byId<HTMLInputElement>("folder");
 const folderError = byId<HTMLElement>("folder-error");
 const status = byId<HTMLElement>("status");
 
-const radios = (): HTMLInputElement[] => [...form.querySelectorAll<HTMLInputElement>('input[name="format"]')];
+const radios = (name: "format" | "output"): HTMLInputElement[] => [
+  ...form.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${name}"]`),
+];
 const checkbox = (name: FormKey): HTMLInputElement => {
   const el = form.querySelector<HTMLInputElement>(`input[type="checkbox"][name="${name}"]`);
   if (!el) throw new Error(`options.html has no checkbox ${name}`);
@@ -68,7 +79,12 @@ function folderProblem(text: string | null): void {
 
 /** The quality slider only matters for JPEG. */
 function syncQualityEnabled(): void {
-  quality.disabled = !radios().some((r) => r.checked && r.value === "jpeg");
+  quality.disabled = !radios("format").some((r) => r.checked && r.value === "jpeg");
+}
+
+/** Vector output has no OCR: the switch shows that instead of a value with no effect. */
+function syncOcrEnabled(): void {
+  checkbox("ocr").disabled = radios("output").some((r) => r.checked && r.value === "vector");
 }
 
 function showQuality(): void {
@@ -76,7 +92,8 @@ function showQuality(): void {
 }
 
 function render(s: Settings): void {
-  for (const r of radios()) r.checked = r.value === s.format;
+  for (const r of radios("format")) r.checked = r.value === s.format;
+  for (const r of radios("output")) r.checked = r.value === s.output;
   // The slider spans 0-100 %, every value isValidSetting accepts, so a stored
   // value always shows as the one the capture uses.
   quality.value = String(Math.round(s.jpegQuality * 100));
@@ -88,6 +105,7 @@ function render(s: Settings): void {
   checkbox("occlusionCheck").checked = s.occlusionCheck;
   checkbox("textFragment").checked = s.textFragment;
   checkbox("ocr").checked = s.ocr;
+  syncOcrEnabled();
 }
 
 /** Writes only values the background would accept. */
@@ -110,6 +128,9 @@ form.addEventListener("change", (event) => {
   if (el.name === "format") {
     syncQualityEnabled();
     if (el.checked && (el.value === "png" || el.value === "jpeg")) void save("format", el.value);
+  } else if (el.name === "output") {
+    syncOcrEnabled();
+    if (el.checked && (el.value === "raster" || el.value === "vector")) void save("output", el.value);
   } else if (el === quality) {
     showQuality();
     void save("jpegQuality", Number(quality.value) / 100);

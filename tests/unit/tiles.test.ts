@@ -6,6 +6,7 @@ import {
   captureScale,
   deviceStep,
   type PlannedTile,
+  planPatches,
   planTiles,
   type TileLimits,
 } from "../../src/shared/tiles.ts";
@@ -191,4 +192,29 @@ test("planTiles: a capped, irrational scale still covers the region within every
   const big = REGIONS[0] as DocRect;
   assert.ok(captureScale(big, 2, 1.1, 20_000_000) * 1.1 < 2 * 1.1);
   assert.equal(deviceStep(captureScale(big, 2, 1.1, 20_000_000) * 1.1), 1);
+});
+
+test("planPatches: each patch is captured at its place in the document and placed region-relative", () => {
+  const region = { x: 100.5, y: 2000, width: 800, height: 600 };
+  const patches = [
+    { x: 10, y: 20, width: 30, height: 40 },
+    { x: 400.25, y: 0, width: 16, height: 16 },
+  ];
+  const plan = planPatches(region, patches, 2, DEFAULT_LIMITS);
+  assert.deepEqual(
+    plan.map((t) => t.doc),
+    [
+      { x: 110, y: 2020, width: 31, height: 40 },
+      { x: 500, y: 2000, width: 17, height: 16 },
+    ],
+  );
+  // The pixels lie where the snapped capture rect is, relative to the region.
+  assert.deepEqual(
+    plan.map((t) => t.rel),
+    [
+      { x: 9.5, y: 20, width: 31, height: 40 },
+      { x: 399.5, y: 0, width: 17, height: 16 },
+    ],
+  );
+  assert.deepEqual(planPatches(region, [], 2, DEFAULT_LIMITS), []);
 });

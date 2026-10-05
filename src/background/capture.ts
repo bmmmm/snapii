@@ -5,7 +5,7 @@
 // scrolling in between, so position:fixed content shows once (S8).
 
 import { SPIKE } from "../shared/spike.ts";
-import { captureScale, type PlannedTile, planTiles } from "../shared/tiles.ts";
+import { captureScale, type PlannedTile, planPatches, planTiles } from "../shared/tiles.ts";
 import type { DocRect, RasterTile, Settings } from "../shared/types.ts";
 
 export interface CaptureResult {
@@ -92,6 +92,21 @@ export async function captureTiles(
   return tiles;
 }
 
+const limitsFor = (settings: Settings) => ({
+  maxSide: SPIKE.maxCaptureSide,
+  maxArea: SPIKE.maxCaptureArea,
+  maxTilePixels: settings.maxTilePixels,
+});
+
+/** A plan that does not fit the per-call limits is a region too large. */
+function planned(plan: () => PlannedTile[]): PlannedTile[] {
+  try {
+    return plan();
+  } catch (e) {
+    throw new TooLargeError(e instanceof Error ? e.message : String(e));
+  }
+}
+
 export async function captureRegion(
   tabId: number,
   windowId: number,
@@ -102,18 +117,30 @@ export async function captureRegion(
   // The background page's devicePixelRatio is the screen's, independent of
   // zoom (S6); the page's own value is quantised.
   const scale = captureScale(region, globalThis.devicePixelRatio, zoom, settings.maxTotalPixels);
-  let plan: PlannedTile[];
-  try {
-    plan = planTiles(region, scale * zoom, {
-      maxSide: SPIKE.maxCaptureSide,
-      maxArea: SPIKE.maxCaptureArea,
-      maxTilePixels: settings.maxTilePixels,
-    });
-  } catch (e) {
-    throw new TooLargeError(e instanceof Error ? e.message : String(e));
-  }
+  const plan = planned(() => planTiles(region, scale * zoom, limitsFor(settings)));
   if (plan.length === 0) throw new Error("the selected region is empty");
 
   const tiles = await captureTiles({ tabId, windowId }, plan, scale, settings, browserDeps());
+  return { tiles, scale, zoom };
+}
+
+/**
+ * The pixels of a vector capture's patches (region-relative): one call per
+ * planned tile of each patch, at the scale the whole region would get, so
+ * patch pixels match a raster capture's. No patches, no capture; zoom and
+ * scale are still read, the record needs them.
+ */
+export async function capturePatches(
+  tabId: number,
+  windowId: number,
+  region: DocRect,
+  patches: readonly DocRect[],
+  settings: Settings,
+): Promise<CaptureResult> {
+  const zoom = await browser.tabs.getZoom(tabId);
+  const scale = captureScale(region, globalThis.devicePixelRatio, zoom, settings.maxTotalPixels);
+  const plan = planned(() => planPatches(region, patches, scale * zoom, limitsFor(settings)));
+  const tiles =
+    plan.length === 0 ? [] : await captureTiles({ tabId, windowId }, plan, scale, settings, browserDeps());
   return { tiles, scale, zoom };
 }

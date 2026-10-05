@@ -5,6 +5,7 @@
 import { makeFilename } from "../shared/filename.ts";
 import { OCR_DISABLED } from "../shared/ocr.ts";
 import { type StrategyTab, strategyFor } from "../shared/strategy.ts";
+import type { VectorRenderInput } from "../shared/svg/vector.ts";
 import type {
   CaptureModel,
   DocRect,
@@ -31,6 +32,15 @@ export interface SaveDeps {
     settings: Settings,
     page: PageMeta,
   ): Promise<CaptureResult>;
+  /** The pixels of a vector capture's patches (region-relative); none needs no capture. */
+  capturePatches(
+    tabId: number,
+    windowId: number,
+    region: DocRect,
+    patches: readonly DocRect[],
+    settings: Settings,
+    page: PageMeta,
+  ): Promise<CaptureResult>;
   /** Sends `message` to the tab's top frame (where content.js runs). */
   tellTab(tabId: number, message: ToContent): Promise<unknown>;
   recognize(
@@ -39,6 +49,7 @@ export interface SaveDeps {
     runs: readonly TextRun[],
   ): Promise<OcrOutput>;
   render(input: RenderInput): string;
+  renderVector(input: VectorRenderInput): string;
   saveSvg(svg: string, filename: string, saveAs: boolean): Promise<unknown>;
   extensionVersion: string;
 }
@@ -64,10 +75,15 @@ export async function save(
     };
   }
   const settings = await deps.loadSettings();
+  // The model says which output it was built for: the content script read the
+  // settings when the session started, and they may have changed since.
+  const { scene } = model;
 
   let captured: CaptureResult;
   try {
-    captured = await deps.captureRegion(tab.id, tab.windowId, model.region, settings, model.page);
+    captured = scene
+      ? await deps.capturePatches(tab.id, tab.windowId, model.region, scene.patches, settings, model.page)
+      : await deps.captureRegion(tab.id, tab.windowId, model.region, settings, model.page);
   } catch (e) {
     return { ok: false, error: captureError(e), detail: errorText(e) };
   }
@@ -76,23 +92,24 @@ export async function save(
   // change again: the content script lifts its hover shield and closes the
   // overlay now instead of keeping the page blocked through OCR and download.
   // Not awaited: the save goes on whether or not the tab still listens.
+  // Vector output has no OCR: there is no picture of the whole region to read.
   const areas = model.imageAreas ?? [];
-  const ocrRuns = settings.ocr && areas.length > 0;
+  const ocrRuns = !scene && settings.ocr && areas.length > 0;
   deps.tellTab(tab.id, { type: "captured", ocr: ocrRuns }).catch(() => {});
 
   // On the captured pixels, so the page is not read twice.
-  const ocr = settings.ocr ? await deps.recognize(areas, captured.tiles, model.runs) : OCR_DISABLED;
+  const ocr = !scene && settings.ocr ? await deps.recognize(areas, captured.tiles, model.runs) : OCR_DISABLED;
 
   let svg: string;
   try {
-    svg = deps.render({
+    const common = {
       ...model,
       tiles: captured.tiles,
       extensionVersion: deps.extensionVersion,
       zoom: captured.zoom,
       scale: captured.scale,
-      ocr,
-    });
+    };
+    svg = scene ? deps.renderVector({ ...common, scene }) : deps.render({ ...common, ocr });
   } catch (e) {
     // SaveResponse has no render error; the capture is what produced nothing.
     return { ok: false, error: "capture-failed", detail: `render: ${errorText(e)}` };

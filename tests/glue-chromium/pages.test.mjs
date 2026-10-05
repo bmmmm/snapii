@@ -30,6 +30,19 @@ test("popup on a web page: the capture button is ready, with the bound shortcut 
   assert.match(state.about, /^snapii \d+\.\d+\.\d+ · .* · Chromium \d+$/);
 });
 
+test("popup with vector output: the OCR toggle is off (that mode has no OCR)", async () => {
+  await g.setSettings({ output: "vector" });
+  try {
+    await g.open("/glue/fixtures/page.html");
+    await g.openPopup();
+    await g.until(async () => (await g.popupState()).ocrDisabled === true, "the OCR toggle to be disabled");
+  } finally {
+    await g.background(() => chrome.storage.sync.clear());
+  }
+  await g.openPopup();
+  assert.equal((await g.popupState()).ocrDisabled, false);
+});
+
 test("popup on a browser page: the button is disabled and the popup says why", async () => {
   await g.open("chrome://version/");
   await g.openPopup();
@@ -62,6 +75,8 @@ test("options page: the shortcut is shown read-only with the way to the browser'
   assert.match(shown.folderHint, /^The browser lets extensions save only inside its Downloads folder, so this is/);
   assert.match(shown.about, /Chromium \d+$/);
   const opened = g.context.waitForEvent("page");
+  // The page is taller than the viewport: the click goes to where the button is on screen.
+  await g.content(`document.getElementById("shortcut-settings").scrollIntoView({ block: "center" });`);
   const button = await g.rect("#shortcut-settings");
   await g.click(button.x + button.width / 2, button.y + button.height / 2);
   const page = await opened;

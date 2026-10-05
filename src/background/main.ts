@@ -3,7 +3,7 @@
 // platform. Listeners are registered at top level so they wake the page.
 
 import { startBackground } from "./background.ts";
-import { captureRegion } from "./capture.ts";
+import { capturePatches, captureRegion } from "./capture.ts";
 import { copyToClipboard } from "./clipboard.ts";
 import { onDownloadChanged, saveSvg } from "./download.ts";
 import { moveLegacyShortcut } from "./legacy-shortcut.ts";
@@ -15,6 +15,7 @@ browser.downloads.onChanged.addListener(onDownloadChanged);
 
 startBackground({
   captureRegion,
+  capturePatches,
   recognize: (areas, tiles, runs) => recognizeAreas(areas, tiles, runs),
   saveSvg,
   copyToClipboard,

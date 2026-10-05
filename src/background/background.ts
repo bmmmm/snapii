@@ -9,6 +9,7 @@
 import { routeMessage } from "../shared/messages.ts";
 import { CAPTURE_COMMAND } from "../shared/shortcut.ts";
 import { rasterTextRenderer } from "../shared/svg/build.ts";
+import { vectorRenderer } from "../shared/svg/vector.ts";
 import { flagTab } from "./flag.ts";
 import type { BrowserPlatform } from "./platform.ts";
 import { type SaveDeps, save } from "./save.ts";
@@ -21,9 +22,11 @@ export function startBackground(platform: BrowserPlatform): void {
   const saveDeps: SaveDeps = {
     loadSettings,
     captureRegion: platform.captureRegion,
+    capturePatches: platform.capturePatches,
     tellTab: (tabId, message) => browser.tabs.sendMessage(tabId, message, { frameId: 0 }),
     recognize: platform.recognize,
     render: rasterTextRenderer,
+    renderVector: vectorRenderer,
     saveSvg: platform.saveSvg,
     extensionVersion: browser.runtime.getManifest().version,
   };

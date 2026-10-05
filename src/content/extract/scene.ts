@@ -891,7 +891,8 @@ class Builder {
     for (const r of rects) {
       const shownPart = clip && intersect(r, clip);
       const inside = shownPart && intersect(shownPart, this.region);
-      if (!inside) continue;
+      // Thinner than a layout unit: float noise where boxes adjoin at a zoom, not a part of the picture.
+      if (!inside || inside.width < 1 / 64 || inside.height < 1 / 64) continue;
       this.#patches.push({ ...inside, reason });
       any = true;
     }

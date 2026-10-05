@@ -6,7 +6,7 @@ import { type SaveDeps, save } from "../../src/background/save.ts";
 import { makeFilename } from "../../src/shared/filename.ts";
 import { OCR_DISABLED, ocrInfo } from "../../src/shared/ocr.ts";
 import { DEFAULT_SETTINGS } from "../../src/shared/settings.ts";
-import type { CaptureModel, ImageArea, Settings } from "../../src/shared/types.ts";
+import type { CaptureModel, ImageArea, Scene, Settings } from "../../src/shared/types.ts";
 
 const TAB = { id: 7, windowId: 3, active: true };
 
@@ -47,6 +47,12 @@ function deps(settings: Partial<Settings> = {}, fail: { capture?: Error; downloa
       log.push("capture:last-tile");
       return { tiles: [], scale: 1, zoom: 1 };
     },
+    async capturePatches(_tabId, _windowId, _region, patches) {
+      log.push(`patches:${patches.length}`);
+      await Promise.resolve();
+      if (fail.capture) throw fail.capture;
+      return { tiles: [], scale: 2, zoom: 1.25 };
+    },
     async tellTab(tabId, message) {
       log.push(`tell:${tabId}:${JSON.stringify(message)}`);
     },
@@ -60,6 +66,10 @@ function deps(settings: Partial<Settings> = {}, fail: { capture?: Error; downloa
     render(input) {
       log.push(`render:${input.ocr?.info.status}`);
       return "<svg/>";
+    },
+    renderVector(input) {
+      log.push(`vector:${input.scene.patches.length}:${input.zoom}:${input.scale}:${"ocr" in input}`);
+      return "<svg vector/>";
     },
     async saveSvg() {
       log.push("download");
@@ -162,6 +172,60 @@ test("save: a tab the window does not show is refused before anything is capture
   assert.equal(reply.ok, false);
   assert.deepEqual(log, []);
   assert.equal(OCR_DISABLED.info.status, "disabled");
+});
+
+const SCENE: Scene = {
+  canvas: { r: 255, g: 255, b: 255, a: 1 },
+  ops: [],
+  patches: [{ x: 1, y: 2, width: 3, height: 4, reason: "image" }],
+  text: [],
+  unsupported: { image: 1 },
+};
+
+test("save: a model with a scene captures its patches, not the region, and renders vector without OCR", async () => {
+  const { d, log } = deps({ ocr: true, output: "vector" });
+  const reply = await save({ ...model([AREA]), scene: SCENE }, TAB, d);
+  assert.equal(reply.ok, true);
+  assert.deepEqual(log, [
+    "patches:1",
+    'tell:7:{"type":"captured","ocr":false}',
+    "vector:1:1.25:2:false",
+    "download",
+  ]);
+});
+
+test("save: a scene without patches still sends `captured` and renders with zoom and scale", async () => {
+  const { d, log } = deps({ output: "vector" });
+  await save({ ...model(), scene: { ...SCENE, patches: [], unsupported: {} } }, TAB, d);
+  assert.deepEqual(log, [
+    "patches:0",
+    'tell:7:{"type":"captured","ocr":false}',
+    "vector:0:1.25:2:false",
+    "download",
+  ]);
+});
+
+test("save: the model decides the output, not the settings read now", async () => {
+  // Built as raster while the setting said so; the setting changed before the save.
+  const raster = deps({ output: "vector" });
+  await save(model(), TAB, raster.d);
+  assert.deepEqual(raster.log.slice(0, 2), ["capture:start", "capture:last-tile"]);
+  assert.ok(raster.log.includes("render:disabled"), raster.log.join(" "));
+  // Built as vector, the setting since back on raster.
+  const vector = deps({ output: "raster" });
+  await save({ ...model(), scene: SCENE }, TAB, vector.d);
+  assert.equal(vector.log[0], "patches:1");
+});
+
+test("save: a patch capture failure reaches the content script under its own name, without `captured`", async () => {
+  const { d, log } = deps({}, { capture: new OutsideViewportError() });
+  const reply = await save({ ...model(), scene: SCENE }, TAB, d);
+  assert.deepEqual(reply, {
+    ok: false,
+    error: "outside-viewport",
+    detail: new OutsideViewportError().message,
+  });
+  assert.deepEqual(log, ["patches:1"]);
 });
 
 test("save: a tab that no longer listens does not fail the save", async () => {

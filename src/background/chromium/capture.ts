@@ -6,7 +6,13 @@
 
 import { SPIKE_CHROMIUM } from "../../shared/spike.ts";
 import type { DocRect, PageMeta, Settings } from "../../shared/types.ts";
-import { fitsViewport, planViewportCrop, type ViewportCrop, visibleRect } from "../../shared/viewport.ts";
+import {
+  fitsViewport,
+  planViewportCrop,
+  planViewportCrops,
+  type ViewportCrop,
+  visibleRect,
+} from "../../shared/viewport.ts";
 import { type CaptureResult, OutsideViewportError, TAB_CHANGED } from "../capture.ts";
 import { blobToDataURL } from "./data-url.ts";
 import { createPacer } from "./pace.ts";
@@ -21,23 +27,21 @@ export interface ViewportCaptureDeps {
   getZoom(tabId: number): Promise<number>;
   /** The page's scroll position now. */
   getScroll(tabId: number): Promise<{ x: number; y: number }>;
-  /** Decodes the picture, cuts out what `plan` says for its size and encodes it as the settings ask. */
+  /** Decodes the picture once, cuts out what `plan` says for its size and encodes each part as the settings ask. */
   crop(
     dataURL: string,
-    plan: (picture: Picture) => ViewportCrop,
+    plan: (picture: Picture) => ViewportCrop[],
     settings: Settings,
-  ): Promise<{ dataURL: string; planned: ViewportCrop }>;
+  ): Promise<{ dataURL: string; planned: ViewportCrop }[]>;
 }
 
-export async function captureViewportRegion(
+/** The viewport, taken while `tabId` is the selected tab and the page has not scrolled since the model. */
+async function takeViewport(
   tabId: number,
   windowId: number,
-  region: DocRect,
-  settings: Settings,
-  page: Pick<PageMeta, "viewport" | "scroll" | "devicePixelRatio">,
+  page: Pick<PageMeta, "scroll">,
   deps: ViewportCaptureDeps,
-): Promise<CaptureResult> {
-  if (!fitsViewport(region, visibleRect(page))) throw new OutsideViewportError();
+): Promise<string> {
   // As in Firefox's captureTiles: captureVisibleTab takes whatever tab is
   // selected, so the capture lies between two checks that saw ours selected.
   const ensureSelected = async (): Promise<void> => {
@@ -53,13 +57,29 @@ export async function captureViewportRegion(
   if (Math.abs(scroll.x - page.scroll.x) > 0.5 || Math.abs(scroll.y - page.scroll.y) > 0.5) {
     throw new Error("the page scrolled during the capture");
   }
+  return viewport;
+}
 
-  const maxPixels = Math.min(settings.maxTotalPixels, settings.maxTilePixels);
-  const { dataURL, planned } = await deps.crop(
+const maxPixelsFor = (settings: Settings): number =>
+  Math.min(settings.maxTotalPixels, settings.maxTilePixels);
+
+export async function captureViewportRegion(
+  tabId: number,
+  windowId: number,
+  region: DocRect,
+  settings: Settings,
+  page: Pick<PageMeta, "viewport" | "scroll" | "devicePixelRatio">,
+  deps: ViewportCaptureDeps,
+): Promise<CaptureResult> {
+  if (!fitsViewport(region, visibleRect(page))) throw new OutsideViewportError();
+  const viewport = await takeViewport(tabId, windowId, page, deps);
+  const [cropped] = await deps.crop(
     viewport,
-    (picture) => planViewportCrop(region, page, picture, maxPixels),
+    (picture) => [planViewportCrop(region, page, picture, maxPixelsFor(settings))],
     settings,
   );
+  if (!cropped) throw new Error("no tile was cut from the capture");
+  const { dataURL, planned } = cropped;
   const zoom = await deps.getZoom(tabId);
   return {
     tiles: [
@@ -76,27 +96,90 @@ export async function captureViewportRegion(
   };
 }
 
+/**
+ * The pixels of a vector capture's patches (region-relative), all cut from
+ * one viewport capture (the call is rate-limited, C3) with one shrink
+ * factor. A patch beyond the viewport cannot be had: refused before any
+ * capture; the vector parts of the region may lie anywhere. No patches, no
+ * capture: the density is the page's devicePixelRatio (C2).
+ */
+export async function captureViewportPatches(
+  tabId: number,
+  windowId: number,
+  region: DocRect,
+  patches: readonly DocRect[],
+  settings: Settings,
+  page: Pick<PageMeta, "viewport" | "scroll" | "devicePixelRatio">,
+  deps: ViewportCaptureDeps,
+): Promise<CaptureResult> {
+  // Thinner than a layout unit is float noise between adjoining boxes, not a
+  // picture: it would crop to no pixel at all.
+  const shown = patches.filter((p) => p.width >= 1 / 64 && p.height >= 1 / 64);
+  const docs = shown.map((p) => ({ ...p, x: region.x + p.x, y: region.y + p.y }));
+  if (docs.some((d) => !fitsViewport(d, visibleRect(page)))) throw new OutsideViewportError();
+  if (docs.length === 0) {
+    const zoom = await deps.getZoom(tabId);
+    return { tiles: [], scale: page.devicePixelRatio / zoom, zoom };
+  }
+  const viewport = await takeViewport(tabId, windowId, page, deps);
+  const cropped = await deps.crop(
+    viewport,
+    (picture) => planViewportCrops(docs, page, picture, maxPixelsFor(settings)),
+    settings,
+  );
+  const zoom = await deps.getZoom(tabId);
+  const tiles = cropped.map(({ dataURL, planned }, i) => ({
+    ...planned.rel,
+    x: planned.rel.x + (shown[i]?.x ?? 0),
+    y: planned.rel.y + (shown[i]?.y ?? 0),
+    dataURL,
+    pixelWidth: planned.output.width,
+    pixelHeight: planned.output.height,
+    format: settings.format,
+  }));
+  // The widest crop says the shared density best: a one-pixel crop keeps its pixel whatever the shrink.
+  const widest = cropped.reduce<ViewportCrop | null>(
+    (w, { planned }) => (w && w.source.width >= planned.source.width ? w : planned),
+    null,
+  );
+  const scale = widest ? widest.output.width / widest.rel.width / zoom : page.devicePixelRatio / zoom;
+  return { tiles, scale, zoom };
+}
+
 /** Canvas and bitmap decoding exist in the service worker (C1). */
 async function crop(
   dataURL: string,
-  plan: (picture: Picture) => ViewportCrop,
+  plan: (picture: Picture) => ViewportCrop[],
   settings: Settings,
-): Promise<{ dataURL: string; planned: ViewportCrop }> {
+): Promise<{ dataURL: string; planned: ViewportCrop }[]> {
   const bitmap = await createImageBitmap(await (await fetch(dataURL)).blob());
   try {
-    const planned = plan({ width: bitmap.width, height: bitmap.height });
-    const { source, output } = planned;
-    const canvas = new OffscreenCanvas(output.width, output.height);
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("no 2d context for the tile");
-    ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(bitmap, source.x, source.y, source.width, source.height, 0, 0, output.width, output.height);
-    const blob = await canvas.convertToBlob(
-      settings.format === "jpeg"
-        ? { type: "image/jpeg", quality: settings.jpegQuality }
-        : { type: "image/png" },
-    );
-    return { dataURL: await blobToDataURL(blob), planned };
+    const out: { dataURL: string; planned: ViewportCrop }[] = [];
+    for (const planned of plan({ width: bitmap.width, height: bitmap.height })) {
+      const { source, output } = planned;
+      const canvas = new OffscreenCanvas(output.width, output.height);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("no 2d context for the tile");
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(
+        bitmap,
+        source.x,
+        source.y,
+        source.width,
+        source.height,
+        0,
+        0,
+        output.width,
+        output.height,
+      );
+      const blob = await canvas.convertToBlob(
+        settings.format === "jpeg"
+          ? { type: "image/jpeg", quality: settings.jpegQuality }
+          : { type: "image/png" },
+      );
+      out.push({ dataURL: await blobToDataURL(blob), planned });
+    }
+    return out;
   } finally {
     bitmap.close();
   }
@@ -129,4 +212,15 @@ export function captureRegion(
   page: PageMeta,
 ): Promise<CaptureResult> {
   return captureViewportRegion(tabId, windowId, region, settings, page, browserDeps());
+}
+
+export function capturePatches(
+  tabId: number,
+  windowId: number,
+  region: DocRect,
+  patches: readonly DocRect[],
+  settings: Settings,
+  page: PageMeta,
+): Promise<CaptureResult> {
+  return captureViewportPatches(tabId, windowId, region, patches, settings, page, browserDeps());
 }
