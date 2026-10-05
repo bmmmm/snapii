@@ -20,7 +20,9 @@
 
 import { parseColor } from "../../shared/color.ts";
 import { intersect, minus, union } from "../../shared/geometry.ts";
+import type { BuildTarget } from "../../shared/manifest.ts";
 import { fitRadii } from "../../shared/svg/vector.ts";
+import { TARGET } from "../../shared/target.ts";
 import type {
   DocRect,
   LinearGradient,
@@ -38,6 +40,7 @@ import type {
 } from "../../shared/types.ts";
 import { collapse, isIconText } from "../../shared/whitespace.ts";
 import { createHtml, setImportant } from "../overlay/styles.ts";
+import { borderSides } from "./border.ts";
 import type { RunSource } from "./collect.ts";
 import { type FrameContext, flatParent, walkFlatTree } from "./flat-tree.ts";
 import { linearGradient } from "./gradient.ts";
@@ -52,6 +55,8 @@ export interface SceneOptions {
   skip?: Element | null;
   /** How pictures are encoded, as the capture's tiles are; PNG where a picture has transparency. Default PNG. */
   encoding?: Pick<Settings, "format" | "jpegQuality">;
+  /** Whose dash and dot layout borders follow: the build's own browser (the layout harness names its own). */
+  target?: BuildTarget;
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -105,6 +110,7 @@ const WHITE: Paint = { r: 255, g: 255, b: 255, a: 1 };
 const CLEAR: Paint = { r: 0, g: 0, b: 0, a: 0 };
 const SIDES = ["top", "right", "bottom", "left"] as const;
 const CORNERS = ["top-left", "top-right", "bottom-right", "bottom-left"] as const;
+const DRAWN_STYLES = new Set(["solid", "dashed", "dotted", "double"]);
 const DECORATION_LINES = ["underline", "overline", "line-through"] as const;
 const DECORATION_STYLES = new Set(["solid", "double", "dotted", "dashed", "wavy"]);
 /** What places a decoration line: the font's size and family. */
@@ -315,6 +321,7 @@ function translateOp(op: SceneOp, dx: number, dy: number): SceneOp {
   if (op.op === "shadow") {
     return { ...op, x: op.x + dx, y: op.y + dy, cut: { ...op.cut, x: op.cut.x + dx, y: op.cut.y + dy } };
   }
+  if (op.op === "line") return { ...op, x1: op.x1 + dx, y1: op.y1 + dy, x2: op.x2 + dx, y2: op.y2 + dy };
   return { ...op, x: op.x + dx, y: op.y + dy };
 }
 
@@ -720,14 +727,17 @@ class Builder {
   #bordersDrawable(b: Box): boolean {
     const { cs } = b;
     const visible = sides(cs).filter(shown);
-    if (visible.some((s) => s.style !== "solid")) return false;
+    if (visible.some((s) => !DRAWN_STYLES.has(s.style))) return false;
     const outline = cs.outlineStyle !== "none" && px(cs.outlineWidth) > 0;
     if (outline && cs.outlineStyle !== "solid") return false;
     if ((cs.getPropertyValue("border-image-source") || "none") !== "none") return false;
     if (visible.length === 0) return true;
+    const square = CORNERS.every((c) => px(cs.getPropertyValue(`border-${c}-radius`)) === 0);
+    // Dashes, dots and double lines are laid out along straight sides only,
+    // and per box: collapsed table cells share their edges.
+    if (visible.some((s) => s.style !== "solid")) return square && cs.borderCollapse !== "collapse";
     // Sides of their own colours are drawn as straight bars: with rounded corners only one colour is.
-    const oneColour = visible.every((s) => s.color === visible[0]?.color);
-    return oneColour || CORNERS.every((c) => px(cs.getPropertyValue(`border-${c}-radius`)) === 0);
+    return square || visible.every((s) => s.color === visible[0]?.color);
   }
 
   #coloursParse(b: Box, text: boolean): boolean {
@@ -1158,6 +1168,10 @@ class Builder {
   ): void {
     const visible = borders.map((s, i) => shown(s) && (i === 1 ? rightEdge : i === 3 ? leftEdge : true));
     if (!visible.some(Boolean)) return;
+    if (borders.some((s, i) => visible[i] && s.style !== "solid")) {
+      this.#styledSides(borders, frag, visible, ops);
+      return;
+    }
     const first = borders[0] as (typeof borders)[number];
     const uniform =
       visible.every(Boolean) && borders.every((s) => s.width === first.width && s.color === first.color);
@@ -1188,6 +1202,25 @@ class Builder {
       const paint = visible[i] ? parseColor(borders[i]?.color ?? "") : null;
       if (paint && paint.a > 0) ops.push({ op: "rect", ...bar, fill: paint });
     }
+  }
+
+  /**
+   * Square borders with a dashed, dotted or double side (border.ts), on the
+   * border box snapped to device pixels as the browsers paint it: a pattern
+   * a fraction of a pixel off would put every thin dash beside the page's.
+   */
+  #styledSides(borders: ReturnType<typeof sides>, frag: DocRect, visible: boolean[], ops: SceneOp[]): void {
+    const dpr = this.doc.defaultView?.devicePixelRatio ?? 1;
+    const snap = (v: number) => Math.round(v * dpr) / dpr;
+    const x = snap(frag.x);
+    const y = snap(frag.y);
+    const box = { x, y, width: snap(frag.x + frag.width) - x, height: snap(frag.y + frag.height) - y };
+    const styled = borders.map((s, i) => ({
+      width: s.width,
+      style: s.style,
+      paint: visible[i] ? parseColor(s.color) : null,
+    }));
+    ops.push(...borderSides(box, styled, dpr, this.opts.target ?? TARGET));
   }
 
   #outlineOp(b: Box, frags: DocRect[], ops: SceneOp[]): void {

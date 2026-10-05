@@ -125,7 +125,7 @@ bug:
    whole-pixel `width` and `height` (the region's size rounded up),
    `<defs>` with clip paths, gradients and filters (ids `c…`, `g…`, `f…`),
    `<rect id="canvas">`, the shapes in `<g id="shapes">` (pictures there as
-   `<image>`), the pixel patches in
+   `<image>`, dashed and dotted border sides as `<line>`), the pixel patches in
    `<g id="patches">`, the link areas, then one text layer of the same runs,
    each painted on its own: visible (painted from numbers, never from a page
    string; optionally its own `clip-path`, `letter-spacing`, `xml:space`

@@ -365,6 +365,43 @@ test("vector: a decoration is the run's text-decoration; one of another colour p
   assert.deepEqual(elements(plain), []);
 });
 
+test("vector: a border side's line is a dashed stroke; dots get round caps, dashes none", () => {
+  const black = { r: 0, g: 0, b: 0, a: 1 };
+  const scene: Scene = {
+    ...makeScene(),
+    ops: [
+      { op: "line", x1: 10, y1: 1, x2: 110, y2: 1, width: 2, paint: black, dash: [6, 4.5] },
+      { op: "line", x1: 0, y1: 0.5, x2: 100 / 3, y2: 0.5, width: 1, paint: black, dash: [2 / 3, 2 / 3] },
+      {
+        op: "line",
+        x1: 1.5,
+        y1: 12,
+        x2: 1.5,
+        y2: 40.25,
+        width: 3,
+        paint: { ...black, a: 0.5 },
+        dash: [0, 5.4],
+        round: true,
+      },
+    ],
+  };
+  const lines = named(byId(parseXml(render({ scene })), "shapes"), "line");
+  assert.equal(lines.length, 3);
+  const [dashes, fine, dots] = lines as [XEl, XEl, XEl];
+  // Four decimals: two would drift a thin pattern by a pixel within 150 periods.
+  assert.equal(attr(fine, "stroke-dasharray"), "0.6667 0.6667");
+  assert.equal(attr(fine, "x2"), "33.3333");
+  assert.deepEqual(
+    ["x1", "y1", "x2", "y2", "stroke", "stroke-width", "stroke-dasharray"].map((a) => attr(dashes, a)),
+    ["10", "1", "110", "1", "rgb(0,0,0)", "2", "6 4.5"],
+  );
+  assert.equal(dashes.attrs.has("stroke-linecap"), false);
+  assert.equal(attr(dots, "stroke-linecap"), "round");
+  assert.equal(attr(dots, "stroke-dasharray"), "0 5.4");
+  assert.equal(attr(dots, "stroke-opacity"), "0.5");
+  assert.equal(attr(dots, "y2"), "40.25");
+});
+
 test("vector: a run that overhangs its clip is clipped, the others are not", () => {
   const root = parseXml(render());
   const cut = runEl(root, "overhang");

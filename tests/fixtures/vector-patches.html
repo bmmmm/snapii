@@ -5,7 +5,7 @@
     <title>vector patches</title>
     <!--
       One element per reason vector output takes as pixels: a transform, a
-      filter, a form control, a dashed border, a text shadow (images:
+      filter, a form control, a groove border, a text shadow (images:
       vector-images.html, gradients: vector-gradients.html, box shadows:
       vector-shadows.html). Each is one patch and its text runs are invisible
       (the pixels show them); the plain paragraph between them stays vector,
@@ -35,7 +35,7 @@
           "Shadowed box",
           "Gradient box",
           "Plain text",
-          "Dashed border",
+          "Groove border",
           "Shadowed text",
           "Wiped text",
           "Under an invisible input",
@@ -55,7 +55,7 @@
             "border": 1,
             "text-effect": 1
           },
-          "hidden": ["Translated box", "Blurred box", "Dashed border", "Shadowed text"],
+          "hidden": ["Translated box", "Blurred box", "Groove border", "Shadowed text"],
           "visible": [
             "Plain text",
             "Shadowed box",
@@ -78,7 +78,7 @@
       <img alt="" width="50" height="20" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='20'%3E%3Crect width='50' height='20' fill='%23c00'/%3E%3C/svg%3E" />
       <p>Plain text</p>
       <input value="a field" />
-      <p style="border: 2px dashed rgb(51, 51, 51)">Dashed border</p>
+      <p style="border: 2px groove rgb(51, 51, 51)">Groove border</p>
       <p style="text-shadow: 1px 1px 0 rgb(153, 153, 153)">Shadowed text</p>
       <div style="position: relative">
         <p>Wiped text</p>

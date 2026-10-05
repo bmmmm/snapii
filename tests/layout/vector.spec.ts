@@ -49,6 +49,12 @@ interface VectorExpect {
   decorationAlpha?: Record<string, number>;
   /** How far below a patched run's baseline its patch reaches at least (a moved underline). */
   patchReach?: Record<string, number>;
+  /** How many dashed or dotted border sides the scene draws as lines. */
+  dashLines?: number;
+  /** How many one-colour borders of unequal widths the scene draws as a ring (the solid path). */
+  rings?: number;
+  /** Every square-capped line starts and ends on a device pixel, across its width too. */
+  snappedLines?: boolean;
   canvas?: string;
   darkCanvas?: boolean;
   pictures?: number;
@@ -77,7 +83,11 @@ function readExpect(file: string, engine?: string): Expect {
   const m = /<script type="application\/json" id="expect">([\s\S]*?)<\/script>/.exec(html);
   if (!m?.[1]) throw new Error(`${file}: no <script type="application/json" id="expect"> block`);
   const exp = JSON.parse(m[1]) as Expect;
-  return { ...exp, ...(engine ? exp.engines?.[engine] : undefined) };
+  const own = engine ? exp.engines?.[engine] : undefined;
+  const merged = { ...exp, ...own };
+  // An engine's vector expectations amend the shared ones field by field.
+  if (exp.vector && own?.vector) merged.vector = { ...exp.vector, ...own.vector };
+  return merged;
 }
 
 const fixtures = readdirSync(DIR)
@@ -85,6 +95,7 @@ const fixtures = readdirSync(DIR)
   .sort();
 const norm = (s: string) => s.replace(/\s+/g, " ").trim();
 type PictureOp = Extract<Scene["ops"][number], { op: "image" }>;
+type LineOp = Extract<Scene["ops"][number], { op: "line" }>;
 const pictureOps = (ops: Scene["ops"]): PictureOp[] =>
   ops.flatMap((op) => (op.op === "group" ? pictureOps(op.children) : op.op === "image" ? [op] : []));
 const pct = (n: number) => `${(n * 100).toFixed(2)}%`;
@@ -772,7 +783,7 @@ for (const file of fixtures) {
     await page.goto(`/fixtures/${file}`);
     await page.addScriptTag({ path: "dist-test/harness.js" });
     const col = await page.evaluate(
-      async ({ exp }) => {
+      async ({ exp, target }) => {
         const h = window.__snapii;
         await window.beforeCollect?.();
         const capture = h.debug.captureRect(exp.capture);
@@ -781,7 +792,7 @@ for (const file of fixtures) {
         const { runs, stats, sources } = await h.debug.collectTextRunsDetailed(document, capture, opts);
         const links = h.collectLinkAreas(document, capture, { skip: skipEl });
         const t0 = performance.now();
-        const scene = h.buildScene(document, capture, { runs, sources, skip: skipEl });
+        const scene = h.buildScene(document, capture, { runs, sources, skip: skipEl, target });
         return {
           capture,
           runs,
@@ -797,7 +808,7 @@ for (const file of fixtures) {
           devicePixelRatio,
         };
       },
-      { exp },
+      { exp, target: browserName as "firefox" | "chromium" },
     );
     const { capture } = col;
     const scene: Scene = col.scene;
@@ -985,6 +996,26 @@ for (const file of fixtures) {
       expect.soft(runNamed(t).fill, `decoration colour of "${t}"`).toBe(fill);
     for (const [t, a] of Object.entries(vec?.decorationAlpha ?? {}))
       expect.soft(Number(runNamed(t).opacity), `decoration opacity of "${t}"`).toBeCloseTo(a, 2);
+    const lineOps = (ops: Scene["ops"]): LineOp[] =>
+      ops.flatMap((op) => (op.op === "group" ? lineOps(op.children) : op.op === "line" ? [op] : []));
+    const lines = lineOps(scene.ops);
+    if (vec?.dashLines !== undefined)
+      expect.soft(lines.length, "dashed and dotted sides").toBe(vec.dashLines);
+    const ringOps = (ops: Scene["ops"]): number =>
+      ops.reduce(
+        (n, op) => n + (op.op === "group" ? ringOps(op.children) : op.op === "rect" && op.border ? 1 : 0),
+        0,
+      );
+    if (vec?.rings !== undefined) expect.soft(ringOps(scene.ops), "border rings").toBe(vec.rings);
+    if (vec?.snappedLines) {
+      const dpr = col.devicePixelRatio;
+      const whole = (v: number) => Math.abs(v * dpr - Math.round(v * dpr)) < 1e-6;
+      for (const l of lines.filter((l) => !l.round)) {
+        // Along the side its ends, across it the edge of its band.
+        const edges = l.y1 === l.y2 ? [l.x1, l.x2, l.y1 - l.width / 2] : [l.y1, l.y2, l.x1 - l.width / 2];
+        expect.soft(edges.every(whole), `line on device pixels ${JSON.stringify(l)}`).toBe(true);
+      }
+    }
     for (const [t, reach] of Object.entries(vec?.patchReach ?? {})) {
       const run = runs.find((r) => r.text === t);
       const cx = (run?.x ?? 0) + (run?.width ?? 0) / 2;

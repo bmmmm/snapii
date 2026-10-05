@@ -158,6 +158,20 @@ function isOp(x: unknown, depth: number, budget: { left: number }): boolean {
     );
   }
   if (x.op === "image") return isRect(x) && isStr(x.dataURL) && IMAGE_DATA_URL.test(x.dataURL);
+  if (x.op === "line") {
+    const { dash } = x;
+    return (
+      [x.x1, x.y1, x.x2, x.y2].every(isNum) &&
+      isNum(x.width) &&
+      x.width >= 0 &&
+      isPaint(x.paint) &&
+      Array.isArray(dash) &&
+      dash.length === 2 &&
+      dash.every((v) => isNum(v) && v >= 0) &&
+      (dash[0] as number) + (dash[1] as number) > 0 &&
+      (x.round === undefined || typeof x.round === "boolean")
+    );
+  }
   if (x.op === "group") {
     return (
       depth < MAX_SCENE_DEPTH &&

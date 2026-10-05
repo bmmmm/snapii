@@ -135,6 +135,20 @@ these decisions:
   SVG paints a decoration in the declaring element's fill and ignores a
   colour in the value, so a decoration of another colour fills the
   `<text>` and the glyphs take a `<tspan>`.
+- **V-D10 Border patterns per browser.** CSS leaves dashes and dots to the
+  browser, and the two lay them out differently: Chromium fits the gap
+  between dashes of a fixed length, Firefox an odd number of equal
+  segments (counted on 21 side lengths at 5 widths in each browser, on
+  boxes with four equal sides; `tests/unit/border.test.ts` holds a sample).
+  `src/content/extract/border.ts` lays a side out the way the build's
+  browser does (`TARGET`, at build time), a `<line>` with a dash array
+  along the side, on the border box snapped to device pixels as the
+  browsers paint it. A double side is its two lines. Rounded dashed or
+  dotted boxes stay patches (their dashes follow the curve), and so does
+  what lies inside a collapsed table (its cells share their edges;
+  `border-collapse` is inherited, so their contents go with them). Firefox also
+  places a side's pattern by its corners and neighbours, which this does
+  not model: there it is approximate.
 
 `tests/layout/vector.spec.ts` renders every fixture's scene back in the
 browser and compares it with the page (`diffRatio`; a fixture whose

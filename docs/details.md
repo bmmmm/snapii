@@ -37,7 +37,9 @@ picture. Raster stays the default and its files are unchanged.
 
 - **Shapes.** Background colours and solid borders as rectangles and paths
   (rounded corners where the border has one colour; sides of their own
-  colours only on square corners), solid outlines (drawn square), linear
+  colours only on square corners), dashed, dotted and double borders of
+  square boxes as lines laid out as the browser lays them out, solid
+  outlines (drawn square), linear
   gradients as `<linearGradient>` (one per box, at the box's own size and
   place), outer box shadows as blurred shapes, stacked as CSS paints them
   (CSS 2.1 Appendix E, approximated); overflow clips as `<clipPath>`.
@@ -69,9 +71,10 @@ picture. Raster stays the default and its files are unchanged.
     lines, painted beyond their `background-origin` box other than under
     opaque borders, or on a frame's root or body;
   - `background-image`: images in `url()` (clipped to the text too);
-  - `border`: dashed, dotted, double, groove, ridge, inset and outset borders,
-    border images, outlines other than solid, and rounded corners whose sides
-    differ in colour;
+  - `border`: groove, ridge, inset and outset borders, dashed, dotted and
+    double ones with rounded corners or inside a collapsed table,
+    border images, outlines other than solid, and rounded corners whose
+    sides differ in colour;
   - `text-effect`: text shadows, text strokes and a background colour clipped
     to the text; decorations SVG cannot draw: an underline moved by
     `text-underline-offset` or `text-underline-position`, a thickness in %, a
@@ -122,6 +125,17 @@ Limits:
   without them shows a fallback font; each run keeps its place and width.
 - Text is drawn above the shapes; text under a half-transparent box or
   shadow is not dimmed as on the page.
+- Dashed and dotted borders follow each browser's own layout, as far as it
+  was measured. Chromium's dashes come close to the page (under 1 % of the
+  border pixels off in a review over some 180 boxes), its dots within a
+  pixel (a fifth of their pixels differ, mostly by a 1 px shift or
+  antialiasing); its round dots of 3 px are spaced evenly where Chromium
+  keeps them two widths apart. Firefox's
+  layout is fitted to boxes with four equal sides: on a single side, a
+  small box or sides of unequal neighbours its dashes and dots can sit
+  elsewhere and differ in number (about a fifth of the border pixels off
+  in the same review). Sides overlap at the corners: of different colours
+  instead of meeting diagonally, of a see-through colour darker there.
 - No OCR in vector output: OCR reads the captured pixels, and a vector
   capture has only the patches.
 - In Chromium a selection whose patches reach beyond the visible part of the

@@ -174,6 +174,17 @@ const scene = (): Scene => ({
           paint: { r: 0, g: 0, b: 0, a: 0.5 },
           cut: { x: 1, y: 1, width: 30, height: 20 },
         },
+        {
+          op: "line",
+          x1: 0,
+          y1: 1,
+          x2: 30,
+          y2: 1,
+          width: 2,
+          paint: { r: 0, g: 0, b: 0, a: 1 },
+          dash: [0, 4],
+          round: true,
+        },
       ],
     },
   ],
@@ -278,6 +289,18 @@ const sceneMutations: Array<[string, (s: Loose) => void]> = [
         [0, 0],
       ]),
   ],
+  ["line end NaN", (s) => (s.ops[0].children[3].x2 = Number.NaN)],
+  ["line end missing", (s) => delete s.ops[0].children[3].y1],
+  ["line width negative", (s) => (s.ops[0].children[3].width = -1)],
+  ["line width infinite", (s) => (s.ops[0].children[3].width = Number.POSITIVE_INFINITY)],
+  ["line width a CSS string", (s) => (s.ops[0].children[3].width = "2px")],
+  ["line paint a CSS string", (s) => (s.ops[0].children[3].paint = "black")],
+  ["line dash a CSS string", (s) => (s.ops[0].children[3].dash = "42")],
+  ["line dash of three", (s) => (s.ops[0].children[3].dash = [1, 2, 3])],
+  ["line dash negative", (s) => (s.ops[0].children[3].dash = [-1, 4])],
+  ["line dash NaN", (s) => (s.ops[0].children[3].dash = [2, Number.NaN])],
+  ["line dash all zero", (s) => (s.ops[0].children[3].dash = [0, 0])],
+  ["line round a string", (s) => (s.ops[0].children[3].round = "round")],
   ["image javascript: URL", (s) => (s.ops[0].children[1].dataURL = "javascript:alert(1)")],
   ["image http: URL", (s) => (s.ops[0].children[1].dataURL = "http://example.com/a.png")],
   [
@@ -350,6 +373,10 @@ test("isToBackground: accepts a save with a well-formed scene", () => {
   const undecorated = scene() as unknown as Loose;
   delete undecorated.text[0].decoration;
   assert.equal(isToBackground({ type: "save", model: { ...model(), scene: undecorated } }), true);
+  // Dashes with square ends: no round.
+  const dashed = scene() as unknown as Loose;
+  delete dashed.ops[0].children[3].round;
+  assert.equal(isToBackground({ type: "save", model: { ...model(), scene: dashed } }), true);
   assert.equal(
     isToBackground({ type: "save", model: { ...model(), scene: { ...scene(), ops: [nested(32)] } } }),
     true,

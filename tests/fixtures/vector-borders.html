@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>vector borders</title>
+    <!--
+      Dashed, dotted and double borders drawn as shapes, as each browser
+      lays them out (content/extract/border.ts): dashes of 1, 2 and 3 px,
+      square and round dots, double lines of 3 and 6 px, a box with a side
+      of each style and colour, a dotted underline on an inline element and
+      a dashed rule.
+      A rounded box with a left border only keeps the solid path (a ring
+      with the box's corners).
+      Patches ("border"): a dashed box with rounded corners (dashes follow
+      the curve), a groove border, and a dashed cell of a collapsed table
+      (cells share their edges).
+      Chromium's own layout comes within 0.16 % of the page, Firefox's
+      layout drawn in Chromium 0.73 %; Firefox 0.47 % (macOS, 2026-10-06).
+    -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; background: rgb(255, 255, 255); color: rgb(0, 0, 0); }
+      #cap { width: 460px; padding-top: 4px; }
+      p { margin: 0 0 8px; white-space: nowrap; }
+      .row { display: flex; flex-wrap: wrap; gap: 16px; margin: 0 0 16px; }
+      .row > div { box-sizing: border-box; width: 100px; height: 44px; background: rgb(255, 255, 255); }
+      hr { margin: 0 0 12px; border: 0; border-top: 2px dashed rgb(0, 128, 0); }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Borders drawn as shapes.", "Card", "An abbr here.", "Broken", "box", "Cell", "After the borders."],
+        "vector": {
+          "unsupported": { "border": 3 },
+          "maxPatchArea": 0.1,
+          "visible": ["Borders drawn as shapes.", "Card", "abbr", "Broken", "box", "After the borders."],
+          "hidden": ["Cell"],
+          "dashLines": 34,
+          "rings": 1,
+          "snappedLines": true,
+          "tolerance": 0.01
+        },
+        "engines": { "chromium": { "vector": { "tolerance": 0.004 } } }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>Borders drawn as shapes.</p>
+      <div class="row">
+        <div style="border: 1px dashed rgb(0, 0, 0)">Card</div>
+        <div style="border: 2px dashed rgb(0, 102, 204)"></div>
+        <div style="border: 3px dashed rgb(0, 0, 0)"></div>
+        <div style="border: 1px dotted rgb(0, 0, 0)"></div>
+        <div style="border: 2px dotted rgb(0, 0, 0)"></div>
+        <div style="border: 4px dotted rgb(204, 0, 0)"></div>
+        <div style="border: 3px double rgb(0, 0, 0)"></div>
+        <div style="border: 6px double rgb(128, 0, 0)"></div>
+        <div style="border-top: 2px dashed rgb(255, 0, 0); border-right: 4px dotted rgb(0, 0, 255); border-bottom: 3px double rgb(0, 0, 0); border-left: 1px solid rgb(0, 128, 0)"></div>
+      </div>
+      <p>An <span style="border-bottom: 1px dotted rgb(0, 0, 0)">abbr</span> here.</p>
+      <p><span style="border: 1px dashed rgb(0, 0, 0)">Broken<br />box</span></p>
+      <div class="row">
+        <div style="border: 2px double rgb(0, 0, 0)"></div>
+        <div style="border-left: 4px solid rgb(0, 0, 0); border-radius: 12px; background: rgb(230, 230, 230)"></div>
+      </div>
+      <table style="border-collapse: collapse; margin: 0 0 12px"><tr><td style="border: 2px dashed rgb(0, 0, 0); padding: 2px 6px">Cell</td></tr></table>
+      <hr />
+      <div class="row">
+        <div style="border: 2px dashed rgb(0, 0, 0); border-radius: 8px"></div>
+        <div style="border: 4px groove rgb(160, 160, 160)"></div>
+      </div>
+      <p>After the borders.</p>
+    </main>
+  </body>
+</html>

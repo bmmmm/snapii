@@ -280,6 +280,16 @@ function shadowLines(op: Extract<SceneOp, { op: "shadow" }>, defs: Defs): string
 function opLines(op: SceneOp, defs: Defs): string[] {
   if (op.op === "rect") return rectLines(op, defs);
   if (op.op === "shadow") return shadowLines(op, defs);
+  if (op.op === "line") {
+    // Four decimals: a dash or gap rounded to two drifts over a long side
+    // (0.67 for 2/3 is off a pixel within 150 periods).
+    const fine = (v: number) => String(Number(v.toFixed(4)));
+    const [dash, gap] = op.dash;
+    const cap = op.round ? ' stroke-linecap="round"' : "";
+    return [
+      `<line x1="${fine(op.x1)}" y1="${fine(op.y1)}" x2="${fine(op.x2)}" y2="${fine(op.y2)}" ${paintAttrs(op.paint, "stroke")} stroke-width="${fmt(op.width)}" stroke-dasharray="${fine(dash)} ${fine(gap)}"${cap}/>`,
+    ];
+  }
   if (op.op === "image") {
     return [
       `<image x="${fmt(op.x)}" y="${fmt(op.y)}" width="${fmt(op.width)}" height="${fmt(op.height)}" preserveAspectRatio="none" xlink:href="${xmlAttr(op.dataURL)}"/>`,

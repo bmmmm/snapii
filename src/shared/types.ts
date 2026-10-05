@@ -145,6 +145,19 @@ export type SceneOp =
       /** The visible part only, already cropped to the rect. */
       dataURL: string;
     }
+  | {
+      /** A dashed or dotted border side: a stroke along the line, dashes and gaps along it. */
+      op: "line";
+      x1: number;
+      y1: number;
+      x2: number;
+      y2: number;
+      width: number;
+      paint: Paint;
+      dash: [number, number];
+      /** Round caps: each dash of length 0 is a dot as wide as the line. */
+      round?: boolean;
+    }
   | { op: "group"; clip?: SceneClip; opacity?: number; children: SceneOp[] };
 
 /** Why part of a vector capture is pixels (a patch) instead of shapes. */
