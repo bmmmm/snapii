@@ -7,7 +7,8 @@
 // `--test-reporter=spec` to see them) and asserts sanity bounds, not exact
 // byte counts: the numbers move with the font rasteriser and the Firefox
 // build. JPEG is only required to win on the page with the photo: on text
-// over white it does not (measured, see the README).
+// over white it does not (measured, see the README). The second test saves the
+// same pages with vector output (docs/details.md, Vector output).
 import assert from "node:assert/strict";
 import { statSync } from "node:fs";
 import { after, before, test } from "node:test";
@@ -20,6 +21,7 @@ const BASE_PAGE = "/glue/fixtures/article.html";
 
 let g;
 let optionsUrl;
+let raster;
 before(async () => {
   g = await startGlue(7);
   const host = await g.s.chrome(
@@ -184,4 +186,53 @@ test("full-viewport selection at DPR 2: PNG and JPEG 0.92, text page and text + 
     jpeg.photo.bytes < png.photo.bytes,
     `JPEG ${jpeg.photo.bytes} B is not smaller than PNG ${png.photo.bytes} B on the photo page`,
   );
+  raster = { png, jpeg };
+});
+
+test("vector output, same pages: smaller than raster in both formats", async (t) => {
+  assert.ok(raster, "needs the raster sizes of the test above");
+  const pick = async (selector) => {
+    await g.open(optionsUrl);
+    const r = await g.rect(selector);
+    await g.click(r.x + r.width / 2, r.y + r.height / 2);
+    await g.until(
+      async () => (await g.content(`return document.getElementById("status").textContent;`)) === "Saved",
+      "the Saved status",
+    );
+  };
+  const save = async (photo) => {
+    await g.open(BASE_PAGE);
+    await g.content(`(${buildPage.toString()})(${photo});`);
+    await g.frames();
+    const before = g.svgFiles();
+    await g.startOverlay();
+    await g.drag(0, 0, 1279, 714);
+    await g.key("Enter");
+    const file = await g.newDownload(before);
+    return { bytes: statSync(file.path).size, capture: file.svg.capture, images: file.svg.images };
+  };
+  // The format stays JPEG from the test above.
+  await pick('input[name="output"][value="vector"]');
+  const jpeg = { text: await save(false), photo: await save(true) };
+  await pick('input[name="format"][value="png"]');
+  const png = { text: await save(false), photo: await save(true) };
+  for (const [format, sizes] of [
+    ["png", png],
+    ["jpeg", jpeg],
+  ]) {
+    for (const page of ["text", "photo"]) {
+      const v = sizes[page];
+      const r = raster[format][page];
+      t.diagnostic(`vector ${format.toUpperCase()}, ${page} page: SVG ${v.bytes} bytes against ${r.bytes} raster`);
+      assert.equal(v.capture.output, "vector");
+      assert.equal(v.capture.scene.patches, 0, JSON.stringify(v.capture.scene));
+      assert.deepEqual(v.capture.selection, r.capture.selection, `the same region of the ${page} page`);
+      // The photo is the page's only picture, embedded in the chosen format.
+      assert.deepEqual(
+        v.images.map((i) => i.href.slice(0, i.href.indexOf(";"))),
+        page === "photo" ? [`data:image/${format}`] : [],
+      );
+      assert.ok(v.bytes < r.bytes, `vector ${v.bytes} B is not smaller than raster ${r.bytes} B`);
+    }
+  }
 });
