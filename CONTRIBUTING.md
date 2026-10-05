@@ -55,13 +55,14 @@ other environment variables and the interactive driver are in
 | `src/content/main.ts`, `session.ts` | Injected on demand; one capture session: overlay → selection → extraction → save or copy → toast |
 | `src/content/overlay/` | The selection overlay, hover pick, toolbar and toast, styled to survive hostile pages |
 | `src/content/extract/` | DOM → text runs (`collect.ts`, `lines.ts`, `baseline.ts`, `visibility.ts`, `flat-tree.ts`), link and image areas, the clean clone for Copy text |
+| `src/content/extract/scene.ts` | Vector output: the region's boxes, pictures and patches in paint order, and how each text run is painted; `extract/gradient.ts` and `extract/shadow.ts` read computed gradients and box shadows |
 | `src/content/fragment.ts`, `clipboard.ts` | Copy link's text-fragment URL; Copy text and Copy link on the clipboard |
 | `src/content/shadow.ts` | Shadow roots and assigned slots as a content script sees them, closed ones included, in either browser |
-| `src/shared/svg/` | The renderer (`build.ts`), the metadata block (`metadata.ts`), XML escaping (`xml.ts`) |
+| `src/shared/svg/` | The renderer (`build.ts`), the vector renderer (`vector.ts`), the metadata block (`metadata.ts`), XML escaping (`xml.ts`) |
 | `src/shared/types.ts` | Data contracts between content script, background and renderer, `Settings` |
 | `src/shared/messages.ts` | Runtime validation of every message the background receives |
 | `src/shared/settings.ts` | `DEFAULT_SETTINGS` |
-| `src/shared/*.ts` (rest) | Pure helpers: geometry, tiling, capture strategy, pick heuristic, toolbar placement, links, whitespace and plain text, HTML sanitising for Copy text, text directives, OCR geometry, file name, save-folder rules, shortcut syntax, the version line (`about.ts`) |
+| `src/shared/*.ts` (rest) | Pure helpers: geometry, tiling, capture strategy, pick heuristic, toolbar placement, links, whitespace and plain text, HTML sanitising for Copy text, text directives, OCR geometry, file name, save-folder rules, shortcut syntax, CSS colours as numbers (`color.ts`), the version line (`about.ts`) |
 | `src/shared/spike.ts` | Platform facts measured on Firefox 157 and on Chromium 151/153 (the headers say how); never edit by hand without a new measurement |
 | `src/shared/manifest.ts`, `target.ts` | The manifest each browser gets; which browser a bundle was built for (`TARGET`, set by the build) |
 | `src/shared/viewport.ts` | Chromium only: whether a region fits the viewport and where it lies in the captured picture |
@@ -120,11 +121,23 @@ bug:
    layer: one `<text>` with `textLength` per run of text, `fill-opacity="0"`
    (not `fill="none"`, which drops the text from hit-testing), OCR words in
    their own `<g id="ocr">`, linked runs wrapped in `<a href>`.
+   Vector output (`output: "vector"` in the record) is a second structure:
+   whole-pixel `width` and `height` (the region's size rounded up),
+   `<defs>` with clip paths, gradients and filters (ids `c…`, `g…`, `f…`),
+   `<rect id="canvas">`, the shapes in `<g id="shapes">` (pictures there as
+   `<image>`), the pixel patches in
+   `<g id="patches">`, the link areas, then one text layer of the same runs,
+   each painted on its own: visible (painted from numbers, never from a page
+   string; optionally its own `clip-path`, `letter-spacing` and
+   `xml:space`) or invisible with `fill-opacity="0"`, with
+   `lengthAdjust="spacing"` and `sans-serif` appended to a font family that
+   names no generic one.
 2. **The capture record** — the JSON in `<snapii:capture>`, `schema: 1`, with
    the fields of `captureRecord()` in `src/shared/svg/metadata.ts`, and the
    Dublin Core fields (`dc:title`, `dc:source`, `dc:relation`, `dc:date`,
    `dc:format`, `dc:language`). Removing, renaming or retyping a field is a
-   schema change.
+   schema change. Vector output adds `output` and `scene` and has no `ocr`
+   (it runs no OCR); its `tiles` are the patches, not the whole region.
 3. **The permissions** — `activeTab`, `scripting`, `downloads`,
    `clipboardWrite`, `storage`; no host permissions and no `content_scripts`
    (decision D1 in [docs/development.md](docs/development.md); the measured facts are in `src/shared/spike.ts`).

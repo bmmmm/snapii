@@ -29,10 +29,115 @@ The short version is in the [README](../README.md).
   sticky bars are skipped as anchors) or the plain URL when there is none;
   `dc:relation` is always the plain URL.
 
+## Vector output (beta)
+
+With **Output: Shapes and text (beta)** in the settings page, Save SVG writes
+the region as SVG shapes, embedded pictures and visible text instead of one
+picture. Raster stays the default and its files are unchanged.
+
+- **Shapes.** Background colours and solid borders as rectangles and paths
+  (rounded corners where the border has one colour; sides of their own
+  colours only on square corners), solid outlines (drawn square), linear
+  gradients as `<linearGradient>` (one per box, at the box's own size and
+  place), outer box shadows as blurred shapes, stacked as CSS paints them
+  (CSS 2.1 Appendix E, approximated); overflow clips as `<clipPath>`.
+- **Pictures.** `<img>` and `<canvas>` as embedded `<image>`s (pixels, not
+  shapes) of the part that shows: cut to the box, `object-fit`, the clips and
+  the selection, rounded corners left transparent, at the screen's density.
+  They are read from the page's own elements: nothing is downloaded.
+- **Text.** Every run is visible text in the page's colour, font family (with
+  `sans-serif` appended when the page names no generic family), size, weight
+  and style; `textLength` pins its width as in raster output. A run that a
+  pixel patch shows, or that an opaque shape painted later covers, stays
+  invisible but selectable. Links are as in raster output.
+- **Patches.** What cannot be drawn so is a picture of the page, cut from a
+  screenshot as in raster output. The record counts the patched elements
+  per reason:
+  - `transform`: transforms (`transform`, `rotate`, `scale`, `translate`);
+  - `effect`: filters, `backdrop-filter`, blend modes, masks, an element's
+    own `clip-path` or `clip`;
+  - `box-shadow`: inset shadows, shadows on an inline box across lines, and
+    shadows whose colour this cannot read;
+  - `gradient`: radial, conic and repeating gradients, and linear ones with
+    several layers, colour hints, colours given in another colour space than
+    `rgb()` (`oklch()`, `lab()`, `color()`), a size or position of their own,
+    fixed or local, blended, clipped to the text, across an inline box's
+    lines, painted beyond their `background-origin` box other than under
+    opaque borders, or on a frame's root or body;
+  - `background-image`: images in `url()` (clipped to the text too);
+  - `border`: dashed, dotted, double, groove, ridge, inset and outset borders,
+    border images, outlines other than solid, and rounded corners whose sides
+    differ in colour;
+  - `text-effect`: text shadows, text strokes and a background colour clipped
+    to the text;
+  - `color`: a colour this cannot read;
+  - `pseudo`: a `::before` or `::after` with content (text, counters,
+    images) or a box of its own, a styled `::first-letter` or `::first-line`;
+  - `marker`: list markers;
+  - `icon-font`, `vertical` (vertical text), `form` (form controls), `media`
+    (video, audio, embed, object), `frame` (frames that cannot be read:
+    cross-origin or sandboxed), `svg` (inline SVG), `math` (MathML);
+  - `image` and `canvas`: images from another origin, still loading or
+    broken; canvases that read back empty (WebGL) or hold another origin's
+    pixels; either positioned in a form this does not read (`calc()`);
+  - `budget`: pictures over the limits below; also the whole selection on a
+    page too large, too deep or too slow to read (over 60,000 elements,
+    150,000 drawing operations, 24 nested transparent groups or 5 seconds),
+    and patches merged into bands of the region when more than 2,000 remain
+    after overlapping ones are merged (over 4,000 go to bands at once).
+
+  A background image or gradient (any kind) on `html`, or on `body` when
+  `html` has no background of its own, paints the whole page and makes the
+  **whole selection one patch**; so does any of the reasons above on `html`
+  or `body` itself.
+- **Record.** The JSON adds `output: "vector"` and `scene`: the number of
+  drawing operations, of patches, their area and the patched elements per
+  reason. It has no `ocr`. `tiles` are the patches (a large one split into
+  tiles as in raster output), not the whole region.
+
+Limits:
+
+- **Not drawn**, and outside patches not in the file at all, among others:
+  text decorations (underlines, line-through), the colour of visited links
+  (the browser hides it from extensions, so they come out in the link
+  colour), the `…` of `text-overflow: ellipsis`, scrollbars and column rules.
+- The viewer needs the page's fonts. Web fonts are not embedded, so a viewer
+  without them shows a fallback font; each run keeps its place and width.
+- Text is drawn above the shapes; text under a half-transparent box or
+  shadow is not dimmed as on the page.
+- No OCR in vector output: OCR reads the captured pixels, and a vector
+  capture has only the patches.
+- In Chromium a selection whose patches reach beyond the visible part of the
+  page is refused with a toast ("Parts of this selection that are saved as
+  pixels are outside the visible area…"); shapes and text may lie anywhere.
+- Pictures beyond about 16.8 million pixels or 32 Mi characters of data URL
+  (about 24 MiB of encoded image) together, or longer than 65,535 device px,
+  become patches.
+
+How close it comes: rendered back in the same browser at device-pixel ratio
+1 (`tests/layout/vector.spec.ts` in Playwright's Firefox and Chromium on
+Linux, CI run of 2026-10-05), the vector SVGs of the 17 test pages
+(`tests/fixtures/vector-*.html`) differ from the page in under 0.3 % of the
+pixels on 15 of them in Firefox and 16 in Chromium; the others are a page of
+inline boxes (1.7 %, Firefox) and the page with half-transparent groups,
+whose text lies above the group instead of in it (3.7 % in Firefox, 3.5 % in
+Chromium). Two of these pages are wholly patches by design. On five real
+pages in Firefox (a Wikipedia article, an MDN page, a GitHub page, a blog
+post and a shop page) 71–98 % of the area came out as shapes, measured
+before pictures, gradients and shadows were drawn instead of patched.
+
+File size, measured as in [File size](#file-size) below
+(`tests/glue/sizes.test.mjs`, its second test; full viewport, DPR 2, Firefox
+157): the text page is 24,453 B as vector against 862,060 B as a
+PNG picture; the page with the photo is 4,266,390 B (the photo as PNG) or
+678,451 B (JPEG 92 %) against 4,632,889 B and 1,221,023 B as raster. The
+photo itself is stored at the screen's density either way; the text and the
+flat areas are what gets smaller.
+
 ## Text in images (OCR)
 
-With "Recognize text in images (OCR)" on, **Save SVG** also reads the text
-inside the images of the selection: `<img>`/`<picture>`, `<canvas>`, SVG
+With "Recognize text in images (OCR)" on, **Save SVG** in raster output also
+reads the text inside the images of the selection: `<img>`/`<picture>`, `<canvas>`, SVG
 `<image>` and boxes with a CSS `background-image` (visible part only, images
 smaller than 24×12 CSS px skipped). It runs Tesseract (tesseract.js 7.0.0,
 German and English models) in the extension's background page; engine and
@@ -87,7 +192,8 @@ link and the full stop after it. Chromium puts a line break between any two
 Other viewers fall short: Inkscape cannot click-select the transparent text
 (Tab or Ctrl+A reach it), and macOS Preview and Quick Look show the image
 without any text selection. For those, `<desc>`, the metadata and **Copy
-text** carry the content.
+text** carry the content. In a vector file the text is drawn, not
+transparent; how these viewers handle it has not been checked yet.
 
 ## Limits
 
@@ -131,10 +237,10 @@ Save SVG; JPEG is switched on in the options page, quality at its default of
 
 | Page | Format | Image payload | SVG file |
 |---|---|---|---|
-| Text only: header band, three columns of prose (76 text runs) | PNG (default) | 628,932 B (0.60 MiB) | **861,778 B (0.82 MiB)** |
-| | JPEG 92 % | 920,991 B (0.88 MiB) | **1,251,192 B (1.19 MiB)** |
-| The same with a photo-like 1280×360 px image on top (35 text runs) | PNG | 3,465,633 B (3.31 MiB) | **4,632,607 B (4.42 MiB)** |
-| | JPEG 92 % | 906,732 B (0.86 MiB) | **1,220,741 B (1.16 MiB)** |
+| Text only: header band, three columns of prose (76 text runs) | PNG (default) | 628,932 B (0.60 MiB) | **862,060 B (0.82 MiB)** |
+| | JPEG 92 % | 920,991 B (0.88 MiB) | **1,251,474 B (1.19 MiB)** |
+| The same with a photo-like 1280×360 px image on top (35 text runs) | PNG | 3,465,633 B (3.31 MiB) | **4,632,889 B (4.42 MiB)** |
+| | JPEG 92 % | 906,732 B (0.86 MiB) | **1,221,023 B (1.16 MiB)** |
 
 What this says: for text on flat backgrounds PNG is the smaller file (JPEG at
 92 % was 45 % larger here); JPEG pays off when the region contains photos
@@ -162,6 +268,17 @@ record), the page title, the capture time and the screen/viewport figures.
 The text-fragment URL in `dc:source` also contains text from the start of
 the selection. Remove these before publishing a file from a page whose
 address carries a token.
+
+A file saved with vector output holds more of the page than its pixels:
+
+- the colours of the region's boxes, and their gradients and shadows;
+- the boxes, gradients and shadows that reach into the selection, at their
+  full size (beyond the selection's edge, hidden by the SVG's frame), also
+  where something else covers them on the page;
+- the pictures of the region's images and canvases, cut to the part inside
+  their box, their clips and the selection, but not to what covers them: a
+  picture under another element, or sharp under a blurring overlay, is in the
+  file as it is, where a raster capture holds only what the page shows.
 
 Permissions, and why each one is declared:
 

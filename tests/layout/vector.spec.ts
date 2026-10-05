@@ -5,8 +5,9 @@
 // vectorRenderer, open the SVG in the same browser and check what a reader
 // of the file gets:
 //   V0 the save message (model with scene) passes the background's validator
-//   V1 (G2) diffRatio(page, SVG) <= vector.tolerance (default T) for the
-//      vector-* fixtures; the other fixtures report theirs
+//   V1 (G2) diffRatio(page, SVG) <= vector.tolerance (default T) for every
+//      fixture with a vector block (each vector-* fixture has one); the
+//      others report theirs
 //   V2 (G4) patch area / region <= vector.maxPatchArea and the scene's
 //      unsupported counts are vector.unsupported, exactly
 //   V3 (G3) one text layer with one <text> per run; select-all copies the

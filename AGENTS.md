@@ -101,7 +101,8 @@ Read first: `src/shared/types.ts` (every data contract), then
 - **Chromium captures the viewport and nothing else** (C2/C5 in
   `src/shared/spike.ts`): one `captureVisibleTab`, cropped in the service
   worker. A region beyond the viewport is refused (`outside-viewport`), and
-  the overlay disables Save for it before that. Do not reach for the API's
+  the overlay disables Save for it before that; in vector output only the
+  patches count, checked in the background. Do not reach for the API's
   `rect`/`scale` there: undocumented, and not Firefox's semantics.
 - **Chromium's service worker keeps no state and has no DOM**: no object
   URLs, no `Worker`, no clipboard, no `devicePixelRatio`. The download goes

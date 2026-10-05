@@ -48,6 +48,7 @@ the same time; 10 would collide with the Chromium suite's 8470–8479 and
 | 13 | Overlay never in the raster | auto (tests/glue/save.test.mjs: item 13) |
 | 14 | Revoke host permission in `about:addons` → hint | obsolete (D1) |
 | 15 | Informative: open the SVG in Chrome and Inkscape | human 15h |
+| 16 | Vector output: Output "Shapes and text" in the settings page → the save has shapes, visible text, pictures and patches; the record says `output: "vector"`; OCR is off | auto (tests/glue/options.test.mjs: output Vector …, vector output with pictures …; tests/glue-chromium/save.test.mjs: vector output …; tests/layout/vector.spec.ts) + human 16h |
 
 ### Chromium
 
@@ -58,9 +59,12 @@ viewport and the save after scrolling, JPEG, closed shadow trees, Copy text on
 a secure and a non-secure origin and Copy link (read back from the
 clipboard), OCR through the offscreen document, the popup on a browser page,
 the read-only shortcut section, the folder rules against the real download
-API, a save across a service-worker restart, the toolbar notice, and a
+API, a save across a service-worker restart, the toolbar notice, a
 cancelled Save-as dialog (headless Chromium has no file dialog, so every
-"Ask where to save" download ends as a cancelled one).
+"Ask where to save" download ends as a cancelled one), and vector output
+(shapes and visible text, pictures and patches, a selection beyond the
+viewport without patches that saves, and one with a patch there that is
+refused).
 
 Human steps there (load `dist-chromium/` via `chrome://extensions` → Developer
 mode → Load unpacked):
@@ -152,3 +156,13 @@ surroundings appears, the toolbar has a blue "Save SVG" button. Save works.
 **15h — other viewers (informative).** Open a saved SVG in Chrome: image and
 selectable text, links clickable. Open it in Inkscape: the image shows; text
 may not be selectable (documented limitation). Record what you see.
+
+**16h — vector output on real pages and in other viewers.** Switch Output to
+"Shapes and text (beta)" in the settings page and save a region of a
+Wikipedia article, a GitHub page and a page with photos and gradients. Open
+each file in Firefox next to the page: boxes, colours, gradients, shadows and
+pictures where the page has them, the text visible and selectable, links
+clickable, zooming in keeps edges sharp (patches excepted). Open the files in
+Inkscape and macOS Preview: the shapes show and can be selected and moved in
+Inkscape; note fonts the viewer replaces. Record the record's `scene` counts
+and what differs from the page.

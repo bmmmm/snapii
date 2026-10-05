@@ -45,7 +45,8 @@ Chromium 151 and 153 in `SPIKE_CHROMIUM` (`src/shared/spike.ts`).
 - **C-D1 Viewport only.** `captureVisibleTab` takes the viewport and nothing
   beyond it. A region that is wholly visible is saved from one capture,
   cropped in the service worker; any other is refused, and the overlay
-  disables Save for it with the reason. Capturing beyond the viewport would
+  disables Save for it with the reason (vector output captures only its
+  patches, so there only those must be visible: V-D8). Capturing beyond the viewport would
   need scroll-and-stitch (two captures a second, scroll events in the page,
   repeated fixed elements) or the `debugger` permission (the Firefox
   semantics, at the price of a permission warning and an infobar); neither is
@@ -69,6 +70,65 @@ The glue tests drive the popup through `Extensions.triggerAction` (DevTools
 protocol), which grants `activeTab` like a click. No key of a command can be
 pressed from a test: the command is fired as an event there, and the real key
 press is a manual item (`tests/MANUAL-CHECKLIST.md`).
+
+## Vector output
+
+The vector output ([docs/details.md](details.md#vector-output-beta)) rests on
+these decisions:
+
+- **V-D1 Opt-in, raster unchanged.** `output` defaults to `"raster"`, and a
+  raster file stays byte-identical (`tests/unit/golden/simple.svg`). Vector is
+  a second renderer (`src/shared/svg/vector.ts`), not a change to the first.
+- **V-D2 Scene in the page, pure renderer in the background.** The content
+  script reads the DOM into a scene of numbers (`src/content/extract/scene.ts`):
+  boxes, pictures, patches and how each text run is painted. The background
+  validates it like every message (`src/shared/messages.ts`), captures only
+  the patches and renders; same scene, same bytes. The scene holds no page
+  string: colours, lengths and gradients are parsed into numbers in the page,
+  and a picture is a `data:image/…;base64` URL the content script encoded
+  itself. The text layer's strings (text, font names, links) are escaped as in
+  raster output.
+- **V-D3 The smallest box as pixels.** An element that cannot be drawn as
+  shapes becomes a patch over its box, grown by what its shadows and filters
+  paint beyond it, and, unless it clips its overflow both ways, over the
+  shown absolute and fixed descendants that leave it (a dropdown); its text
+  stays in the text layer, invisible, because the pixels show it. The record
+  counts the patched elements per reason. On five real pages this kept 71–98 % of the area as shapes before
+  pictures, gradients and shadows were drawn (four of five at 85 % or more).
+- **V-D4 Text stays text, fonts are not embedded.** Embedding would mean
+  reading font files, which a content script cannot do without requests.
+  Each run names the page's font with a generic fallback, and `textLength`
+  with `lengthAdjust="spacing"` pins its width (measured against the page:
+  glyphs keep their shape, the run its extent).
+- **V-D5 Pictures from the page's own pixels, cut to what shows.** An `<img>`
+  or `<canvas>` is drawn into a canvas the content script makes and read
+  back: no request. What the page may not read (another origin) is a patch;
+  measured in both browsers, the content script may read exactly what the
+  page may. Only the part inside the box, its clips and the selection is
+  stored, at the screen's density, with what lies outside rounded corners
+  removed (a rounded ancestor's clip is cut about two device pixels outside
+  its curve, a corner under about seven not at all; the SVG's own clip hides
+  that rest).
+- **V-D6 Paint order as CSS 2.1 Appendix E, approximated.** Per stacking
+  context: its background, negative z-index, blocks, floats, inline content,
+  positioned boxes, positive z-index. Text is drawn above all shapes; a run
+  an opaque shape painted later covers is made invisible instead.
+- **V-D7 No OCR in vector output.** OCR reads the pixels of the captured
+  tiles; a vector capture has only the patches, and reading the embedded
+  pictures would mean decoding them once more. Not built for now; the
+  settings page and the menu disable the OCR switch for vector output, the
+  stored setting stays, and a vector save ignores it.
+- **V-D8 Chromium: one capture for all patches.** Two captures a second is
+  Chromium's limit (C3), so all patches come from one viewport capture with
+  one shrink factor; a patch outside the viewport refuses the save before any
+  capture, while shapes and text may lie anywhere.
+
+`tests/layout/vector.spec.ts` renders every fixture's scene back in the
+browser and compares it with the page (`diffRatio`; a fixture whose
+expectations have a `vector` block must stay within its tolerance, 2 % by
+default, the others only report it),
+checks the text layer, the links, hostile values and that the save message
+passes the background's validator.
 
 ## Driving Firefox interactively
 
