@@ -107,6 +107,18 @@ test("planViewportCrop: at a fractional ratio a region ending at the viewport's 
   assert.deepEqual(crop.source, { x: 1170, y: 674, width: 110, height: 110 });
 });
 
+test("planViewportCrop: a region wholly in the viewport's last part of a device pixel gets the picture's last pixel", () => {
+  // At 110 % the picture ends at 1280 × 784 device px, the viewport at 1280.4 × 784.3:
+  // a vector patch from CSS 1163.7 / 712.75 starts past the picture's last pixel.
+  const crop = planViewportCrop(
+    { x: 1163.7, y: 712.75, width: 0.3, height: 0.25 },
+    { viewport: { width: 1164, height: 713 }, scroll: { x: 0, y: 0 }, devicePixelRatio: 1.1 },
+    { width: 1280, height: 784 },
+    1e9,
+  );
+  assert.deepEqual(crop.source, { x: 1279, y: 783, width: 1, height: 1 });
+});
+
 test("planViewportCrop: a region outside the picture is refused", () => {
   assert.throws(
     () =>

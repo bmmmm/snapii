@@ -92,9 +92,10 @@ function cropSource(
     throw new Error("the region is outside the captured viewport");
   // At a fractional ratio the viewport's CSS size times dpr lies between two
   // device pixels and the capture has the lower one, so a region ending at the
-  // viewport's edge reaches a pixel past the picture.
-  const left = Math.max(0, Math.floor((region.x - page.scroll.x) * dpr + EPS));
-  const top = Math.max(0, Math.floor((region.y - page.scroll.y) * dpr + EPS));
+  // viewport's edge reaches a pixel past the picture, and one wholly in that
+  // last part of a pixel (a vector patch) gets the picture's last one.
+  const left = Math.min(picture.width - 1, Math.max(0, Math.floor((region.x - page.scroll.x) * dpr + EPS)));
+  const top = Math.min(picture.height - 1, Math.max(0, Math.floor((region.y - page.scroll.y) * dpr + EPS)));
   const right = Math.min(picture.width, Math.ceil((region.x + region.width - page.scroll.x) * dpr - EPS));
   const bottom = Math.min(picture.height, Math.ceil((region.y + region.height - page.scroll.y) * dpr - EPS));
   if (right <= left || bottom <= top) throw new Error("the region is outside the captured viewport");
