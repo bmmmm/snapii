@@ -138,8 +138,9 @@ clipboard.
 **9h — real click and display.** On
 `http://127.0.0.1:8438/glue/fixtures/article.html` scroll to the last
 paragraph ("Piezoelectric quartz …"), click it, click **Copy link**: toast
-"Copied link". Paste the URL into a new tab's address bar and press Enter:
-the page opens scrolled to that paragraph, which is highlighted. Optional:
+"Copied link", the overlay closes. Paste the URL into a new tab's address
+bar and press Enter: the page opens scrolled to that paragraph, which is
+highlighted. Optional:
 paste it into Chrome — the same paragraph is highlighted.
 
 **10h — AMO and PDF viewer (need network / a PDF).** Open

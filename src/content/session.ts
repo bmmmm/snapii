@@ -92,7 +92,7 @@ export interface SessionDeps {
 
 export interface SessionHandle {
   readonly overlay: OverlayHandle;
-  /** True until the session ends (captured, saved, cancelled or cancel()). */
+  /** True until the session ends (captured, saved, a link copied, cancelled or cancel()). */
   isOpen(): boolean;
   /** Ends the session and removes the overlay (a second start: popup or shortcut). */
   cancel(): void;
@@ -426,10 +426,15 @@ export function startSession(deps: SessionDeps): SessionHandle {
 
   async function onAction(action: ToolbarAction, selection: Selection): Promise<void> {
     if (action !== "save") {
-      // The overlay stays open after a copy: saving the same selection is a
-      // likely next step, and Escape still closes it.
+      // The overlay stays open after copied text: saving the same selection
+      // is a likely next step, and Escape still closes it. A copied link is
+      // the end of it; a failed copy keeps it for another try.
       try {
-        await (action === "copy-text" ? copyText(selection) : copyLink(selection));
+        if (action === "copy-text") await copyText(selection);
+        else {
+          await copyLink(selection);
+          close();
+        }
       } catch (e) {
         console.error("snapii: copy failed", e);
         notify(COPY_FAILED_TOAST);

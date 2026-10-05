@@ -75,7 +75,7 @@ for (const [name, host, secure] of [
     // Hidden text absent, javascript: link unwrapped, real link kept.
     assert.equal(body(clip["text/html"]).replace(/\s+/g, " ").trim(), html(origin));
     assert.equal(await g.until(() => g.toast(), "the toast"), "Copied text");
-    // The overlay stays open after a copy.
+    // The overlay stays open after copied text (a copied link closes it, item 9).
     assert.equal(await g.overlayPresent(), 1);
     await g.key("Escape");
   });
@@ -112,7 +112,8 @@ test("item 9: Copy link -> the URL opened in a new tab scrolls to the passage an
   assert.ok(link.startsWith(`${url}#:~:text=`), link);
   assert.equal(body(clip["text/html"]), `<a href="${link.replace(/&/g, "&amp;")}">snapii glue article</a>`);
   assert.equal(await g.until(() => g.toast(), "the toast"), "Copied link");
-  await g.key("Escape");
+  // A copied link closes the overlay (a copied text keeps it, item 8).
+  await g.until(async () => (await g.overlayPresent()) === 0, "the overlay to close");
 
   // Control: the plain URL opens at the top, and the passage scrolled into
   // view by hand shows no highlight colour, so the check below can fail.

@@ -48,6 +48,8 @@ test("Copy link: the text-fragment URL as plain text and as a link named like th
   await g.click(130, 150);
   await g.clickToolbar("copy-link");
   assert.equal(await g.until(() => g.toast(), "the toast"), "Copied link");
+  // A copied link closes the overlay.
+  await g.until(async () => !(await g.overlayPresent()), "the overlay to close");
   const clip = await g.readClipboard(reader);
   assert.ok(clip["text/plain"].startsWith(`${g.base}${PAGE}#:~:text=`), clip["text/plain"]);
   assert.match(clip["text/html"], /^(<meta[^>]*>)?<a href="[^"]+#:~:text=[^"]+">snapii glue page<\/a>$/);

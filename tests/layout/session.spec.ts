@@ -341,7 +341,7 @@ test("copy text: visible text as plain + clean HTML; the overlay stays, nothing 
   expect(await calls(page)).toEqual([]);
 });
 
-test("copy link: the text-fragment URL of the picked paragraph, as plain text and as a titled link", async ({
+test("copy link: the text-fragment URL of the picked paragraph, as plain text and as a titled link; the overlay closes", async ({
   page,
 }) => {
   await load(page);
@@ -353,7 +353,10 @@ test("copy link: the text-fragment URL of the picked paragraph, as plain text an
   // The generator lower-cases the passage; matching is case-insensitive.
   expect(clip?.plain).toBe(`${url}#:~:text=some%20paragraph%20text%20with%20a%20link%20inside.`);
   expect(clip?.html).toBe(`<a href="${clip?.plain}">overlay</a>`);
-  expect(await hostState(page)).toEqual({ attached: true, display: "block" });
+  // A copied link is the end of it, unlike copied text (a save may follow that).
+  expect(await hostState(page)).toEqual({ attached: false, display: null });
+  expect(await page.evaluate(() => (window as unknown as TestWindow).__session.isOpen())).toBe(false);
+  expect(await calls(page)).toEqual([]);
 });
 
 test("save: the model carries the paragraph's text-fragment URL with status SUCCESS", async ({ page }) => {
@@ -574,16 +577,20 @@ test("copy text of text only in a shadow tree: the HTML is the plain text as a p
   });
 });
 
-test("a failed clipboard write shows the copy-failed toast and keeps the overlay", async ({ page }) => {
-  await load(page);
-  await begin(page, { ok: true, filename: "x.svg" });
-  await page.evaluate(() => {
-    (window as unknown as TestWindow).__clipFail = true;
+for (const action of ["copy-text", "copy-link"] as const) {
+  test(`a failed clipboard write on ${action} shows the copy-failed toast and keeps the overlay`, async ({
+    page,
+  }) => {
+    await load(page);
+    await begin(page, { ok: true, filename: "x.svg" });
+    await page.evaluate(() => {
+      (window as unknown as TestWindow).__clipFail = true;
+    });
+    await pickElement(page, "para");
+    await clickButton(page, action, "Copy failed. Try again");
+    expect(await hostState(page)).toEqual({ attached: true, display: "block" });
   });
-  await pickElement(page, "para");
-  await clickButton(page, "copy-text", "Copy failed. Try again");
-  expect(await hostState(page)).toEqual({ attached: true, display: "block" });
-});
+}
 
 /** Makes sendSave and writeClipboard hang until release(). */
 function hold(page: Page): Promise<void> {
