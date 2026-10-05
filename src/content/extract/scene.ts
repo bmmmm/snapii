@@ -1069,9 +1069,18 @@ class Builder {
     if (cs.outlineStyle !== "solid" || w <= 0) return;
     const paint = parseColor(cs.outlineColor);
     if (!paint || paint.a <= 0) return;
-    const grow = px(cs.outlineOffset) + w;
+    const offset = px(cs.outlineOffset);
     for (const f of frags) {
-      const box = { x: f.x - grow, y: f.y - grow, width: f.width + 2 * grow, height: f.height + 2 * grow };
+      // A negative offset shrinks the box down to its centre at most, and the
+      // outline goes round that (measured in Firefox and Chromium, 2026-10-05).
+      const iw = Math.max(0, f.width + 2 * offset);
+      const ih = Math.max(0, f.height + 2 * offset);
+      const box = {
+        x: f.x + (f.width - iw) / 2 - w,
+        y: f.y + (f.height - ih) / 2 - w,
+        width: iw + 2 * w,
+        height: ih + 2 * w,
+      };
       ops.push({ op: "rect", ...box, stroke: { width: w, paint } });
     }
   }

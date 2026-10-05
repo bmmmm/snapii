@@ -516,6 +516,42 @@ test("pictures over the data URL budget are patches", async ({ page }) => {
   expect(pictureOps(scene.ops)).toHaveLength(2);
 });
 
+test("outlines: a negative offset shrinks the box down to its centre at most, as both browsers paint it", async ({
+  page,
+}) => {
+  // Measured 2026-10-05 in Firefox and Chromium: 4, 32 and 112 red pixels.
+  const scene = await sceneOf(
+    page,
+    '<main id="cap" style="display:flex;gap:40px;padding:40px;width:300px">' +
+      '<div style="width:40px;height:10px;outline:1px solid rgb(255,0,0);outline-offset:-30px"></div>' +
+      '<div style="width:2px;height:20px;outline:1px solid rgb(255,0,0);outline-offset:-3px"></div>' +
+      '<div style="width:40px;height:20px;outline:2px solid rgb(255,0,0);outline-offset:-9px"></div></main>',
+  );
+  const outlines = (ops: Scene["ops"]): number[][] =>
+    ops.flatMap((op) =>
+      op.op === "group"
+        ? outlines(op.children)
+        : op.op === "rect" && op.stroke
+          ? [[op.width, op.height, op.x + op.width / 2, op.y + op.height / 2]]
+          : [],
+    );
+  // Each round its element's centre (region-relative).
+  const centres = await page.evaluate(() => {
+    const cap = (document.getElementById("cap") as HTMLElement).getBoundingClientRect();
+    return [...document.querySelectorAll("#cap > div")].map((d) => {
+      const r = d.getBoundingClientRect();
+      return [r.left - cap.left + r.width / 2, r.top - cap.top + r.height / 2];
+    });
+  });
+  expect(outlines(scene.ops)).toEqual(
+    [
+      [2, 2],
+      [2, 16],
+      [26, 6],
+    ].map((size, i) => [...size, ...(centres[i] as number[])]),
+  );
+});
+
 test("gradients: the page's own body, its background not on the canvas (the root has one), is drawn", async ({
   page,
 }) => {
