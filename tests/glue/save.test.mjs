@@ -101,7 +101,7 @@ test("item 12: metadata (dc:source, dc:date, capture JSON) is in the saved file"
   );
   assert.equal(capture.url, url);
   assert.equal(capture.capturedAt, dc.date);
-  assert.equal(capture.extensionVersion, "0.1.0");
+  assert.equal(capture.extensionVersion, "0.2.0");
   assert.equal(capture.textFragmentStatus, "SUCCESS");
   assert.equal(capture.textFragmentURL, dc.source);
   assert.deepEqual(capture.selection, { mode: "element", x: 100, y: 100, width: 500, height: 200 });

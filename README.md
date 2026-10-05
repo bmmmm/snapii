@@ -12,7 +12,7 @@ and links straight from the page and lays them invisibly over the image; only
 text that exists solely as pixels inside images needs OCR, and that runs
 locally if you switch it on.
 
-Status: **beta** (0.1.0) — see [Install](#install).
+Status: **beta** (0.2.0) — see [Install](#install).
 
 ## Features
 

@@ -1,6 +1,6 @@
 {
   "name": "snapii",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Browser extension (Firefox, Chromium): save a page region as SVG with real, selectable text and clickable links.",
   "type": "module",
