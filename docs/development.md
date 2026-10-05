@@ -122,6 +122,19 @@ these decisions:
   Chromium's limit (C3), so all patches come from one viewport capture with
   one shrink factor; a patch outside the viewport refuses the save before any
   capture, while shapes and text may lie anywhere.
+- **V-D9 Decorations from the viewer's font.** A run's underline, overline
+  and line-through are its `<text>`'s `text-decoration`, drawn from the
+  run's font (V3 in `SPIKE_VECTOR`: within 36 of 40 000 px of the page in
+  Firefox on macOS at a baseline on a whole pixel, a device pixel row off
+  in Chromium and in Linux Firefox; between pixels the page snaps the line
+  and SVG softens it over two rows). That is where the page
+  draws them only while all the text a line reaches shares the declaring
+  box's font and baseline: the browser places one line per box from every
+  font in it. A box with other text inside, and what SVG has no value for
+  (an underline offset or position), is a patch, grown by the line's reach.
+  SVG paints a decoration in the declaring element's fill and ignores a
+  colour in the value, so a decoration of another colour fills the
+  `<text>` and the glyphs take a `<tspan>`.
 
 `tests/layout/vector.spec.ts` renders every fixture's scene back in the
 browser and compares it with the page (`diffRatio`; a fixture whose

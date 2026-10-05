@@ -292,6 +292,79 @@ test("vector: a run with a space at either end preserves it on its own <text>; l
   assert.equal(attr(trail, "fill-opacity"), "0");
 });
 
+test("vector: a decoration is the run's text-decoration; one of another colour paints the <text>, the glyphs a <tspan>", () => {
+  const black = { r: 0, g: 0, b: 0, a: 1 };
+  const runs = [
+    makeRun({ text: "same colour", line: 0 }),
+    makeRun({ text: "red line", x: 120, line: 0 }),
+    makeRun({ text: "faint glyphs", line: 1 }),
+    makeRun({ text: "plain", x: 120, line: 1 }),
+    makeRun({ text: "blue line", line: 2 }),
+  ];
+  const scene: Scene = {
+    ...makeScene(),
+    text: [
+      { fill: black, decoration: { lines: ["underline"], paint: black, style: "solid" } },
+      {
+        fill: black,
+        decoration: {
+          lines: ["underline", "line-through"],
+          paint: { r: 255, g: 0, b: 0, a: 0.5 },
+          style: "dotted",
+          thickness: 2.5,
+        },
+      },
+      {
+        fill: { r: 0, g: 0, b: 0, a: 0.25 },
+        decoration: { lines: ["overline"], paint: { r: 0, g: 0, b: 238, a: 0.5 }, style: "wavy" },
+      },
+      { fill: black },
+      {
+        fill: black,
+        decoration: { lines: ["underline"], paint: { r: 0, g: 0, b: 238, a: 1 }, style: "solid" },
+      },
+    ],
+  };
+  const root = parseXml(render({ runs, scene }));
+  const same = runEl(root, "same colour");
+  assert.equal(attr(same, "text-decoration"), "underline");
+  assert.equal(attr(same, "fill"), "rgb(0,0,0)");
+  assert.deepEqual(elements(same), []);
+
+  // SVG paints a decoration in its <text>'s fill (spike V3).
+  const red = runEl(root, "red line");
+  assert.equal(attr(red, "text-decoration"), "underline line-through dotted 2.5px");
+  assert.equal(attr(red, "fill"), "rgb(255,0,0)");
+  assert.equal(attr(red, "fill-opacity"), "0.5");
+  const [glyphs] = elements(red);
+  assert.ok(glyphs);
+  assert.equal(glyphs.name, "tspan");
+  assert.equal(attr(glyphs, "fill"), "rgb(0,0,0)");
+  // Opaque glyphs under a translucent decoration do not inherit its opacity.
+  assert.equal(attr(glyphs, "fill-opacity"), "1");
+  // textLength stays on the <text>.
+  assert.ok(red.attrs.has("textLength"));
+  assert.equal(glyphs.attrs.has("textLength"), false);
+
+  // Translucent glyphs under a translucent decoration: each its own opacity, once.
+  const faint = runEl(root, "faint glyphs");
+  assert.equal(attr(faint, "text-decoration"), "overline wavy");
+  assert.equal(attr(faint, "fill-opacity"), "0.5");
+  const [faintGlyphs] = elements(faint);
+  assert.ok(faintGlyphs);
+  assert.equal(attr(faintGlyphs, "fill-opacity"), "0.25");
+
+  // Opaque both: nothing to undo.
+  const [blueGlyphs] = elements(runEl(root, "blue line"));
+  assert.ok(blueGlyphs);
+  assert.equal(attr(blueGlyphs, "fill"), "rgb(0,0,0)");
+  assert.equal(blueGlyphs.attrs.has("fill-opacity"), false);
+
+  const plain = runEl(root, "plain");
+  assert.equal(plain.attrs.has("text-decoration"), false);
+  assert.deepEqual(elements(plain), []);
+});
+
 test("vector: a run that overhangs its clip is clipped, the others are not", () => {
   const root = parseXml(render());
   const cut = runEl(root, "overhang");

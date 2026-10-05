@@ -175,12 +175,25 @@ export interface Patch extends DocRect {
   reason: UnsupportedReason;
 }
 
+/**
+ * The text decoration that reaches a run, as SVG draws it from the run's own
+ * font: its lines, colour and style, and a thickness in px (absent: the
+ * font's own).
+ */
+export interface TextDecoration {
+  lines: ("underline" | "overline" | "line-through")[];
+  paint: Paint;
+  style: "solid" | "double" | "dotted" | "dashed" | "wavy";
+  thickness?: number;
+}
+
 /** How a run is painted in a vector capture; `clip` where its glyphs would overhang (region-relative). */
 export interface TextPaint {
   fill: Paint;
   clip?: DocRect;
   /** CSS letter-spacing in px: it follows every glyph, the last one too, which textLength alone cannot place. */
   letterSpacing?: number;
+  decoration?: TextDecoration;
 }
 
 /**

@@ -47,9 +47,13 @@ picture. Raster stays the default and its files are unchanged.
   They are read from the page's own elements: nothing is downloaded.
 - **Text.** Every run is visible text in the page's colour, font family (with
   `sans-serif` appended when the page names no generic family), size, weight
-  and style; `textLength` pins its width as in raster output. A run that a
-  pixel patch shows, or that an opaque shape painted later covers, stays
-  invisible but selectable. Links are as in raster output.
+  and style; `textLength` pins its width as in raster output. Underlines,
+  overlines and line-throughs are drawn by the viewer from the run's font
+  (SVG `text-decoration`), in their colour, style and thickness, where all
+  the text a line reaches is in the font and on the baseline of the box
+  that declares it. A run that a pixel patch shows, or that an opaque shape painted
+  later covers, stays invisible but selectable. Links are as in raster
+  output.
 - **Patches.** What cannot be drawn so is a picture of the page, cut from a
   screenshot as in raster output. The record counts the patched elements
   per reason:
@@ -69,7 +73,12 @@ picture. Raster stays the default and its files are unchanged.
     border images, outlines other than solid, and rounded corners whose sides
     differ in colour;
   - `text-effect`: text shadows, text strokes and a background colour clipped
-    to the text;
+    to the text; decorations SVG cannot draw: an underline moved by
+    `text-underline-offset` or `text-underline-position`, a thickness in %, a
+    colour this cannot read, one inside another of a different colour,
+    style or thickness, one over text of another font, size or baseline
+    (a link with a `<code>` or `<sup>`: the browser places one line for the
+    whole box), and the boxes below such a decoration;
   - `color`: a colour this cannot read;
   - `pseudo`: a `::before` or `::after` with content (text, counters,
     images) or a box of its own, a styled `::first-letter` or `::first-line`;
@@ -98,9 +107,17 @@ picture. Raster stays the default and its files are unchanged.
 Limits:
 
 - **Not drawn**, and outside patches not in the file at all, among others:
-  text decorations (underlines, line-through), the colour of visited links
-  (the browser hides it from extensions, so they come out in the link
-  colour), the `…` of `text-overflow: ellipsis`, scrollbars and column rules.
+  the colour of visited links (the browser hides it from extensions, so
+  they come out in the link colour), a decoration of `::first-line`, the
+  `…` of `text-overflow: ellipsis`, scrollbars and column rules.
+- A decoration takes the viewer's own way of skipping descenders
+  (`text-decoration-skip-ink` is not carried over), and breaks between the
+  glyphs where the viewer spaces them out to the run's width (a narrower
+  fallback font). The page snaps a line to whole device pixels and the
+  viewer does not: where a baseline falls between two, the line comes out
+  softer, spread over two pixel rows (always about a row off in Chromium,
+  and in Firefox on Linux).
+  Chromium also draws a thickness of 0 unlike the page.
 - The viewer needs the page's fonts. Web fonts are not embedded, so a viewer
   without them shows a fallback font; each run keeps its place and width.
 - Text is drawn above the shapes; text under a half-transparent box or

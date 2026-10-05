@@ -178,7 +178,18 @@ const scene = (): Scene => ({
     },
   ],
   patches: [{ x: 5, y: 5, width: 10, height: 10, reason: "pseudo" }],
-  text: [{ fill: { r: 0, g: 0, b: 0, a: 1 }, clip: { x: 0, y: 0, width: 50, height: 20 } }],
+  text: [
+    {
+      fill: { r: 0, g: 0, b: 0, a: 1 },
+      clip: { x: 0, y: 0, width: 50, height: 20 },
+      decoration: {
+        lines: ["underline", "line-through"],
+        paint: { r: 0, g: 0, b: 238, a: 0.5 },
+        style: "dotted",
+        thickness: 2,
+      },
+    },
+  ],
   unsupported: { pseudo: 1, budget: 0 },
 });
 
@@ -298,6 +309,23 @@ const sceneMutations: Array<[string, (s: Loose) => void]> = [
   ["text clip negative width", (s) => (s.text[0].clip.width = -5)],
   ["text letterSpacing a CSS string", (s) => (s.text[0].letterSpacing = "8px")],
   ["text letterSpacing NaN", (s) => (s.text[0].letterSpacing = Number.NaN)],
+  ["decoration a CSS string", (s) => (s.text[0].decoration = "underline red")],
+  ["decoration null", (s) => (s.text[0].decoration = null)],
+  ["decoration without lines", (s) => (s.text[0].decoration.lines = [])],
+  ["decoration line unknown", (s) => (s.text[0].decoration.lines = ["underline", "blink"])],
+  ["decoration lines a string", (s) => (s.text[0].decoration.lines = "u")],
+  [
+    "decoration lines more than three",
+    (s) => (s.text[0].decoration.lines = ["underline", "overline", "line-through", "underline"]),
+  ],
+  ["decoration paint a CSS string", (s) => (s.text[0].decoration.paint = "red")],
+  ["decoration style unknown", (s) => (s.text[0].decoration.style = "groove")],
+  ["decoration style missing", (s) => delete s.text[0].decoration.style],
+  ["decoration style with a colour", (s) => (s.text[0].decoration.style = 'dotted" fill="red')],
+  ["decoration thickness negative", (s) => (s.text[0].decoration.thickness = -1)],
+  ["decoration thickness NaN", (s) => (s.text[0].decoration.thickness = Number.NaN)],
+  ["decoration thickness infinite", (s) => (s.text[0].decoration.thickness = Number.POSITIVE_INFINITY)],
+  ["decoration thickness a CSS string", (s) => (s.text[0].decoration.thickness = "2px")],
   ["unsupported reason unknown", (s) => (s.unsupported = { magic: 1 })],
   ["unsupported count negative", (s) => (s.unsupported = { pseudo: -1 })],
   ["unsupported count fractional", (s) => (s.unsupported = { pseudo: 0.5 })],
@@ -315,6 +343,13 @@ test("isToBackground: accepts a save with a well-formed scene", () => {
     unsupported: {},
   };
   assert.equal(isToBackground({ type: "save", model: { ...model(), scene: bare } }), true);
+  // A decoration of the font's own thickness has none; most runs have no decoration.
+  const fontThick = scene() as unknown as Loose;
+  delete fontThick.text[0].decoration.thickness;
+  assert.equal(isToBackground({ type: "save", model: { ...model(), scene: fontThick } }), true);
+  const undecorated = scene() as unknown as Loose;
+  delete undecorated.text[0].decoration;
+  assert.equal(isToBackground({ type: "save", model: { ...model(), scene: undecorated } }), true);
   assert.equal(
     isToBackground({ type: "save", model: { ...model(), scene: { ...scene(), ops: [nested(32)] } } }),
     true,

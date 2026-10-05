@@ -31,6 +31,7 @@ import type {
   SceneClip,
   SceneOp,
   Settings,
+  TextDecoration,
   TextPaint,
   TextRun,
   UnsupportedReason,
@@ -57,6 +58,9 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 const MATHML_NS = "http://www.w3.org/1998/Math/MathML";
 const FORM = new Set(["input", "select", "textarea", "meter", "progress"]);
 const MEDIA = new Set(["video", "audio", "embed", "object"]);
+// Replaced elements drawn as shapes or pictures: atomic inlines that no
+// decoration reaches (the others are patches of their own, as media or form).
+const REPLACED = new Set(["img", "canvas", "iframe"]);
 // Replaced and void elements have no ::before/::after of their own.
 const NO_PSEUDO = new Set([
   "img",
@@ -101,6 +105,10 @@ const WHITE: Paint = { r: 255, g: 255, b: 255, a: 1 };
 const CLEAR: Paint = { r: 0, g: 0, b: 0, a: 0 };
 const SIDES = ["top", "right", "bottom", "left"] as const;
 const CORNERS = ["top-left", "top-right", "bottom-right", "bottom-left"] as const;
+const DECORATION_LINES = ["underline", "overline", "line-through"] as const;
+const DECORATION_STYLES = new Set(["solid", "double", "dotted", "dashed", "wavy"]);
+/** What places a decoration line: the font's size and family. */
+const fontOf = (cs: CSSStyleDeclaration): string => `${cs.fontSize} ${cs.fontFamily}`;
 
 const px = (v: string): number => Number.parseFloat(v) || 0;
 const contains = (r: DocRect, x: number, y: number): boolean =>
@@ -145,6 +153,52 @@ interface Layer {
 }
 
 const isBox = (x: Box | Layer | Text): x is Box => "kids" in x;
+
+/**
+ * Whether the decorations b's parent carries reach b: CSS propagates them
+ * to in-flow descendants, not into an inline-block, a replaced element, a
+ * float, an absolutely or fixed positioned box or a frame's document.
+ */
+function receives(b: Box): boolean {
+  const { cs, parent } = b;
+  return (
+    parent !== null &&
+    parent.el.ownerDocument === b.el.ownerDocument &&
+    !cs.display.startsWith("inline-") &&
+    !REPLACED.has(b.el.localName) &&
+    cs.float === "none" &&
+    cs.position !== "absolute" &&
+    cs.position !== "fixed"
+  );
+}
+
+/**
+ * Whether every text b's decoration reaches is in b's font, on b's
+ * baseline. The browser draws one line for the whole box, placed from all
+ * the fonts and baselines in it (a link's <code> or <sup> moves the line
+ * under all of its text, seen in both browsers; a larger block inside, seen
+ * in Firefox), while SVG draws each run's line from the run's own font.
+ * Past 2 000 boxes it gives up (a patch) rather than scan a whole page for
+ * each decorated box.
+ */
+function evenLine(b: Box): boolean {
+  const font = fontOf(b.cs);
+  const todo = b.kids.filter(isBox).map((box) => ({ box, raised: false }));
+  let n = 0;
+  for (let next = todo.pop(); next; next = todo.pop()) {
+    if (++n > 2_000) return false;
+    const { box } = next;
+    // Text that is not laid out does not move the line.
+    if (!receives(box) || box.cs.display === "none") continue;
+    const { cs } = box;
+    const raised = next.raised || (cs.display === "inline" && cs.verticalAlign !== "baseline");
+    if ((raised || fontOf(cs) !== font) && box.kids.some((k) => !isBox(k) && k.data.trim() !== ""))
+      return false;
+    for (const k of box.kids) if (isBox(k)) todo.push({ box: k, raised });
+  }
+  return true;
+}
+
 const isLayer = (x: Box | Layer | Text): x is Layer => "real" in x;
 
 const layer = (owner: Box, real: boolean, z = 0, opacity = 1): Layer => ({
@@ -197,6 +251,12 @@ function inkMargin(cs: CSSStyleDeclaration): number {
   if (cs.boxShadow !== "none") m = Math.max(m, lengths(cs.boxShadow));
   if (cs.textShadow !== "none") m = Math.max(m, lengths(cs.textShadow));
   if (cs.filter !== "none") m = Math.max(m, 3 * lengths(cs.filter));
+  // An underline moved by text-underline-offset or below the descenders, or
+  // a thick one, leaves the box.
+  if (cs.textDecorationLine !== "none") {
+    const line = Math.max(lengths(cs.getPropertyValue("text-decoration-thickness")), px(cs.fontSize) / 4);
+    m = Math.max(m, lengths(cs.getPropertyValue("text-underline-offset")) + line);
+  }
   return m;
 }
 
@@ -275,6 +335,8 @@ class Builder {
   readonly #gradients = new Map<Box, LinearGradient>();
   /** Outer box shadows that are drawn, the top one first. */
   readonly #shadows = new Map<Box, Shadow[]>();
+  /** The decoration that reaches each box's text (#decorationOf). */
+  readonly #decorations = new Map<Box, TextDecoration | null | undefined>();
   #picturePixels = 0;
   #pictureChars = 0;
   #seq = 0;
@@ -480,6 +542,8 @@ class Builder {
         /text/.test(cs.getPropertyValue("-webkit-background-clip")))
     )
       return "text-effect";
+    // Where a decoration was added, or below a box out of reach that added one.
+    if (this.#decorationOf(b) === undefined) return "text-effect";
     if (!this.#bordersDrawable(b)) return "border";
     if (!this.#coloursParse(b, text)) return "color";
     if (
@@ -1283,6 +1347,71 @@ class Builder {
     return product;
   }
 
+  /**
+   * b's own text decoration: null for none, undefined where SVG cannot draw
+   * it (an underline moved by text-underline-offset or -position, a colour
+   * this cannot read, a thickness in %).
+   */
+  #ownDecoration(cs: CSSStyleDeclaration): TextDecoration | null | undefined {
+    const words = cs.textDecorationLine.split(" ");
+    const lines = DECORATION_LINES.filter((l) => words.includes(l));
+    if (lines.length === 0) return null;
+    if (
+      lines.includes("underline") &&
+      (cs.getPropertyValue("text-underline-offset") !== "auto" ||
+        cs.getPropertyValue("text-underline-position") !== "auto")
+    )
+      return undefined;
+    const paint = parseColor(cs.textDecorationColor);
+    const style = cs.textDecorationStyle;
+    if (!paint || !DECORATION_STYLES.has(style)) return undefined;
+    const decoration: TextDecoration = { lines, paint, style: style as TextDecoration["style"] };
+    const thickness = cs.getPropertyValue("text-decoration-thickness");
+    if (thickness === "auto" || thickness === "from-font") return decoration;
+    if (!/px$/.test(thickness)) return undefined;
+    // A negative one is computed as it is, and drawn as the font's own (measured, both browsers).
+    return px(thickness) < 0 ? decoration : { ...decoration, thickness: px(thickness) };
+  }
+
+  /**
+   * The decoration that reaches b's text: its own and those its ancestors
+   * pass on to it (receives), merged where they share colour, style and
+   * thickness. Undefined where they do not, or where SVG cannot draw one of
+   * them.
+   */
+  #decorationOf(b: Box): TextDecoration | null | undefined {
+    // Up to the nearest box already known, then back down (as #opacityOf).
+    const chain: Box[] = [];
+    let at: Box | null = b;
+    while (at && !this.#decorations.has(at)) {
+      chain.push(at);
+      at = at.parent;
+    }
+    let outer = at ? this.#decorations.get(at) : null;
+    for (const box of chain.reverse()) {
+      const { cs } = box;
+      // A display: contents element has no box to decorate (measured, both browsers).
+      const own = cs.display === "contents" ? null : this.#ownDecoration(cs);
+      const inner = own && !evenLine(box) ? undefined : own;
+      const from = receives(box) ? outer : null;
+      let d: TextDecoration | null | undefined;
+      if (inner === undefined || from === undefined) d = undefined;
+      else if (!inner || !from) d = inner ?? from;
+      else if (
+        inner.style === from.style &&
+        inner.thickness === from.thickness &&
+        (["r", "g", "b", "a"] as const).every((k) => inner.paint[k] === from.paint[k])
+      )
+        d = {
+          ...inner,
+          lines: DECORATION_LINES.filter((l) => inner.lines.includes(l) || from.lines.includes(l)),
+        };
+      this.#decorations.set(box, d);
+      outer = d;
+    }
+    return this.#decorations.get(b);
+  }
+
   #textPaint(run: TextRun, source: RunSource | undefined): TextPaint | null {
     const parent = source && flatParent(source.node);
     const box = parent && this.#boxes.get(parent);
@@ -1297,7 +1426,11 @@ class Builder {
     if (band.some((o) => o.seq > seq && contains(o.rect, cx, cy))) return null;
     const colour = this.#textColour(box);
     if (!colour) return null;
-    const paint: TextPaint = { fill: { ...colour, a: colour.a * this.#opacityOf(box) } };
+    const opacity = this.#opacityOf(box);
+    const paint: TextPaint = { fill: { ...colour, a: colour.a * opacity } };
+    const decoration = this.#decorationOf(box);
+    if (decoration)
+      paint.decoration = { ...decoration, paint: { ...decoration.paint, a: decoration.paint.a * opacity } };
     const spacing = px(box.cs.letterSpacing);
     if (spacing !== 0) paint.letterSpacing = spacing;
     // The collector keeps lines that are half visible; their glyphs would overhang the clip.

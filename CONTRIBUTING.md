@@ -128,8 +128,10 @@ bug:
    `<image>`), the pixel patches in
    `<g id="patches">`, the link areas, then one text layer of the same runs,
    each painted on its own: visible (painted from numbers, never from a page
-   string; optionally its own `clip-path`, `letter-spacing` and
-   `xml:space`) or invisible with `fill-opacity="0"`, with
+   string; optionally its own `clip-path`, `letter-spacing`, `xml:space`
+   and `text-decoration`, with the glyphs in a `<tspan>` of their own fill
+   when the decoration has another colour) or invisible with
+   `fill-opacity="0"`, with
    `lengthAdjust="spacing"` and `sans-serif` appended to a font family that
    names no generic one.
 2. **The capture record** — the JSON in `<snapii:capture>`, `schema: 1`, with

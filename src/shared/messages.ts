@@ -172,12 +172,25 @@ function isOp(x: unknown, depth: number, budget: { left: number }): boolean {
 
 const isPatch = (x: unknown): boolean => isRect(x) && isReason((x as Rec).reason);
 
+const DECORATION_LINES = new Set<unknown>(["underline", "overline", "line-through"]);
+const DECORATION_STYLES = new Set<unknown>(["solid", "double", "dotted", "dashed", "wavy"]);
+const isDecoration = (x: unknown): boolean =>
+  isRec(x) &&
+  Array.isArray(x.lines) &&
+  x.lines.length >= 1 &&
+  x.lines.length <= 3 &&
+  x.lines.every((l) => DECORATION_LINES.has(l)) &&
+  isPaint(x.paint) &&
+  DECORATION_STYLES.has(x.style) &&
+  (x.thickness === undefined || (isNum(x.thickness) && x.thickness >= 0));
+
 const isTextPaint = (x: unknown): boolean =>
   x === null ||
   (isRec(x) &&
     isPaint(x.fill) &&
     (x.clip === undefined || isRect(x.clip)) &&
-    (x.letterSpacing === undefined || isNum(x.letterSpacing)));
+    (x.letterSpacing === undefined || isNum(x.letterSpacing)) &&
+    (x.decoration === undefined || isDecoration(x.decoration)));
 
 /** `runs`: the model's run count; the scene says how each run is painted, one entry per run. */
 const isScene = (x: unknown, runs: number): boolean => {

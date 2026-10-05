@@ -6,7 +6,9 @@
     <!--
       Icon fonts put their glyphs in the Private Use Area; such text means
       nothing outside that font. "Snap Icons" does not exist, the code points
-      render as boxes, which is irrelevant to extraction.
+      render as boxes, which is irrelevant to extraction. In vector output
+      the link's underline reaches the icon in the icon's font, so the link
+      as a whole is the patch ("text-effect"), the other icon one of its own.
     -->
     <style>
       body { margin: 0; padding: 20px; font: 16px/1.5 serif; }
@@ -18,7 +20,7 @@
         "lines": ["Settings", "Home link"],
         "absent": ["\ue001", "\ue002"],
         "areas": [{ "alt": "Home", "href": "/home" }],
-        "vector": { "maxPatchArea": 0.02, "unsupported": { "icon-font": 2 }, "visible": ["Settings", "Home link"] }
+        "vector": { "maxPatchArea": 0.02, "unsupported": { "icon-font": 1, "text-effect": 1 }, "visible": ["Settings", "Home link"] }
       }
     </script>
   </head>

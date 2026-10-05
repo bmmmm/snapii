@@ -20,6 +20,7 @@ import type {
   Scene,
   SceneClip,
   SceneOp,
+  TextDecoration,
   TextPaint,
   TextRun,
 } from "../types.ts";
@@ -295,6 +296,24 @@ function opLines(op: SceneOp, defs: Defs): string[] {
 const countOps = (ops: readonly SceneOp[]): number =>
   ops.reduce((n, op) => n + 1 + (op.op === "group" ? countOps(op.children) : 0), 0);
 
+/** A text-decoration value: the lines, then a style and a thickness other than the default. */
+function decorationValue(d: TextDecoration): string {
+  const parts: string[] = [...d.lines];
+  if (d.style !== "solid") parts.push(d.style);
+  if (d.thickness !== undefined) parts.push(`${fmt(d.thickness)}px`);
+  return parts.join(" ");
+}
+
+/**
+ * Whether a run's glyphs need a <tspan> of their own: the decoration takes
+ * the fill of the <text> that declares it (V3), so a decoration of another
+ * colour than the glyphs' paints the <text>, and the glyphs the <tspan>.
+ */
+const ownGlyphs = (p: TextPaint): p is TextPaint & { decoration: TextDecoration } =>
+  SPIKE_VECTOR.decorationTakesDeclaringFill &&
+  p.decoration !== undefined &&
+  paintAttrs(p.decoration.paint, "fill") !== paintAttrs(p.fill, "fill");
+
 /** The whole document: canvas, boxes, patches, link areas, text layer, metadata. */
 export function vectorRenderer(input: VectorRenderInput): string {
   const { page, region, scene } = input;
@@ -321,13 +340,22 @@ export function vectorRenderer(input: VectorRenderInput): string {
     const edge = own ? 'xml:space="preserve" ' : "";
     const p = paints.get(run);
     if (!p) return `${edge}${TRANSPARENT}`;
-    const attrs = [paintAttrs(p.fill, "fill")];
+    const attrs = [paintAttrs(ownGlyphs(p) ? p.decoration.paint : p.fill, "fill")];
+    if (p.decoration) attrs.push(`text-decoration="${xmlAttr(decorationValue(p.decoration))}"`);
     if (p.letterSpacing) attrs.push(`letter-spacing="${fmt(p.letterSpacing)}"`);
     if (p.clip) attrs.push(`clip-path="url(#${defs.clip(p.clip)})"`);
     return `${edge}${attrs.join(" ")}`;
   };
+  const glyphs = (run: TextRun): string | undefined => {
+    const p = paints.get(run);
+    if (!p || !ownGlyphs(p)) return undefined;
+    const fill = paintAttrs(p.fill, "fill");
+    // An opaque glyph paint would inherit the decoration's opacity.
+    return p.fill.a >= 1 && p.decoration.paint.a < 1 ? `${fill} fill-opacity="1"` : fill;
+  };
   const text = textLayerLines(input.runs, {
     paint,
+    glyphs,
     lengthAdjust: LENGTH_ADJUST,
     fallbackFamily: FALLBACK_FAMILY,
   });

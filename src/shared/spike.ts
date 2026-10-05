@@ -118,7 +118,8 @@ export const SPIKE_CHROMIUM = {
 // the pure vectorRenderer(). Same rule: a value changes only with a new
 // measurement of that kind.
 export const SPIKE_VECTOR = {
-  measuredOn: "Playwright Firefox build 1543 and Chromium build 1243, headless, macOS, 2026-10-04 (V1, V2)",
+  measuredOn:
+    "Playwright Firefox build 1543 and Chromium build 1243, headless, macOS, 2026-10-04 (V1, V2) and 2026-10-05 (V3)",
 
   // V1: with textLength, lengthAdjust "spacing" came within 0.03 pt of
   // "spacingAndGlyphs" or better on five fixtures and kept the glyphs' shape
@@ -129,4 +130,16 @@ export const SPIKE_VECTOR = {
   // element itself has xml:space="preserve" or white-space: pre; inherited
   // from a <g> it does not count. Firefox keeps it either way.
   edgeSpaceNeedsOwnPreserve: true,
+  // V3 (2026-10-05, same builds): a <text>'s text-decoration is drawn from
+  // its own font where HTML draws it (underline, overline, line-through,
+  // dotted, double, wavy, a thickness in the value: 0–36 of 40 000 px off in
+  // Firefox, 28–509 in Chromium, at a baseline on a whole pixel), always in
+  // the fill of the element that declares it; a colour in the value is
+  // ignored in both. A <tspan> inside gives the glyphs their own fill, and
+  // textLength still holds. HTML snaps the line to whole pixels and SVG does
+  // not: at a baseline half a pixel off, an underline differs in 356 px
+  // (Firefox) and 360 (Chromium) against 176 and 344 with no line at all.
+  // In Linux Firefox (CI image, DejaVu) the line lands about a row off as in
+  // Chromium (tests/fixtures/vector-decoration.html: 0.80 %).
+  decorationTakesDeclaringFill: true,
 } as const;

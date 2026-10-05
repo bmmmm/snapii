@@ -41,6 +41,14 @@ interface VectorExpect {
   fills?: Record<string, string>;
   alpha?: Record<string, number>;
   clipped?: string[];
+  /** A run's text-decoration attribute, null for none. */
+  decorations?: Record<string, string | null>;
+  /** The colour of a run's decoration where it differs from its glyphs' (the <text> fill around a <tspan>). */
+  decorationFills?: Record<string, string>;
+  /** The opacity of a run's decoration (the <text>'s fill-opacity). */
+  decorationAlpha?: Record<string, number>;
+  /** How far below a patched run's baseline its patch reaches at least (a moved underline). */
+  patchReach?: Record<string, number>;
   canvas?: string;
   darkCanvas?: boolean;
   pictures?: number;
@@ -876,6 +884,9 @@ for (const file of fixtures) {
           fill: e.getAttribute("fill"),
           opacity: e.getAttribute("fill-opacity"),
           clip: e.getAttribute("clip-path"),
+          decoration: e.getAttribute("text-decoration"),
+          glyphFill: (e.querySelector("tspan") ?? e).getAttribute("fill"),
+          glyphOpacity: (e.querySelector("tspan") ?? e).getAttribute("fill-opacity"),
         })),
         textHrefs: [...(document.getElementById("text")?.querySelectorAll("a") ?? [])].map((a) =>
           a.getAttribute("href"),
@@ -967,9 +978,26 @@ for (const file of fixtures) {
       expect.soft(r.opacity === "0" || r.fill === "#000", `V3 "${t}" is painted`).toBe(false);
     }
     for (const [t, fill] of Object.entries(vec?.fills ?? {}))
-      expect.soft(runNamed(t).fill, `fill of "${t}"`).toBe(fill);
+      expect.soft(runNamed(t).glyphFill, `fill of "${t}"`).toBe(fill);
+    for (const [t, deco] of Object.entries(vec?.decorations ?? {}))
+      expect.soft(runNamed(t).decoration, `text-decoration of "${t}"`).toBe(deco);
+    for (const [t, fill] of Object.entries(vec?.decorationFills ?? {}))
+      expect.soft(runNamed(t).fill, `decoration colour of "${t}"`).toBe(fill);
+    for (const [t, a] of Object.entries(vec?.decorationAlpha ?? {}))
+      expect.soft(Number(runNamed(t).opacity), `decoration opacity of "${t}"`).toBeCloseTo(a, 2);
+    for (const [t, reach] of Object.entries(vec?.patchReach ?? {})) {
+      const run = runs.find((r) => r.text === t);
+      const cx = (run?.x ?? 0) + (run?.width ?? 0) / 2;
+      const cy = (run?.top ?? 0) + (run?.height ?? 0) / 2;
+      const patch = scene.patches.find(
+        (p) => cx >= p.x && cx < p.x + p.width && cy >= p.y && cy < p.y + p.height,
+      );
+      expect
+        .soft(run && patch ? patch.y + patch.height - run.y : null, `the patch of "${t}" below its baseline`)
+        .toBeGreaterThanOrEqual(reach);
+    }
     for (const [t, a] of Object.entries(vec?.alpha ?? {}))
-      expect.soft(Number(runNamed(t).opacity), `fill-opacity of "${t}"`).toBeCloseTo(a, 2);
+      expect.soft(Number(runNamed(t).glyphOpacity), `fill-opacity of "${t}"`).toBeCloseTo(a, 2);
     for (const t of vec?.clipped ?? [])
       expect.soft(runNamed(t).clip, `"${t}" is clipped`).toMatch(/^url\(#c\d+\)$/);
     if (vec?.canvas) expect.soft(got.canvas, "canvas colour").toBe(vec.canvas);

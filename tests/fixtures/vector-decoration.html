@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>vector decoration</title>
+    <!--
+      Text decorations drawn by the viewer from the run's own font (SVG
+      text-decoration): a link's underline, a line-through (an underline
+      offset does not move it) and an overline, three styles (one of the
+      font's thickness) and a thickness, a negative thickness (drawn as the
+      font's, as both browsers do), a block's underline reaching its
+      inline children in the block's colour (under a red child's glyphs)
+      but not into an inline-block, a float, an absolutely or fixed
+      positioned box or a frame, an underline of its own colour, one under
+      half opacity, and an underline and a line-through of one colour on the
+      same run.
+      Patches ("text-effect"), reaching as far below the baseline as the
+      moved line does (measured in both browsers: 9, 6 and 13 px): an
+      underline offset, an underline below the descenders, a thick one
+      offset a little; a line-through of another colour, style or thickness
+      inside an underlined link; a thickness in %; a colour this cannot read;
+      an overlined box inside one with a moved underline that lies above the
+      capture (so it is never looked at itself); a box without text under a
+      moved underline; a link with a <code> and a <sup>, and a block with a
+      larger one inside, whose single line the browser places from all the
+      fonts in it (the whole box, as SVG would draw each run's line from
+      its own font), and a link raised in part by a box without text of its
+      own; a box with more than 2 000 boxes inside (not scanned).
+      Not patched: a display: contents link (no box, no line), a link with
+      a hidden part in another font, a link with text in its own font
+      inside a box of another, a table cell (vertical-align moves inline
+      boxes only), an inline-block of another font (no decoration reaches
+      it), a <small> under no decoration, a picture lowered to the middle
+      of an underlined line and one beside "Escaped" (replaced elements,
+      which no decoration reaches), and the frame's text under an iframe
+      with a decoration of its own (none reaches into another document).
+      Chromium, and Firefox on Linux (DejaVu), draw an SVG decoration about
+      a device pixel row off the HTML one (spike V3), so each line counts as
+      differing there: Chromium 0.58 % against 1.05 % with no decorations
+      drawn or patched, Firefox 0.13 % against 0.82 % (macOS); on Linux
+      Firefox 0.80 %, Chromium 0.73 % (CI image, all 2026-10-05). The run
+      checks are what tells drawn from missing lines apart. Every line sits
+      on a whole pixel here (line-height 24 px).
+    -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; background: rgb(255, 255, 255); color: rgb(0, 0, 0); }
+      #cap { width: 460px; }
+      p { margin: 0 0 8px; white-space: nowrap; }
+      a { color: rgb(0, 0, 238); }
+      iframe { width: 100px; height: 24px; border: 0; vertical-align: bottom; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": [
+          "Read the link now",
+          "Struck text over",
+          "Dotted Double Thick Neg",
+          "Block red boxed",
+          "Red line Half",
+          "Offset Under Link struck both Heavy",
+          "Styles dotted thick Percent Wide",
+          "Flow",
+          "Placed",
+          "Fixed",
+          "Floated",
+          "Outer",
+          "Inner",
+          "Nested",
+          "Picture",
+          "Many",
+          "Hid",
+          "Up2 bold",
+          "Cell",
+          "see map() and12 Contents tiny",
+          "Bigger block",
+          "Escaped"
+        ],
+        "links": [
+          { "text": "the link", "href": "/a" },
+          { "text": "Offset", "href": "/b" },
+          { "text": "Under", "href": "/c" },
+          { "text": "Link struck", "href": "/d" },
+          { "text": "both", "href": "/e" },
+          { "text": "Heavy", "href": "/g" },
+          { "text": "Styles dotted thick", "href": "/f" },
+          { "text": "Nested", "href": "/j" },
+          { "text": "Hid", "href": "/l" },
+          { "text": "Up2", "href": "/m" },
+          { "text": "bold", "href": "/n" },
+          { "text": "see map() and12", "href": "/h" },
+          { "text": "Contents", "href": "/i" }
+        ],
+        "vector": {
+          "tolerance": 0.01,
+          "unsupported": { "text-effect": 14 },
+          "maxPatchArea": 0.25,
+          "hidden": ["Offset", "Under", "Heavy", "struck", "dotted ", "thick", "Percent", "Wide", "Escaped", "see ", "map()", " and", "12", "Nested", "Bigger block", "Many", "Up", "2"],
+          "visible": ["the link", "now", "Struck text", "over", "Dotted", "Double", "Thick", "red", "boxed", "Red line", "Half", "Link ", "both", "Styles ", "Flow", "Placed", "Fixed", "Floated", "Inner", "Picture", "Hid", "bold", "Cell", "Contents", "tiny"],
+          "pictures": 2,
+          "decorations": {
+            "the link": "underline",
+            "now": null,
+            "Struck text": "line-through",
+            "over": "overline",
+            "Dotted": "underline dotted",
+            "Double": "underline double",
+            "Thick": "underline 3px",
+            "Neg": "underline",
+            "red": "underline",
+            "boxed": null,
+            "Red line": "underline",
+            "Half": "underline",
+            "Link ": "underline",
+            "both": "underline line-through",
+            "Styles ": "underline",
+            "Flow": "underline",
+            "Placed": null,
+            "Fixed": null,
+            "Floated": null,
+            "Inner": null,
+            "Contents": null,
+            "tiny": null,
+            "Picture": "underline",
+            "Hid": "underline",
+            "bold": "underline",
+            "Cell": "underline"
+          },
+          "fills": { "the link": "rgb(0,0,238)", "red": "rgb(255,0,0)", "Red line": "rgb(0,0,0)", "both": "rgb(0,0,238)" },
+          "decorationFills": { "red": "rgb(0,0,0)", "Red line": "rgb(255,0,0)" },
+          "alpha": { "Half": 0.5 },
+          "decorationAlpha": { "Half": 0.5 },
+          "patchReach": { "Offset": 9, "Under": 6, "Heavy": 13, "Nested": 9 }
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>Read <a href="/a">the link</a> <span>now</span></p>
+      <p><del style="text-underline-offset: 4px">Struck text</del> <span style="text-decoration: overline">over</span></p>
+      <p><span style="text-decoration: underline dotted; text-decoration-thickness: from-font">Dotted</span> <span style="text-decoration: underline double">Double</span> <span style="text-decoration: underline 3px">Thick</span> <span style="text-decoration: underline; text-decoration-thickness: -3px">Neg</span></p>
+      <p style="text-decoration: underline">Block <span style="color: rgb(255, 0, 0)">red</span> <span style="display: inline-block; font-family: monospace; line-height: 1">boxed</span></p>
+      <p><span style="text-decoration: underline rgb(255, 0, 0)">Red line</span> <span style="opacity: 0.5; text-decoration: underline">Half</span></p>
+      <p><a href="/b" style="text-underline-offset: 8px">Offset</a> <a href="/c" style="text-underline-position: under">Under</a> <a href="/d"><span>Link </span><s style="color: rgb(0, 128, 0)">struck</s></a> <a href="/e"><s>both</s></a> <a href="/g" style="text-underline-offset: 1px; text-decoration-thickness: 12px">Heavy</a></p>
+      <p><a href="/f"><span>Styles </span><s style="text-decoration-style: dotted">dotted </s><s style="text-decoration-thickness: 3px">thick</s></a> <span style="text-decoration: underline; text-decoration-thickness: 10%">Percent</span> <span style="text-decoration: underline color(rec2020 0 0 1)">Wide</span></p>
+      <p style="position: relative; text-decoration: underline"><span>Flow</span> <span style="position: absolute; left: 160px">Placed</span><span style="position: fixed; left: 300px">Fixed</span><span style="float: right">Floated</span></p>
+      <p style="text-decoration: underline"><span>Outer</span> <iframe style="text-decoration: underline" srcdoc="<body style='margin: 0; font: 16px/1.5 serif; color: rgb(0, 0, 0)'>Inner</body>"></iframe></p>
+      <p><a href="/j" style="text-underline-offset: 8px"><span>Nested</span></a></p>
+      <p style="text-decoration: underline"><span>Picture</span> <img src="images/quadrants.png" alt="" style="vertical-align: middle; width: 16px; height: 16px" /></p>
+      <p style="text-decoration: underline">Many<span id="many"></span></p>
+      <script>
+        document.getElementById("many").append(...Array.from({ length: 2001 }, () => document.createElement("i")));
+      </script>
+      <p><a href="/l">Hid<span style="display: none; font-family: monospace">den</span></a></p>
+      <p><a href="/m">Up<span style="vertical-align: super"><b>2</b></span></a> <a href="/n"><span style="font-family: monospace"><b style="font-family: serif">bold</b></span></a></p>
+      <div style="text-decoration: underline"><table style="border-spacing: 0"><tr><td style="padding: 0">Cell</td></tr></table></div>
+      <p><a href="/h">see <code>map()</code> and<sup>12</sup></a> <a href="/i" style="display: contents">Contents</a> <small>tiny</small></p>
+      <div style="text-decoration: underline"><p style="font-size: 20px">Bigger block</p></div>
+      <div style="position: absolute; top: 0; left: 400px; height: 10px; text-decoration: underline; text-underline-offset: 3px"><span style="position: relative; top: 20px; text-decoration: overline">Escaped</span><img src="images/quadrants.png" alt="" style="position: relative; top: 20px; width: 16px; height: 16px" /></div>
+    </main>
+  </body>
+</html>

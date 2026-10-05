@@ -29,6 +29,8 @@ export interface TextLayerOptions {
    * is invisible as a whole, through the group.
    */
   paint?: (run: TextRun) => string;
+  /** Attributes of a <tspan> around the run's glyphs, when they are painted unlike the <text> itself. */
+  glyphs?: (run: TextRun) => string | undefined;
   lengthAdjust?: "spacing" | "spacingAndGlyphs";
   /** Appended to a font-family list that names no generic family. */
   fallbackFamily?: string;
@@ -82,7 +84,9 @@ function runText(run: TextRun, opts: TextLayerOptions): string {
   if (run.lang) attrs.push(`xml:lang="${xmlAttr(run.lang)}"`);
   const paint = opts.paint?.(run);
   if (paint) attrs.push(paint);
-  const el = `<text ${attrs.join(" ")}>${xmlText(run.text)}</text>`;
+  const glyphs = opts.glyphs?.(run);
+  const body = glyphs ? `<tspan ${glyphs}>${xmlText(run.text)}</tspan>` : xmlText(run.text);
+  const el = `<text ${attrs.join(" ")}>${body}</text>`;
   return run.href === null ? el : anchor(run.href, el);
 }
 
