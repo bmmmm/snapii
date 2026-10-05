@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>vector images</title>
+    <!--
+      Pictures the scene reads from the elements themselves. First row: a
+      same-origin PNG (160x80, shown at half size), a data: PNG, a filled
+      canvas. Third row: object-fit cover (at 20 %), contain (its background
+      around it), scale-down (a picture smaller than its box), a round avatar,
+      none inside padding and a rounded border (at -30px -30px). Then an
+      opaque picture over a line of text (which it hides), a canvas that is
+      transparent but for a bar at its end over another line (which stays
+      painted), pictures cut by an overflow clip (to 100 px, to 0.3 px wide or
+      high, away entirely), an empty SVG, canvases of no width or height and a picture
+      positioned out of its box (nothing to draw), and one that starts left
+      of the region (only its part inside is drawn).
+      The quadrants split at x 100, y 30, so a wrong crop moves an edge.
+      Second row, what cannot be read is a patch: the same PNG from the other
+      origin (localhost, not 127.0.0.1), a canvas that drew it (tainted), a
+      canvas never drawn (a WebGL canvas without preserveDrawingBuffer reads
+      back like this), a missing image, and object positions in calc().
+    -->
+    <style>
+      body { margin: 0; padding: 20px 60px; font: 16px/1.5 serif; background: rgb(255, 255, 255); }
+      #cap { width: 420px; }
+      p { margin: 0 0 8px; }
+      .row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; }
+      .row img, .row canvas { display: block; }
+      .calc { width: 30px; height: 30px; object-fit: none; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": [
+          "Pictures read from the page.",
+          "Hidden under a picture",
+          "Under a picture with transparency",
+          "After the pictures."
+        ],
+        "vector": {
+          "tolerance": 0.006,
+          "maxPatchArea": 0.06,
+          "unsupported": { "image": 4, "canvas": 2 },
+          "pictures": 14,
+          "pictureArea": 38572,
+          "hidden": ["Hidden under a picture"],
+          "visible": ["Pictures read from the page.", "Under a picture with transparency", "After the pictures."]
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>Pictures read from the page.</p>
+      <div class="row">
+        <img alt="" width="80" height="40" src="images/quadrants.png" />
+        <img alt="" width="40" height="20" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAUCAIAAABwJOjsAAAAJklEQVR4nGMQoQD86mEgGzGMWjxq8ajFoxaPWjxq8ajFoxaPHIsBP+O/P0Zs1ccAAAAASUVORK5CYII=" />
+        <canvas width="60" height="40" id="drawn"></canvas>
+      </div>
+      <div class="row">
+        <img alt="" width="80" height="40" id="cross" />
+        <canvas width="60" height="40" id="tainted"></canvas>
+        <canvas width="30" height="40"></canvas>
+        <img alt="" width="20" height="20" src="images/missing.png" />
+        <img alt="" class="calc" src="images/quadrants.png" style="object-position: calc(10% + 5px) 50%" />
+        <img alt="" class="calc" src="images/quadrants.png" style="object-position: 50% calc(10% + 5px)" />
+      </div>
+      <div class="row">
+        <img alt="" src="images/quadrants.png" style="width: 60px; height: 60px; object-fit: cover; object-position: 20% 50%" />
+        <img alt="" src="images/quadrants.png" style="width: 60px; height: 60px; object-fit: contain; background: rgb(230, 230, 230)" />
+        <img alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAUCAIAAABwJOjsAAAAJklEQVR4nGMQoQD86mEgGzGMWjxq8ajFoxaPWjxq8ajFoxaPHIsBP+O/P0Zs1ccAAAAASUVORK5CYII=" style="width: 60px; height: 60px; object-fit: scale-down" />
+        <img alt="" src="images/quadrants.png" style="width: 60px; height: 60px; object-fit: cover; border-radius: 50%" />
+        <img alt="" src="images/quadrants.png" style="width: 60px; height: 60px; object-fit: none; object-position: -30px -30px; padding: 4px; border: 2px solid rgb(0, 0, 0); border-radius: 12px" />
+      </div>
+      <p style="position: relative">Hidden under a picture<img alt="" src="images/quadrants.png" style="position: absolute; left: 0; top: 0; width: 220px; height: 24px" /></p>
+      <p style="position: relative">Under a picture with transparency<canvas width="220" height="24" id="bar" style="position: absolute; left: 0; top: 0"></canvas></p>
+      <div class="row">
+        <div style="width: 100px; overflow: hidden"><img alt="" src="images/quadrants.png" style="display: block; width: 160px; height: 40px" /></div>
+        <div style="width: 0.3px; overflow: hidden"><img alt="" src="images/quadrants.png" style="display: block; width: 20px; height: 20px" /></div>
+        <div style="height: 0.3px; overflow: hidden"><img alt="" src="images/quadrants.png" style="display: block; width: 20px; height: 20px" /></div>
+        <div style="width: 0; overflow: hidden"><img alt="" src="images/quadrants.png" style="display: block; width: 20px; height: 20px" /></div>
+        <img alt="" width="20" height="20" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'/%3E" />
+        <canvas width="0" height="40" style="width: 20px; height: 40px"></canvas>
+        <canvas width="20" height="0" style="width: 20px; height: 40px"></canvas>
+        <img alt="" src="images/quadrants.png" style="width: 30px; height: 30px; object-fit: none; object-position: 100px 0" />
+      </div>
+      <img alt="" src="images/quadrants.png" style="display: block; margin: 0 0 8px -40px; width: 160px; height: 40px" />
+      <p>After the pictures.</p>
+    </main>
+    <script>
+      const drawn = document.getElementById("drawn").getContext("2d");
+      drawn.fillStyle = "rgb(0, 128, 128)";
+      drawn.fillRect(0, 0, 60, 40);
+      drawn.fillStyle = "rgb(255, 255, 255)";
+      drawn.beginPath();
+      drawn.arc(30, 20, 14, 0, 2 * Math.PI);
+      drawn.fill();
+      const bar = document.getElementById("bar").getContext("2d");
+      bar.fillStyle = "rgb(128, 0, 128)";
+      bar.fillRect(210, 0, 10, 24);
+      // Another origin on the same server: the port is whatever serves this page.
+      const cross = document.getElementById("cross");
+      const ready = new Promise((resolve) => {
+        cross.onload = () => {
+          document.getElementById("tainted").getContext("2d").drawImage(cross, 0, 0, 60, 40);
+          resolve();
+        };
+        cross.onerror = resolve;
+      });
+      cross.src = `${location.protocol}//localhost:${location.port}/fixtures/images/quadrants.png`;
+      window.beforeCollect = async () => {
+        await ready;
+        await Promise.all([...document.images].map((im) => im.decode().catch(() => {})));
+      };
+    </script>
+  </body>
+</html>

@@ -20,6 +20,7 @@
 
 import { parseColor } from "../../shared/color.ts";
 import { intersect, union } from "../../shared/geometry.ts";
+import { fitRadii } from "../../shared/svg/vector.ts";
 import type {
   DocRect,
   Paint,
@@ -28,6 +29,7 @@ import type {
   Scene,
   SceneClip,
   SceneOp,
+  Settings,
   TextPaint,
   TextRun,
   UnsupportedReason,
@@ -44,6 +46,8 @@ export interface SceneOptions {
   sources: readonly RunSource[];
   /** The snapii overlay, left out as everywhere else. */
   skip?: Element | null;
+  /** How pictures are encoded, as the capture's tiles are; PNG where a picture has transparency. Default PNG. */
+  encoding?: Pick<Settings, "format" | "jpegQuality">;
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -77,6 +81,11 @@ const BAND = 256;
 // Below the limits the background's validator sets (shared/messages.ts).
 const MAX_GROUP_DEPTH = 24;
 const MAX_OPS = 150_000;
+// Pictures travel to the background inside the scene's message: half of
+// Chromium's 64 MiB message limit as data URLs at most, and no more pixels
+// than this to draw and read back. Beyond either, a picture is a patch.
+const MAX_PICTURE_CHARS = 32 * 1024 * 1024;
+const MAX_PICTURE_PIXELS = 16 * 1024 * 1024;
 
 /** The walk ran out of budget: the region becomes one patch. */
 class OverBudget extends Error {}
@@ -192,6 +201,42 @@ const ownShapeClip = (cs: CSSStyleDeclaration): boolean =>
   cs.clipPath !== "none" ||
   (cs.clip.startsWith("rect(") && (cs.position === "absolute" || cs.position === "fixed"));
 
+type Size = { width: number; height: number };
+type Quad = [number, number, number, number];
+// A computed object-position of two plain lengths or percentages.
+const POSITION = /^(-?\d*\.?\d+)(px|%) (-?\d*\.?\d+)(px|%)$/;
+
+/**
+ * Where object-fit and object-position put a picture of `natural` size in
+ * the content box (css-images-3 § 5.5, 5.6); null for a position this does
+ * not read (calc(), an edge keyword with an offset).
+ */
+function objectBox(cs: CSSStyleDeclaration, box: DocRect, natural: Size): DocRect | null {
+  const fit = cs.objectFit;
+  const contain = Math.min(box.width / natural.width, box.height / natural.height);
+  const cover = Math.max(box.width / natural.width, box.height / natural.height);
+  const s = fit === "contain" ? contain : fit === "cover" ? cover : fit === "none" ? 1 : Math.min(1, contain);
+  const width = fit === "fill" ? box.width : natural.width * s;
+  const height = fit === "fill" ? box.height : natural.height * s;
+  const pos = POSITION.exec(cs.objectPosition.trim());
+  if (!pos) return null;
+  const offset = (v: string, unit: string, free: number) =>
+    unit === "%" ? (Number(v) / 100) * free : Number(v);
+  return {
+    x: box.x + offset(pos[1] as string, pos[2] as string, box.width - width),
+    y: box.y + offset(pos[3] as string, pos[4] as string, box.height - height),
+    width,
+    height,
+  };
+}
+
+/** Radii of a box inset by `by` (top, right, bottom, left): each corner less the two sides it joins. */
+const insetRadii = (radii: Radii, [t, r, b, l]: Quad): Radii =>
+  radii.map(([x, y], i) => [
+    Math.max(0, x - (i === 0 || i === 3 ? l : r)),
+    Math.max(0, y - (i < 2 ? t : b)),
+  ]) as Radii;
+
 function translateOp(op: SceneOp, dx: number, dy: number): SceneOp {
   if (op.op === "group") {
     return {
@@ -214,6 +259,10 @@ class Builder {
   readonly #contentClips = new Map<Box, SceneClip | null>();
   readonly #opacities = new Map<Box, number>();
   readonly #rects = new Map<Box, DocRect>();
+  /** The drawn part of each <img> and <canvas> that shows one; opaque ones hide text as fills do. */
+  readonly #pictures = new Map<Box, { op: Extract<SceneOp, { op: "image" }>; opaque: boolean }>();
+  #picturePixels = 0;
+  #pictureChars = 0;
   #seq = 0;
   #alpha = 1;
   #depth = 0;
@@ -379,8 +428,6 @@ class Builder {
     const name = el.localName;
     if (el.namespaceURI === SVG_NS) return "svg";
     if (el.namespaceURI === MATHML_NS) return "math";
-    if (name === "img") return "image";
-    if (name === "canvas") return "canvas";
     if (MEDIA.has(name)) return "media";
     if (FORM.has(name) || (name === "button" && cs.appearance !== "none")) return "form";
     if (b.opaque) return "frame";
@@ -428,6 +475,119 @@ class Builder {
       return "pseudo";
     if (text && !cs.writingMode.startsWith("horizontal")) return "vertical";
     if (b.kids.some((k) => !isBox(k) && isIconText(collapse(k.data, "normal")))) return "icon-font";
+    if (name === "img" || name === "canvas") return this.#picture(b);
+    return null;
+  }
+
+  /**
+   * Draws what shows of an <img>'s or <canvas>'s picture: read from the
+   * element itself (no request), cut to its content box, object-fit, the
+   * clips and the region, with its own rounded corners left transparent and
+   * a rounded clip's cut out, at the screen's density (a raster capture's
+   * too, unless the capture is shrunk to its pixel budget). Null when drawn
+   * or nothing shows; why not otherwise (not loaded, cross-origin, over
+   * budget).
+   */
+  #picture(b: Box): UnsupportedReason | null {
+    const { cs } = b;
+    const img = b.el.localName === "img" ? (b.el as HTMLImageElement) : null;
+    const el = img ?? (b.el as HTMLCanvasElement);
+    const reason: UnsupportedReason = img ? "image" : "canvas";
+    const natural = img
+      ? { width: img.naturalWidth, height: img.naturalHeight }
+      : { width: el.width, height: el.height };
+    // Still loading, or broken (the page shows its alt text or an icon, if anything).
+    if (img && !(img.complete && natural.width > 0)) return reason;
+    // A canvas of no width or height: nothing to draw.
+    if (natural.width === 0 || natural.height === 0) return null;
+    const border = this.#rect(b);
+    const [bt, br, bb, bl] = sides(cs).map((s) => (shown(s) ? s.width : 0)) as Quad;
+    const [pt, pr, pb, pl] = [cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft].map(
+      px,
+    ) as Quad;
+    const content = inset(border, bt + pt, br + pr, bb + pb, bl + pl);
+    const dest = objectBox(cs, content, natural);
+    if (!dest) return reason;
+    const clip = this.#ownClip(b);
+    const inBox = intersect(dest, content);
+    const clipped = inBox && clip && intersect(inBox, clip);
+    const visible = clipped && intersect(clipped, this.region);
+    if (!visible) return null;
+    const dpr = this.doc.defaultView?.devicePixelRatio ?? 1;
+    const w = Math.max(1, Math.round(visible.width * dpr));
+    const h = Math.max(1, Math.round(visible.height * dpr));
+    if (this.#picturePixels + w * h > MAX_PICTURE_PIXELS) return "budget";
+    this.#picturePixels += w * h;
+
+    const canvas = createHtml("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    // A new canvas always has one.
+    const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
+    const kx = w / visible.width;
+    const ky = h / visible.height;
+    // What lies outside a rounded corner stays out of the file, not just out
+    // of view. The radii fitted as the SVG's clips fit them: Firefox's
+    // roundRect cuts nothing for calc(infinity * 1px), which it computes as 3.4e38px.
+    const rounded = (box: DocRect, r: Radii) => {
+      ctx.beginPath();
+      ctx.roundRect(
+        (box.x - visible.x) * kx,
+        (box.y - visible.y) * ky,
+        box.width * kx,
+        box.height * ky,
+        fitRadii(box.width, box.height, r).map(([x, y]) => ({ x: x * kx, y: y * ky })),
+      );
+    };
+    const radii = this.#radii(cs, border);
+    if (radii) {
+      // Its own corners cut the picture along the content box's curve (css-backgrounds-3 § 5.3).
+      rounded(content, insetRadii(radii, [bt + pt, br + pr, bb + pb, bl + pl]));
+      ctx.clip();
+    }
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(
+      el,
+      (dest.x - visible.x) * kx,
+      (dest.y - visible.y) * ky,
+      dest.width * kx,
+      dest.height * ky,
+    );
+    let data: Uint8ClampedArray;
+    try {
+      data = ctx.getImageData(0, 0, w, h).data;
+    } catch {
+      // Cross-origin pixels taint the canvas: the page may show them, a script may not read them.
+      return reason;
+    }
+    let opaque = true;
+    let blank = true;
+    for (let i = 3; i < data.length && (opaque || blank); i += 4) {
+      const a = data[i] as number;
+      if (a < 255) opaque = false;
+      if (a > 0) blank = false;
+    }
+    // A WebGL canvas that does not keep its drawing buffer reads back empty, whatever it shows.
+    if (blank) return img ? null : reason;
+    if (clip?.radii) {
+      // Cut after the scan: the clip hides these corners, and the text in
+      // them, in the file too, so they leave the picture opaque. Cut about 2
+      // device px outside the curve (a corner below about 7 device px is not
+      // cut at all): the SVG's clip draws that edge, and an edge cut twice
+      // shows a rim (dark in JPEG, where the cut-out turns black).
+      const e = 2 / dpr;
+      const grown = { x: clip.x - e, y: clip.y - e, width: clip.width + 2 * e, height: clip.height + 2 * e };
+      ctx.globalCompositeOperation = "destination-in";
+      rounded(grown, clip.radii);
+      ctx.fill();
+    }
+    const jpeg = opaque && this.opts.encoding?.format === "jpeg";
+    const dataURL = jpeg
+      ? canvas.toDataURL("image/jpeg", this.opts.encoding?.jpegQuality)
+      : canvas.toDataURL("image/png");
+    if (this.#pictureChars + dataURL.length > MAX_PICTURE_CHARS) return "budget";
+    this.#pictureChars += dataURL.length;
+    this.#pictures.set(b, { op: { op: "image", ...visible, dataURL }, opaque });
     return null;
   }
 
@@ -706,12 +866,8 @@ class Builder {
     const border = this.#layout.toDoc(b.el.getBoundingClientRect(), b.ctx);
     const radii = this.#radii(b.cs, border);
     if (!radii) return null;
-    const [t, r, bt, l] = sides(b.cs).map((s) => s.width) as [number, number, number, number];
-    const inner = radii.map(([x, y], i) => [
-      Math.max(0, x - (i === 0 || i === 3 ? l : r)),
-      Math.max(0, y - (i < 2 ? t : bt)),
-    ]) as Radii;
-    return { ...inset(border, t, r, bt, l), radii: inner };
+    const [t, r, bt, l] = sides(b.cs).map((s) => s.width) as Quad;
+    return { ...inset(border, t, r, bt, l), radii: insetRadii(radii, [t, r, bt, l]) };
   }
 
   #containerBox(b: Box): Box | null {
@@ -761,6 +917,12 @@ class Builder {
         this.#opaque(area, clip, bg);
       }
       this.#borderOps(borders, frag, radii, leftEdge, rightEdge, ops);
+    }
+    const picture = this.#pictures.get(b);
+    if (picture) {
+      ops.push(picture.op);
+      // Without transparency it hides the text under it as an opaque fill does.
+      if (picture.opaque) this.#opaque(picture.op, clip, WHITE);
     }
     this.#outlineOp(b, frags, ops);
     if (ops.length === 0) return;

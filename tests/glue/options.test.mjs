@@ -9,7 +9,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { checkFolder } from "../../src/shared/folder.ts";
-import { ADDON_ID, ROOT, startGlue } from "./env.mjs";
+import { ADDON_ID, decodeDataUrl, ROOT, startGlue } from "./env.mjs";
 
 const PAGE = "/glue/fixtures/page.html";
 const ARROW_LEFT = "\uE012"; // WebDriver ArrowLeft: a range input steps down by 1.
@@ -277,21 +277,56 @@ test("output Vector in the options page: stored, OCR switched off, and the card 
   assert.equal(file.svg.images.length, 0);
 });
 
-test("vector output with images: each image is a patch with the page's pixels; raster beside it for the time", async () => {
+test("vector output with pictures read in the content script: drawn where the page could read them, patches where not; raster beside it for the time", async () => {
   await openWith({ output: "vector" });
   // Loaded with vector output stored, not switched to it: the OCR switch is off too.
   assert.equal(await g.content(`return document.querySelector('input[name="ocr"]').disabled;`), true);
-  const vector = await saveAt("/fixtures/images.html", "#cap p");
-  const { capture } = vector.file.svg;
+  const vector = await saveAt("/fixtures/vector-images.html", "#cap p");
+  const { capture, images } = vector.file.svg;
   assert.equal(capture.output, "vector");
-  assert.equal(capture.scene.unsupported.image, 3);
+  // As in the page's own context (vector.spec.ts): the picture from the other
+  // origin, the canvas it tainted, the blank canvas, the missing image and
+  // the calc() positions are patches.
+  assert.deepEqual(capture.scene.unsupported, { image: 4, canvas: 2 });
   assert.equal(capture.tiles.length, capture.scene.patches);
   // Two device px per CSS px, as a raster capture of the same region would have.
   for (const t of capture.tiles) assert.equal(t.pixelWidth, Math.floor(Math.ceil(t.rect.width) * 2));
-  for (const im of vector.file.svg.images) assert.match(im.href, /^data:image\/png;base64,/);
+  // The pictures come first (the shapes layer), at the screen's density at most.
+  const pictures = images.slice(0, images.length - capture.tiles.length);
+  assert.equal(pictures.length, 14);
+  for (const im of pictures) {
+    const png = await decodeDataUrl(im.href);
+    assert.ok(
+      png.width <= Math.ceil(im.width * 2) + 1 && png.height <= Math.ceil(im.height * 2) + 1,
+      `${png.width}x${png.height} for ${im.width}x${im.height}`,
+    );
+  }
+  // At the screen's density, as a raster capture of the area holds it: the
+  // 160 x 80 PNG shown at 80 x 40, and shown stretched to 220 x 24 (more
+  // pixels than it has across), as is the 220 x 24 canvas.
+  const sizeOf = async (w, h) =>
+    Promise.all(
+      pictures
+        .filter((im) => im.width === w && im.height === h)
+        .map(async (im) => {
+          const png = await decodeDataUrl(im.href);
+          return [png.width, png.height];
+        }),
+    );
+  assert.deepEqual(await sizeOf(80, 40), [[160, 80]]);
+  assert.deepEqual(await sizeOf(220, 24), [
+    [440, 48],
+    [440, 48],
+  ]);
+
+  // The JPEG setting reaches the pictures, as it does the tiles: the opaque ones.
+  await openWith({ output: "vector", format: "jpeg" });
+  const jpeg = await saveAt("/fixtures/vector-images.html", "#cap p");
+  const kinds = jpeg.file.svg.images.slice(0, 14).map((im) => /^data:image\/(\w+)/.exec(im.href)?.[1]);
+  assert.ok(kinds.includes("jpeg") && kinds.includes("png"), kinds.join());
 
   await openWith({});
-  const raster = await saveAt("/fixtures/images.html", "#cap p");
+  const raster = await saveAt("/fixtures/vector-images.html", "#cap p");
   assert.equal("output" in raster.file.svg.capture, false);
   console.log(
     `vector save with ${capture.tiles.length} patch captures: ${vector.ms} ms; raster save of the same region: ${raster.ms} ms`,

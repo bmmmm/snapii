@@ -143,18 +143,12 @@ test("Ask where to save, dialog cancelled: the page says the SVG was not saved, 
 
 const VECTOR_NOTICE =
   "Parts of this selection that are saved as pixels are outside the visible area. Scroll them into view or select a smaller area";
-const IMG = `data:image/svg+xml,${encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='40' height='30'><rect width='40' height='30' fill='#c00'/></svg>")}`;
-
-/** Puts a 40 x 30 image (a patch in vector output) at the start of `selector`. */
-async function addImage(selector) {
+/** Puts a 40 x 30 red box with a filter (a patch in vector output) at the start of `selector`. */
+async function addPatch(selector) {
   await g.content(`
-    const img = document.createElement("img");
-    img.src = ${JSON.stringify(IMG)};
-    img.width = 40;
-    img.height = 30;
-    img.style.cssText = "display:block";
-    document.querySelector(${JSON.stringify(selector)}).prepend(img);
-    return img.decode();
+    const box = document.createElement("div");
+    box.style.cssText = "width:40px;height:30px;background:#c00;filter:opacity(1)";
+    document.querySelector(${JSON.stringify(selector)}).prepend(box);
   `);
   await g.frames();
 }
@@ -200,8 +194,8 @@ test("vector output with a patch beyond the viewport: the toast says so and noth
   await g.setSettings({ output: "vector" });
   try {
     await g.open(PAGE);
-    await addImage("#below");
-    // The image sits at the top of #below (document y 3000), above the viewport.
+    await addPatch("#below");
+    // The box sits at the top of #below (document y 3000), above the viewport.
     await g.scrollTo(3200);
     const before = g.svgFiles();
     await g.startOverlay();
@@ -220,11 +214,55 @@ test("vector output with a patch beyond the viewport: the toast says so and noth
     const file = await g.newDownload(before);
     const { capture, images } = file.svg;
     assert.deepEqual(capture.selection, { mode: "drag", x: 100, y: 3000, width: 600, height: 400 });
-    assert.equal(capture.scene.unsupported.image, 1);
+    assert.equal(capture.scene.unsupported.effect, 1);
     assert.equal(capture.tiles.length, 1);
     assert.equal(capture.tiles[0].pixelWidth, 80);
     const tile = await decodeDataUrl(images[0].href);
     assert.deepEqual(tile.at(40, 30).slice(0, 3), [204, 0, 0]);
+  } finally {
+    await g.background(() => chrome.storage.sync.clear());
+  }
+});
+
+test("vector output with pictures read in the content script: drawn where the page could read them, patches where not", async () => {
+  await g.setSettings({ output: "vector" });
+  try {
+    await g.open("/fixtures/vector-images.html");
+    const p = await g.rect("#cap p");
+    const file = await saveElementAt(p.x + 10, p.y + p.height / 2);
+    const { capture, images } = file.svg;
+    // As in the page's own context (vector.spec.ts): the picture from the other
+    // origin, the canvas it tainted, the blank canvas, the missing image and
+    // the calc() positions are patches.
+    assert.deepEqual(capture.scene.unsupported, { image: 4, canvas: 2 });
+    assert.equal(capture.tiles.length, capture.scene.patches);
+    // The pictures come first (the shapes layer), at the screen's density at most.
+    const pictures = images.slice(0, images.length - capture.tiles.length);
+    assert.equal(pictures.length, 14);
+    // At the screen's density, as a raster capture of the area holds it: the
+    // 160 x 80 PNG shown at 80 x 40, and shown stretched to 220 x 24 (more
+    // pixels than it has across), as is the 220 x 24 canvas.
+    const sizeOf = async (w, h) =>
+      Promise.all(
+        pictures
+          .filter((im) => im.width === w && im.height === h)
+          .map(async (im) => {
+            const png = await decodeDataUrl(im.href);
+            return [png.width, png.height];
+          }),
+      );
+    assert.deepEqual(await sizeOf(80, 40), [[160, 80]]);
+    assert.deepEqual(await sizeOf(220, 24), [
+      [440, 48],
+      [440, 48],
+    ]);
+    for (const im of pictures) {
+      const png = await decodeDataUrl(im.href);
+      assert.ok(
+        png.width <= Math.ceil(im.width * 2) + 1 && png.height <= Math.ceil(im.height * 2) + 1,
+        `${png.width}x${png.height} for ${im.width}x${im.height}`,
+      );
+    }
   } finally {
     await g.background(() => chrome.storage.sync.clear());
   }

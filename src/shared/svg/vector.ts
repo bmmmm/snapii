@@ -58,7 +58,7 @@ const NO_RADII: Radii = [
  * (css-backgrounds-3 § 5.5); an SVG <rect> would clamp rx and ry each on its
  * own and make a pill's round ends elliptical.
  */
-function fitRadii(w: number, h: number, radii: Radii): Radii {
+export function fitRadii(w: number, h: number, radii: Radii): Radii {
   // A corner with either radius zero is square (css-backgrounds-3 § 5.2).
   const square = radii.map(([x, y]) => (x > 0 && y > 0 ? [x, y] : [0, 0])) as Radii;
   const [tl, tr, br, bl] = square;

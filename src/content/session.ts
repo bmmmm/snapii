@@ -339,7 +339,12 @@ export function startSession(deps: SessionDeps): SessionHandle {
       };
       // Vector output: how the same runs are painted, and the boxes around them.
       if (deps.settings.output === "vector") {
-        model.scene = buildScene(document, region, { runs, sources, skip: overlay.host });
+        model.scene = buildScene(document, region, {
+          runs,
+          sources,
+          skip: overlay.host,
+          encoding: deps.settings,
+        });
       }
       // Only with OCR on (raster output): the background recognises text in these areas.
       if (deps.settings.ocr && !model.scene) {

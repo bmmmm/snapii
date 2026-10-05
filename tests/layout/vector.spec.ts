@@ -16,8 +16,12 @@
 //   V4 (G5) well-formed; no <script>, <foreignObject> or on* attribute;
 //      url() only for generated clip ids; images only as base64 png, jpeg,
 //      webp or gif data URLs
+//   V5 every picture the scene drew from an <img> or <canvas> has at most the
+//      pixels of its box at the page's density (+1 rounding): the part that
+//      shows, not the whole original (the corner tests below check the rest)
 //   plus per fixture: vector.fills / alpha (a run's paint), clipped (a run
-//   with its own clip-path), canvas / darkCanvas (the canvas colour).
+//   with its own clip-path), canvas / darkCanvas (the canvas colour),
+//   pictures / pictureArea (how many the scene drew, their area in CSS px).
 // The SVGs stay in test-results/vector/ for inspection.
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
@@ -36,6 +40,8 @@ interface VectorExpect {
   clipped?: string[];
   canvas?: string;
   darkCanvas?: boolean;
+  pictures?: number;
+  pictureArea?: number;
 }
 
 interface Expect {
@@ -67,6 +73,9 @@ const fixtures = readdirSync(DIR)
   .filter((f) => f.endsWith(".html") && !NOT_FIXTURES.has(f))
   .sort();
 const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+type PictureOp = Extract<Scene["ops"][number], { op: "image" }>;
+const pictureOps = (ops: Scene["ops"]): PictureOp[] =>
+  ops.flatMap((op) => (op.op === "group" ? pictureOps(op.children) : op.op === "image" ? [op] : []));
 const pct = (n: number) => `${(n * 100).toFixed(2)}%`;
 
 test("the vector fixtures are there, each with its vector expectations", () => {
@@ -167,6 +176,344 @@ test("the skipped subtree (the overlay) is not in the scene", async ({ page }) =
   expect(fills.skipped).toBe(0);
 });
 
+/** The scene of #cap after `html` replaced the smoke page's body (and its pictures loaded). */
+async function sceneOf(page: Page, html: string, encoding?: { format: "png" | "jpeg"; jpegQuality: number }) {
+  await page.goto("/fixtures/smoke.html");
+  await page.evaluate(async (html) => {
+    document.body.innerHTML = html;
+    await Promise.all([...document.images].map((im) => im.decode()));
+    window.prepare?.();
+  }, html);
+  await page.addScriptTag({ path: "dist-test/harness.js" });
+  return page.evaluate(async (encoding) => {
+    const h = window.__snapii;
+    const capture = h.debug.captureRect("#cap");
+    const { runs, sources } = await h.debug.collectTextRunsDetailed(document, capture, {});
+    return h.buildScene(document, capture, { runs, sources, ...(encoding ? { encoding } : {}) });
+  }, encoding);
+}
+
+test("pictures: JPEG where the settings ask for it and the picture is opaque, else PNG", async ({ page }) => {
+  // The canvas is opaque at the top and transparent below.
+  await page.addInitScript(() => {
+    window.prepare = () => {
+      const half = document.querySelector("canvas") as HTMLCanvasElement;
+      (half.getContext("2d") as CanvasRenderingContext2D).fillRect(0, 0, 40, 20);
+    };
+  });
+  const html =
+    '<main id="cap" style="width:300px"><img src="/fixtures/images/quadrants.png" width="80" height="40"><img src="/fixtures/images/quadrants.png" width="40" height="40" style="border-radius:50%"><canvas width="40" height="40"></canvas></main>';
+  const kinds = (scene: Scene) =>
+    pictureOps(scene.ops).map((op) => /^data:image\/(\w+)/.exec(op.dataURL)?.[1]);
+  // The round one has transparent corners, the canvas a transparent half: JPEG keeps neither.
+  expect(kinds(await sceneOf(page, html, { format: "jpeg", jpegQuality: 0.8 }))).toEqual([
+    "jpeg",
+    "png",
+    "png",
+  ]);
+  expect(kinds(await sceneOf(page, html))).toEqual(["png", "png", "png"]);
+  // The quality setting reaches the encoder.
+  const size = async (q: number) =>
+    pictureOps((await sceneOf(page, html, { format: "jpeg", jpegQuality: q })).ops)[0]?.dataURL.length ?? 0;
+  expect(await size(0.1)).toBeLessThan(await size(1));
+});
+
+test("pictures: an image still loading is a patch, whatever it shows meanwhile", async ({ page }) => {
+  // A new src that never arrives: the old picture stays on screen, the load is not complete.
+  await page.route("**/never.png", () => {});
+  await page.addInitScript(() => {
+    window.prepare = () => {
+      (document.querySelector("img") as HTMLImageElement).src = "/fixtures/images/never.png";
+    };
+  });
+  const scene = await sceneOf(
+    page,
+    '<main id="cap" style="width:300px"><img src="/fixtures/images/quadrants.png" width="80" height="40"></main>',
+  );
+  expect(scene.unsupported).toEqual({ image: 1 });
+  expect(pictureOps(scene.ops)).toEqual([]);
+});
+
+test("pictures: their own rounded corners cut along the content box, each corner less the two sides it joins", async ({
+  page,
+}) => {
+  // An opaque canvas of 100 x 100 CSS px (200 x 200 of its own, so one
+  // picture pixel per CSS px), radius 40, borders 10, 6, 4, 12 (top, right,
+  // bottom, left) and padding 10: the content box's corners are 18/20,
+  // 24/20, 24/26 and 18/26.
+  await page.addInitScript(() => {
+    window.prepare = () => {
+      const c = document.querySelector("canvas") as HTMLCanvasElement;
+      (c.getContext("2d") as CanvasRenderingContext2D).fillRect(0, 0, 200, 200);
+    };
+  });
+  const scene = await sceneOf(
+    page,
+    '<main id="cap" style="width:300px"><canvas width="200" height="200" style="display:block;width:100px;height:100px;border:solid rgb(0,0,0);border-width:10px 6px 4px 12px;padding:10px;border-radius:40px"></canvas></main>',
+  );
+  const [picture] = pictureOps(scene.ops);
+  const { size, alpha } = await page.evaluate(async (url) => {
+    const bitmap = await createImageBitmap(await (await fetch(url)).blob());
+    const c = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const ctx = c.getContext("2d") as OffscreenCanvasRenderingContext2D;
+    ctx.drawImage(bitmap, 0, 0);
+    const data = ctx.getImageData(0, 0, bitmap.width, bitmap.height).data;
+    return { size: [bitmap.width, bitmap.height], alpha: [...data.filter((_, i) => i % 4 === 3)] };
+  }, picture?.dataURL ?? "");
+  expect(size).toEqual([100, 100]);
+  const radii = [
+    [18, 20],
+    [24, 20],
+    [24, 26],
+    [18, 26],
+  ] as const;
+  const wrong: string[] = [];
+  for (const [corner, [rx, ry]] of radii.entries()) {
+    // Each corner's 40 x 40 square: transparent only outside its ellipse.
+    for (let j = 0; j < 40; j++) {
+      for (let i = 0; i < 40; i++) {
+        // The pixel's centre, measured from this corner inwards.
+        const f = ((i + 0.5 - rx) / rx) ** 2 + ((j + 0.5 - ry) / ry) ** 2;
+        const outside = i < rx && j < ry && f > 1;
+        // Antialiasing: no verdict for a pixel the curve may cross.
+        if (i < rx && j < ry && Math.abs(Math.sqrt(f) - 1) * Math.min(rx, ry) < 0.75) continue;
+        const x = corner === 0 || corner === 3 ? i : 99 - i;
+        const y = corner < 2 ? j : 99 - j;
+        const a = alpha[y * 100 + x] ?? -1;
+        if (outside ? a > 32 : a < 223) wrong.push(`corner ${corner} (${x},${y}) alpha ${a}`);
+      }
+    }
+  }
+  expect(wrong).toEqual([]);
+});
+
+test("pictures: a rounded one the region cuts keeps its corners where the element has them", async ({
+  page,
+}) => {
+  // An opaque 100 x 100 canvas, radius 20, half of it left of and above the
+  // region: only its bottom-right corner is in the picture.
+  await page.addInitScript(() => {
+    window.prepare = () => {
+      const c = document.querySelector("canvas") as HTMLCanvasElement;
+      (c.getContext("2d") as CanvasRenderingContext2D).fillRect(0, 0, 200, 200);
+    };
+  });
+  const scene = await sceneOf(
+    page,
+    '<main id="cap" style="display:flow-root;margin:100px;width:100px;height:100px"><canvas width="200" height="200" style="display:block;width:100px;height:100px;margin:-50px 0 0 -50px;border-radius:20px"></canvas></main>',
+  );
+  const [picture] = pictureOps(scene.ops);
+  const alpha = await page.evaluate(async (url) => {
+    const bitmap = await createImageBitmap(await (await fetch(url)).blob());
+    const c = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const ctx = c.getContext("2d") as OffscreenCanvasRenderingContext2D;
+    ctx.drawImage(bitmap, 0, 0);
+    const at = (x: number, y: number) => ctx.getImageData(x, y, 1, 1).data[3];
+    return {
+      size: [bitmap.width, bitmap.height],
+      bottomLeft: at(0, 49),
+      topRight: at(49, 0),
+      bottomRight: at(49, 49),
+    };
+  }, picture?.dataURL ?? "");
+  expect(alpha).toEqual({ size: [50, 50], bottomLeft: 255, topRight: 255, bottomRight: 0 });
+});
+
+test.describe("at two device px per CSS px", () => {
+  test.use({ deviceScaleFactor: 2 });
+
+  test("pictures: an ancestor's rounded clip cuts them too, so its corners are not in the file", async ({
+    page,
+  }) => {
+    // An opaque 100 x 100 canvas in a box with radius 20 and overflow hidden
+    // (an avatar made the common way), half of it left of and above the
+    // region: only the box's bottom-right corner is in the picture, 40 device
+    // px round.
+    await page.addInitScript(() => {
+      window.prepare = () => {
+        const c = document.querySelector("canvas") as HTMLCanvasElement;
+        (c.getContext("2d") as CanvasRenderingContext2D).fillRect(0, 0, 200, 200);
+      };
+    });
+    const scene = await sceneOf(
+      page,
+      '<main id="cap" style="display:flow-root;margin:100px;width:100px;height:100px"><div style="width:100px;height:100px;margin:-50px 0 0 -50px;border-radius:20px;overflow:hidden"><canvas width="200" height="200" style="display:block;width:100px;height:100px"></canvas></div></main>',
+    );
+    const [picture] = pictureOps(scene.ops);
+    const alpha = await page.evaluate(async (url) => {
+      const bitmap = await createImageBitmap(await (await fetch(url)).blob());
+      const c = new OffscreenCanvas(bitmap.width, bitmap.height);
+      const ctx = c.getContext("2d") as OffscreenCanvasRenderingContext2D;
+      ctx.drawImage(bitmap, 0, 0);
+      const at = (x: number, y: number) => ctx.getImageData(x, y, 1, 1).data[3];
+      return {
+        size: [bitmap.width, bitmap.height],
+        bottomLeft: at(0, 99),
+        topRight: at(99, 0),
+        // Outside a 40 px corner, inside a 20 px one.
+        inCorner: at(91, 91),
+        // 0.3 px outside the curve: kept, the SVG's clip draws that edge.
+        nearCurve: at(88, 88),
+      };
+    }, picture?.dataURL ?? "");
+    expect(alpha).toEqual({ size: [100, 100], bottomLeft: 255, topRight: 255, inCorner: 0, nearCurve: 255 });
+  });
+
+  test("pictures: an ancestor's rounded clip is cut out a little outside the curve, at every corner", async ({
+    page,
+  }) => {
+    // A card of 100 x 100 CSS px, radius 20 (40 device px), wholly in view:
+    // the pixels at both ends of each corner's arc, 0.87 px outside it, stay
+    // for the SVG's clip to draw the edge.
+    await page.addInitScript(() => {
+      window.prepare = () => {
+        const c = document.querySelector("canvas") as HTMLCanvasElement;
+        (c.getContext("2d") as CanvasRenderingContext2D).fillRect(0, 0, 200, 200);
+      };
+    });
+    const scene = await sceneOf(
+      page,
+      '<main id="cap" style="width:100px"><div style="width:100px;height:100px;border-radius:20px;overflow:hidden"><canvas width="200" height="200" style="display:block;width:100px;height:100px"></canvas></div></main>',
+    );
+    const ends: [number, number][] = [
+      [199, 170],
+      [170, 199],
+      [199, 29],
+      [170, 0],
+      [0, 29],
+      [29, 0],
+      [0, 170],
+      [29, 199],
+    ];
+    expect(await alphaAt(page, scene, ends)).toEqual([ends.map(() => 255)]);
+  });
+
+  test("pictures: JPEG under an ancestor's rounded clip has no dark rim at the curve", async ({ page }) => {
+    // The same white canvas as a JPEG: JPEG has no transparency, what is
+    // erased turns black, and the edge the SVG's clip draws must not.
+    await page.addInitScript(() => {
+      window.prepare = () => {
+        const ctx = (document.querySelector("canvas") as HTMLCanvasElement).getContext(
+          "2d",
+        ) as CanvasRenderingContext2D;
+        ctx.fillStyle = "rgb(255, 255, 255)";
+        ctx.fillRect(0, 0, 200, 200);
+      };
+    });
+    const scene = await sceneOf(
+      page,
+      '<main id="cap" style="display:flow-root;margin:100px;width:100px;height:100px"><div style="width:100px;height:100px;margin:-50px 0 0 -50px;border-radius:20px;overflow:hidden"><canvas width="200" height="200" style="display:block;width:100px;height:100px"></canvas></div></main>',
+      { format: "jpeg", jpegQuality: 0.92 },
+    );
+    const [picture] = pictureOps(scene.ops);
+    expect(picture?.dataURL).toMatch(/^data:image\/jpeg/);
+    const darkest = await page.evaluate(async (url) => {
+      const bitmap = await createImageBitmap(await (await fetch(url)).blob());
+      const c = new OffscreenCanvas(bitmap.width, bitmap.height);
+      const ctx = c.getContext("2d") as OffscreenCanvasRenderingContext2D;
+      ctx.drawImage(bitmap, 0, 0);
+      // Along the corner's diagonal, from inside up to 0.3 px outside the curve.
+      return Math.min(
+        ...[80, 84, 86, 88].map((p) => Math.min(...ctx.getImageData(p, p, 1, 1).data.slice(0, 3))),
+      );
+    }, picture?.dataURL ?? "");
+    expect(darkest).toBeGreaterThanOrEqual(230);
+  });
+});
+
+/** Alpha at each point of every picture in the scene, in its own pixels. */
+async function alphaAt(page: Page, scene: Scene, points: [number, number][]): Promise<number[][]> {
+  return page.evaluate(
+    ({ urls, points }) =>
+      Promise.all(
+        urls.map(async (url) => {
+          const bitmap = await createImageBitmap(await (await fetch(url)).blob());
+          const c = new OffscreenCanvas(bitmap.width, bitmap.height);
+          const ctx = c.getContext("2d") as OffscreenCanvasRenderingContext2D;
+          ctx.drawImage(bitmap, 0, 0);
+          return points.map(([x, y]) => ctx.getImageData(x, y, 1, 1).data[3] ?? -1);
+        }),
+      ),
+    { urls: pictureOps(scene.ops).map((p) => p.dataURL), points },
+  );
+}
+
+test("pictures: a radius of calc(infinity * 1px), a full round, cuts them too", async ({ page }) => {
+  // Its own and an ancestor's; Firefox computes it as 3.4e38px.
+  await page.addInitScript(() => {
+    window.prepare = () => {
+      for (const c of document.querySelectorAll("canvas"))
+        (c.getContext("2d") as CanvasRenderingContext2D).fillRect(0, 0, 60, 60);
+    };
+  });
+  const round = "border-radius:calc(infinity * 1px)";
+  const scene = await sceneOf(
+    page,
+    `<main id="cap" style="display:flex;gap:10px;width:300px"><canvas width="60" height="60" style="display:block;${round}"></canvas><div style="${round};overflow:hidden"><canvas width="60" height="60" style="display:block"></canvas></div></main>`,
+  );
+  // A corner pixel and the centre of each.
+  expect(
+    await alphaAt(page, scene, [
+      [1, 1],
+      [30, 30],
+    ]),
+  ).toEqual([
+    [0, 255],
+    [0, 255],
+  ]);
+});
+
+test("pictures: an ancestor's rounded clip leaves an opaque one opaque: it hides the text under it, and JPEG applies", async ({
+  page,
+}) => {
+  // The card's corners are hidden by the card's clip anyway, the text in them too.
+  await page.addInitScript(() => {
+    window.prepare = () => {
+      const c = document.querySelector("canvas") as HTMLCanvasElement;
+      (c.getContext("2d") as CanvasRenderingContext2D).fillRect(0, 0, 200, 40);
+    };
+  });
+  const html =
+    '<main id="cap" style="width:300px"><div style="position:relative;width:200px;border-radius:12px;overflow:hidden;font:16px/40px serif"><p style="margin:0">Text under the picture</p><canvas width="200" height="40" style="position:absolute;left:0;top:0"></canvas></div></main>';
+  const scene = await sceneOf(page, html, { format: "jpeg", jpegQuality: 0.8 });
+  expect(scene.text.length).toBeGreaterThan(0);
+  expect(scene.text.every((t) => t === null)).toBe(true);
+  expect(pictureOps(scene.ops).map((op) => /^data:image\/(\w+)/.exec(op.dataURL)?.[1])).toEqual(["jpeg"]);
+});
+
+test("pictures over the pixel budget are patches, counted before anything is drawn", async ({ page }) => {
+  // Three blank canvases of 6 Mpx: the first two are drawn (and read back
+  // empty), the third would take the pictures past 16 Mi px.
+  const canvas = '<canvas width="2450" height="2450"></canvas>';
+  const scene = await sceneOf(
+    page,
+    `<main id="cap" style="display:flex;width:7350px">${canvas}${canvas}${canvas}</main>`,
+  );
+  expect(scene.unsupported).toEqual({ canvas: 2, budget: 1 });
+});
+
+test("pictures over the data URL budget are patches", async ({ page }) => {
+  // Three canvases of 3 Mpx opaque noise, each 12 M (RGB) to 16 M (RGBA)
+  // characters as a PNG data URL: two fit in 32 MiB, three do not.
+  await page.addInitScript(() => {
+    window.prepare = () => {
+      for (const c of document.querySelectorAll("canvas")) {
+        const ctx = c.getContext("2d") as CanvasRenderingContext2D;
+        const img = ctx.createImageData(c.width, c.height);
+        for (let i = 0; i < img.data.length; i++) img.data[i] = i % 4 === 3 ? 255 : (Math.random() * 256) | 0;
+        ctx.putImageData(img, 0, 0);
+      }
+    };
+  });
+  const canvas = '<canvas width="1732" height="1732"></canvas>';
+  const scene = await sceneOf(
+    page,
+    `<main id="cap" style="display:flex;width:5196px">${canvas}${canvas}${canvas}</main>`,
+  );
+  expect(scene.unsupported).toEqual({ budget: 1 });
+  expect(pictureOps(scene.ops)).toHaveLength(2);
+});
+
 /** Each patch's pixels, cut from the region's screenshot on whole pixels (DPR 1, CSS scale). */
 async function cropTiles(page: Page, png: Buffer, patches: Patch[]): Promise<RasterTile[]> {
   return page.evaluate(
@@ -240,6 +587,17 @@ for (const file of fixtures) {
     );
     const { capture } = col;
     const scene: Scene = col.scene;
+    const pictures = pictureOps(scene.ops);
+    const pictureSizes = await page.evaluate(
+      (urls) =>
+        Promise.all(
+          urls.map(async (url) => {
+            const bitmap = await createImageBitmap(await (await fetch(url)).blob());
+            return { width: bitmap.width, height: bitmap.height };
+          }),
+        ),
+      pictures.map((p) => p.dataURL),
+    );
     // Whole pixels: Chromium scales a screenshot of a fractional width to whole
     // pixels (Firefox cuts), and the patches come out of this picture, so a
     // fractional clip would resample them once more in the comparison (a
@@ -334,6 +692,25 @@ for (const file of fixtures) {
     for (const m of svg.matchAll(/href="([^"]*)"/g)) {
       if (m[1]?.startsWith("data:"))
         expect.soft(m[1], "V4 image data URLs").toMatch(/^data:image\/(png|jpeg|webp|gif);base64,/);
+    }
+    // V5
+    for (const [i, p] of pictures.entries()) {
+      const size = pictureSizes[i];
+      const most = {
+        width: Math.ceil(p.width * col.devicePixelRatio) + 1,
+        height: Math.ceil(p.height * col.devicePixelRatio) + 1,
+      };
+      expect
+        .soft(
+          size && size.width <= most.width && size.height <= most.height,
+          `V5 picture ${i} ${JSON.stringify(size)} in ${JSON.stringify(most)}`,
+        )
+        .toBe(true);
+    }
+    if (vec?.pictures !== undefined) expect.soft(pictures.length, "pictures drawn").toBe(vec.pictures);
+    if (vec?.pictureArea !== undefined) {
+      const area = pictures.reduce((s, p) => s + p.width * p.height, 0);
+      expect.soft(Math.abs(area - vec.pictureArea), `area of the pictures ${area}`).toBeLessThan(1);
     }
 
     // V3

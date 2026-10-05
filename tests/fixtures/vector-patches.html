@@ -5,10 +5,10 @@
     <title>vector patches</title>
     <!--
       One element per reason vector output takes as pixels: a transform, a
-      filter, a box shadow, a gradient, an image, a form control, a dashed
-      border, a text shadow. Each is one patch and its text runs are
-      invisible (the pixels show them); the plain paragraph between them stays
-      vector. A black overlay clipped away entirely by its own clip-path
+      filter, a box shadow, a gradient, a form control, a dashed border, a
+      text shadow (images: vector-images.html). Each is one patch and its text
+      runs are invisible (the pixels show them); the plain paragraph between
+      them stays vector. A black overlay clipped away entirely by its own clip-path
       paints nothing and must not hide "Wiped text", nor may a visually
       hidden label show; one clipped to half its width is a patch ("effect").
       The bar above the capture casts its shadow into it: a patch strip, though
@@ -17,7 +17,8 @@
       and is no patch over the text under it.
       The half-transparent badge lies over a link: its link area (it
       has alt text) must lie under the text layer, or it would take the
-      clicks meant for "Linked words".
+      clicks meant for "Linked words". The badge is a picture, and the text
+      over it stays painted: only opaque shapes hide text.
     -->
     <style>
       body { margin: 0; padding: 20px; font: 16px/1.5 serif; background: rgb(255, 255, 255); }
@@ -51,7 +52,6 @@
             "effect": 2,
             "box-shadow": 2,
             "gradient": 1,
-            "image": 2,
             "form": 1,
             "border": 1,
             "text-effect": 1
@@ -62,10 +62,9 @@
             "Shadowed box",
             "Gradient box",
             "Dashed border",
-            "Shadowed text",
-            "Linked words"
+            "Shadowed text"
           ],
-          "visible": ["Plain text", "Wiped text", "Under an invisible input"]
+          "visible": ["Plain text", "Wiped text", "Under an invisible input", "Linked words"]
         }
       }
     </script>
