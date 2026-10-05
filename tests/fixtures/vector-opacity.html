@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>vector opacity</title>
+    <!--
+      Opacity groups, nested: the boxes go into <g opacity>, the text (in the
+      layer on top) carries the product of its ancestors' opacities as
+      fill-opacity (0.5 and 0.25 here).
+    -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; background: rgb(255, 255, 255); }
+      #cap { width: 360px; }
+      .half { opacity: 0.5; padding: 8px; background: rgb(0, 0, 200); color: rgb(255, 255, 255); }
+      .inner { opacity: 0.5; margin-top: 6px; padding: 4px; background: rgb(200, 0, 0); }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Half opaque text", "Quarter opaque text"],
+        "vector": {
+          "tolerance": 0.05,
+          "maxPatchArea": 0,
+          "unsupported": {},
+          "alpha": { "Half opaque text": 0.5, "Quarter opaque text": 0.25 }
+        },
+        "reason": "The text layer lies over the opacity groups, not inside them: its glyphs blend with the half-transparent box under them instead of being blended as one with it, so their pixels differ (3.7 % in both browsers, measured 2026-10-04). The boxes themselves match; without their opacity the region differs by far more."
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <div class="half">Half opaque text<div class="inner">Quarter opaque text</div></div>
+    </main>
+  </body>
+</html>

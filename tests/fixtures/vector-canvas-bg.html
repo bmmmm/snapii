@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>vector canvas background</title>
+    <!--
+      The root element has no background, body has one: CSS propagates it to
+      the whole canvas, also where body's own box does not reach (its margin).
+      The capture has no background of its own, so the scene's canvas colour
+      is all that paints behind the text.
+    -->
+    <style>
+      body { margin: 30px; font: 16px/1.5 serif; background: rgb(250, 240, 220); }
+      #cap { width: 300px; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Text on the canvas colour"],
+        "vector": { "maxPatchArea": 0, "unsupported": {}, "canvas": "rgb(250,240,220)" }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap"><p>Text on the canvas colour</p></main>
+  </body>
+</html>

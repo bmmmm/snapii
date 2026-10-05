@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>vector patches</title>
+    <!--
+      One element per reason vector output takes as pixels: a transform, a
+      filter, a box shadow, a gradient, an image, a form control, a dashed
+      border, a text shadow. Each is one patch and its text runs are
+      invisible (the pixels show them); the plain paragraph between them stays
+      vector. A black overlay clipped away entirely by its own clip-path
+      paints nothing and must not hide "Wiped text", nor may a visually
+      hidden label show; one clipped to half its width is a patch ("effect").
+      The bar above the capture casts its shadow into it: a patch strip, though
+      the bar itself lies outside.
+      A file input at opacity 0 (a styled upload button's trick) is not painted
+      and is no patch over the text under it.
+      The half-transparent badge lies over a link: its link area (it
+      has alt text) must lie under the text layer, or it would take the
+      clicks meant for "Linked words".
+    -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; background: rgb(255, 255, 255); }
+      #cap { width: 360px; }
+      #cap > * { display: block; margin: 0 0 8px; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": [
+          "Translated box",
+          "Blurred box",
+          "Shadowed box",
+          "Gradient box",
+          "Plain text",
+          "Dashed border",
+          "Shadowed text",
+          "Wiped text",
+          "Under an invisible input",
+          "Linked words"
+        ],
+        "absent": ["a visually hidden label"],
+        "links": [{ "text": "Linked words", "href": "/target" }],
+        "areas": [{ "alt": "badge", "href": null }],
+        "reason": "tolerance: patches are the page's own pixels and this page renders pixel-identical (2026-10-04); a shadow or blur cut off at its box is about 1 % of the region.",
+        "vector": {
+          "tolerance": 0.005,
+          "maxPatchArea": 0.95,
+          "unsupported": {
+            "transform": 1,
+            "effect": 2,
+            "box-shadow": 2,
+            "gradient": 1,
+            "image": 2,
+            "form": 1,
+            "border": 1,
+            "text-effect": 1
+          },
+          "hidden": [
+            "Translated box",
+            "Blurred box",
+            "Shadowed box",
+            "Gradient box",
+            "Dashed border",
+            "Shadowed text",
+            "Linked words"
+          ],
+          "visible": ["Plain text", "Wiped text", "Under an invisible input"]
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div style="height: 8px; margin-bottom: 4px; background: rgb(240, 240, 240); box-shadow: 0 14px 12px rgba(0, 0, 0, 0.6)"></div>
+    <main id="cap">
+      <div style="transform: translateX(8px); background: rgb(255, 204, 204)">Translated box</div>
+      <div style="filter: blur(1px); background: rgb(204, 255, 204)">Blurred box</div>
+      <div style="box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5); background: rgb(204, 204, 255)">Shadowed box</div>
+      <div style="background: linear-gradient(90deg, rgb(255, 0, 0), rgb(0, 0, 255)); color: rgb(255, 255, 255)">Gradient box</div>
+      <img alt="" width="50" height="20" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='20'%3E%3Crect width='50' height='20' fill='%23c00'/%3E%3C/svg%3E" />
+      <p>Plain text</p>
+      <input value="a field" />
+      <p style="border: 2px dashed rgb(51, 51, 51)">Dashed border</p>
+      <p style="text-shadow: 1px 1px 0 rgb(153, 153, 153)">Shadowed text</p>
+      <div style="position: relative">
+        <p>Wiped text</p>
+        <div style="position: absolute; inset: 0; background: rgb(0, 0, 0); clip-path: inset(0 100% 0 0)"></div>
+        <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); background: rgb(255, 0, 0)">a visually hidden label</span>
+      </div>
+      <div style="position: relative; height: 24px">
+        <div style="position: absolute; inset: 0; background: rgb(0, 120, 0); clip-path: inset(0 50% 0 0)"></div>
+      </div>
+      <p style="position: relative">Under an invisible input<input type="file" style="position: absolute; left: 0; top: 0; width: 200px; opacity: 0" /></p>
+      <p style="position: relative"><a href="/target">Linked words</a><img alt="badge" width="120" height="24" style="position: absolute; left: 0; top: 0; opacity: 0.5" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='24'%3E%3Crect width='120' height='24' fill='%2300c'/%3E%3C/svg%3E" /></p>
+    </main>
+  </body>
+</html>

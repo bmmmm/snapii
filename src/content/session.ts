@@ -21,6 +21,7 @@ import { cloneVisibleRange } from "./extract/clone.ts";
 import { collectTextRunsDetailed, type RunSource } from "./extract/collect.ts";
 import { areasRelativeTo, collectImageAreas } from "./extract/image-areas.ts";
 import { collectLinkAreas } from "./extract/images.ts";
+import { buildScene } from "./extract/scene.ts";
 import { anchorSources, textFragmentURL } from "./fragment.ts";
 import { type OverlayHandle, type Selection, startOverlay, type ToolbarAction } from "./overlay/overlay.ts";
 import { viewportSize, visibleViewport } from "./overlay/pick.ts";
@@ -329,6 +330,10 @@ export function startSession(deps: SessionDeps): SessionHandle {
         links: linksRelativeTo(links, region),
         page: pageMeta(selection, deps, stats, fragmentFor(selection, sources)),
       };
+      // Vector output: how the same runs are painted, and the boxes around them.
+      if (deps.settings.output === "vector") {
+        model.scene = buildScene(document, region, { runs, sources, skip: overlay.host });
+      }
       // Only with OCR on: the background recognises text in these areas.
       if (deps.settings.ocr) {
         model.imageAreas = areasRelativeTo(

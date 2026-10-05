@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>vector clip</title>
+    <!--
+      Clips vector output has to reproduce: a child larger than its
+      overflow:hidden parent (cut to the parent's padding box), a child that
+      fills a container with rounded corners and overflow:hidden (cut round),
+      and a line that is more than half visible in a short overflow:hidden
+      box: the collector keeps it, its glyphs would hang out below the box.
+      The white child of .tallclip is painted after the page's text (its
+      parent is positioned) but cut to 20 px: it must not hide the paragraph
+      below, which only its unclipped box would reach.
+    -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; background: rgb(255, 255, 255); }
+      #cap { width: 360px; }
+      .box { overflow: hidden; width: 200px; height: 50px; background: rgb(238, 238, 238); }
+      .big { width: 300px; height: 80px; background: rgb(0, 100, 200); }
+      .round { overflow: hidden; width: 200px; height: 60px; margin-top: 10px; border-radius: 20px; }
+      .round div { height: 60px; background: rgb(200, 50, 0); }
+      .cut { overflow: hidden; width: 300px; height: 50px; margin-top: 10px; font-size: 24px; line-height: 30px; }
+      .tallclip { position: relative; overflow: hidden; width: 300px; height: 20px; margin-top: 10px; }
+      .tallclip div { height: 200px; background: rgb(255, 255, 255); }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["First line here", "Second line cut", "Text below a clipped box"],
+        "vector": {
+          "tolerance": 0.002,
+          "maxPatchArea": 0,
+          "unsupported": {},
+          "clipped": ["Second line cut"],
+          "visible": ["Text below a clipped box"]
+        },
+        "reason": "tolerance: the rounded corners are about 0.5 % of the region and this page renders pixel-identical (2026-10-04), so a square clip has to show."
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <div class="box"><div class="big"></div></div>
+      <div class="round"><div></div></div>
+      <div class="cut">First line here<br />Second line cut</div>
+      <div class="tallclip"><div></div></div>
+      <p>Text below a clipped box</p>
+    </main>
+  </body>
+</html>

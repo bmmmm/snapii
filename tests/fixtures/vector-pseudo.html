@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>vector pseudo</title>
+    <!--
+      ::before/::after have no DOM node and no box of their own to read: an
+      element whose pseudo-element paints (text content, or a box with a
+      background) becomes a patch. A clearfix paints nothing and is left
+      alone: content "" without a box, Bootstrap 3's " ", or a hidden ".".
+    -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; background: rgb(255, 255, 255); }
+      #cap { width: 360px; }
+      p, div { margin: 0 0 8px; }
+      .sign::before { content: "§ "; }
+      .cf::after { content: ""; display: table; clear: both; }
+      .bs::before, .bs::after { content: " "; display: table; }
+      .pie::after { content: "."; display: block; height: 0; clear: both; visibility: hidden; }
+      .bar::after { content: ""; display: block; height: 4px; background: rgb(0, 0, 0); }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": [
+          "Section sign before",
+          "Clearfix text",
+          "Bootstrap clearfix",
+          "Hidden dot clearfix",
+          "Underlined by a pseudo box"
+        ],
+        "vector": {
+          "maxPatchArea": 0.4,
+          "unsupported": { "pseudo": 2 },
+          "hidden": ["Section sign before", "Underlined by a pseudo box"],
+          "visible": ["Clearfix text", "Bootstrap clearfix", "Hidden dot clearfix"]
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p class="sign">Section sign before</p>
+      <div class="cf">Clearfix text</div>
+      <div class="bs">Bootstrap clearfix</div>
+      <div class="pie">Hidden dot clearfix</div>
+      <div class="bar">Underlined by a pseudo box</div>
+    </main>
+  </body>
+</html>

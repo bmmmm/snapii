@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>vector canvas dark</title>
+    <!--
+      No background anywhere, but a dark colour scheme: the canvas is the
+      system colour Canvas in that scheme, dark, which a probe in the page's
+      own scheme reads (the overlay's all:initial host would read it light).
+    -->
+    <style>
+      :root { color-scheme: dark; }
+      body { margin: 20px; font: 16px/1.5 serif; }
+      #cap { width: 300px; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Light text on a dark canvas"],
+        "vector": { "maxPatchArea": 0, "unsupported": {}, "darkCanvas": true }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap"><p>Light text on a dark canvas</p></main>
+  </body>
+</html>

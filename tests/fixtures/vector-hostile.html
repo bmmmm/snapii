@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>vector &lt;hostile&gt; "values"</title>
+    <!--
+      Page values that must reach a vector SVG only as escaped text or as
+      numbers: a font name that closes the attribute and opens a script, an
+      oklch() colour, a javascript: background (a patch, never a URL in the
+      file), a javascript: link (dropped by links.ts), an inline SVG with an
+      event handler (a patch, none of its markup in the file).
+    -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; background: rgb(255, 255, 255); }
+      #cap { width: 360px; }
+      p { margin: 0 0 6px; }
+      .font { font-family: '"><script>alert(1)</script>', serif; }
+      .ok { color: oklch(0.5 0.2 30); }
+      .js { height: 24px; background-image: url("javascript:alert(1)"); }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Hostile font name", "An oklch colour", "Javascript background", "A javascript link", "After the SVG"],
+        "vector": {
+          "maxPatchArea": 0.3,
+          "unsupported": { "background-image": 1, "svg": 1 },
+          "visible": ["Hostile font name", "An oklch colour", "A javascript link"],
+          "fills": { "An oklch colour": "rgb(186,13,1)" }
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p class="font">Hostile font name</p>
+      <p class="ok">An oklch colour</p>
+      <div class="js">Javascript background</div>
+      <p><a href="javascript:alert(1)">A javascript link</a></p>
+      <svg width="40" height="20" onload="window.svgLoaded = true"><rect width="40" height="20" fill="rgb(200, 0, 0)" /></svg>
+      <p>After the SVG</p>
+    </main>
+  </body>
+</html>

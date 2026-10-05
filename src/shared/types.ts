@@ -104,6 +104,8 @@ export type SceneOp =
       fill?: Paint;
       /** A CSS border: painted inside the rect's edge, like the border box. */
       stroke?: { width: number; paint: Paint };
+      /** A one-colour border of unequal widths (top, right, bottom, left): the ring between the box and its padding box. */
+      border?: { widths: [number, number, number, number]; paint: Paint };
     }
   | {
       op: "image";
@@ -148,6 +150,8 @@ export interface Patch extends DocRect {
 export interface TextPaint {
   fill: Paint;
   clip?: DocRect;
+  /** CSS letter-spacing in px: it follows every glyph, the last one too, which textLength alone cannot place. */
+  letterSpacing?: number;
 }
 
 /**

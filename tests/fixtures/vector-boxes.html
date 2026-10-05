@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>vector boxes</title>
+    <!--
+      Boxes that vector output draws as shapes: backgrounds, a uniform border
+      with rounded corners, a pill (radius larger than the box), a border on
+      one side only, a padding-box background, corners rounded unlike each
+      other, a one-colour border of unequal widths with rounded corners (a
+      ring), an outline. "slotted text" is a text node slotted straight into a shadow
+      tree: its colour comes from the slot's side (blue), not from the light
+      DOM host (black), which is what parentElement would give.
+    -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; background: rgb(244, 241, 234); }
+      #cap { width: 520px; padding: 12px; background: rgb(255, 255, 255); border: 2px solid rgb(51, 51, 85); border-radius: 10px; }
+      p { margin: 0 0 8px; }
+      .pill { display: inline-block; padding: 0 12px; border-radius: 999px; background: rgb(216, 232, 255); color: rgb(0, 51, 102); }
+      .card { margin: 8px 0; padding: 6px; background: rgba(0, 120, 0, 0.15); border-bottom: 3px solid rgb(0, 128, 0); }
+      .padded { margin: 8px 0; padding: 6px; border: 6px solid rgba(0, 0, 0, 0.2); background-color: rgb(255, 238, 153); background-clip: padding-box; }
+      .tiles { display: flex; gap: 6px; margin: 8px 0; }
+      .tiles div { width: 60px; height: 24px; background: rgb(204, 51, 51); border-radius: 4px 12px 4px 12px; }
+      .ring { width: 160px; height: 60px; margin: 8px 0; border: solid rgb(80, 80, 160); border-width: 2px 12px 2px 12px; border-radius: 30px; }
+      .outlined { width: 120px; height: 16px; margin: 12px 4px; background: rgb(230, 230, 250); outline: 2px solid rgb(200, 0, 200); outline-offset: 2px; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": [
+          "Plain text on white.",
+          "a pill badge next to text",
+          "A card with a bottom border",
+          "A padding-box background",
+          "slotted text"
+        ],
+        "reason": "tolerance: the ring's corners and the outline are each about 0.3 % of the region and this page renders within 0.07 % (2026-10-04), so either missing has to show.",
+        "vector": {
+          "tolerance": 0.002,
+          "maxPatchArea": 0,
+          "unsupported": {},
+          "fills": { "slotted text": "rgb(0,0,200)", "a pill badge": "rgb(0,51,102)" }
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>Plain text on white.</p>
+      <p><span class="pill">a pill badge</span> next to text</p>
+      <div class="card">A card with a bottom border</div>
+      <div class="padded">A padding-box background</div>
+      <div class="tiles"><div></div><div></div><div></div></div>
+      <div class="ring"></div>
+      <div class="outlined"></div>
+      <snap-slot>
+        <template shadowrootmode="open"><div style="color: rgb(0, 0, 200)"><slot></slot></div></template>slotted text</snap-slot>
+    </main>
+  </body>
+</html>

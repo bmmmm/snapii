@@ -95,6 +95,8 @@ const isReason = (x: unknown): x is UnsupportedReason => isStr(x) && Object.hasO
 // not ours, and walking it would cost the background more than it is worth.
 const MAX_SCENE_DEPTH = 32;
 const MAX_SCENE_OPS = 200_000;
+// The content script merges patches beyond 2 000 (content/extract/scene.ts).
+const MAX_SCENE_PATCHES = 10_000;
 // The only images a scene may carry; everything else (http:, javascript:,
 // image/svg+xml with its scripts) never reaches an href.
 const IMAGE_DATA_URL = /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/]*={0,2}$/;
@@ -115,13 +117,19 @@ const isClip = (x: unknown): boolean =>
 function isOp(x: unknown, depth: number, budget: { left: number }): boolean {
   if (!isRec(x) || --budget.left < 0) return false;
   if (x.op === "rect") {
-    const stroke = x.stroke;
+    const { stroke, border } = x;
     return (
       isRect(x) &&
       (x.radii === undefined || isRadii(x.radii)) &&
       (x.fill === undefined || isPaint(x.fill)) &&
       (stroke === undefined ||
-        (isRec(stroke) && isNum(stroke.width) && stroke.width >= 0 && isPaint(stroke.paint)))
+        (isRec(stroke) && isNum(stroke.width) && stroke.width >= 0 && isPaint(stroke.paint))) &&
+      (border === undefined ||
+        (isRec(border) &&
+          Array.isArray(border.widths) &&
+          border.widths.length === 4 &&
+          border.widths.every((w) => isNum(w) && w >= 0) &&
+          isPaint(border.paint)))
     );
   }
   if (x.op === "image") return isRect(x) && isStr(x.dataURL) && IMAGE_DATA_URL.test(x.dataURL);
@@ -140,7 +148,11 @@ function isOp(x: unknown, depth: number, budget: { left: number }): boolean {
 const isPatch = (x: unknown): boolean => isRect(x) && isReason((x as Rec).reason);
 
 const isTextPaint = (x: unknown): boolean =>
-  x === null || (isRec(x) && isPaint(x.fill) && (x.clip === undefined || isRect(x.clip)));
+  x === null ||
+  (isRec(x) &&
+    isPaint(x.fill) &&
+    (x.clip === undefined || isRect(x.clip)) &&
+    (x.letterSpacing === undefined || isNum(x.letterSpacing)));
 
 /** `runs`: the model's run count; the scene says how each run is painted, one entry per run. */
 const isScene = (x: unknown, runs: number): boolean => {
@@ -151,6 +163,7 @@ const isScene = (x: unknown, runs: number): boolean => {
     Array.isArray(x.ops) &&
     x.ops.every((op) => isOp(op, 0, budget)) &&
     Array.isArray(x.patches) &&
+    x.patches.length <= MAX_SCENE_PATCHES &&
     x.patches.every(isPatch) &&
     Array.isArray(x.text) &&
     x.text.length === runs &&

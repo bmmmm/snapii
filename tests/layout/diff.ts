@@ -29,19 +29,22 @@ export async function diffRatio(page: Page, a: Buffer, b: Buffer): Promise<Diff>
         return ctx.getImageData(0, 0, c.width, c.height);
       };
       const [pa, pb] = await Promise.all([decode(a), decode(b)]);
-      if (pa.width !== pb.width || pa.height !== pb.height)
+      // Screenshots of a fractional rect may round to one pixel more or less.
+      if (Math.abs(pa.width - pb.width) > 1 || Math.abs(pa.height - pb.height) > 1)
         throw new Error(`size differs: ${pa.width}x${pa.height} vs ${pb.width}x${pb.height}`);
-      const { width: w, height: h } = pa;
+      const w = Math.min(pa.width, pb.width);
+      const h = Math.min(pa.height, pb.height);
+      const at = (p: ImageData, x: number, y: number) => (y * p.width + x) * 4;
       if (w * h === 0) throw new Error("empty image");
       const near = (p: ImageData, q: ImageData, x: number, y: number): boolean => {
-        const i = (y * w + x) * 4;
+        const i = at(p, x, y);
         for (let dy = -1; dy <= 1; dy++) {
           const yy = y + dy;
           if (yy < 0 || yy >= h) continue;
           for (let dx = -1; dx <= 1; dx++) {
             const xx = x + dx;
             if (xx < 0 || xx >= w) continue;
-            const j = (yy * w + xx) * 4;
+            const j = at(q, xx, yy);
             let max = 0;
             for (let k = 0; k < 4; k++)
               max = Math.max(max, Math.abs((p.data[i + k] ?? 0) - (q.data[j + k] ?? 0)));

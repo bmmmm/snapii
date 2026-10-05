@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>vector body overflow</title>
+    <!--
+      body is one viewport tall (height: 100%) and its content runs on below
+      it, followed by body's own ::after bar. The capture lies wholly below
+      body's box: body still paints there through its pseudo-element, so the
+      region is a patch, not a body box that misses it while everything
+      inside body is left out.
+    -->
+    <style>
+      html, body { height: 100%; margin: 0; }
+      body { font: 16px/1.5 serif; background: rgb(255, 255, 255); }
+      body::after { content: ""; display: block; height: 20px; background: rgb(200, 0, 0); }
+      #tall { position: relative; height: 1000px; }
+      #late { position: absolute; top: 850px; left: 20px; width: 260px; }
+      #late div { height: 40px; background: rgb(0, 120, 200); }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": { "x": 0, "y": 820, "width": 320, "height": 200 },
+        "lines": ["Text near the end"],
+        "vector": {
+          "tolerance": 0.005,
+          "maxPatchArea": 1,
+          "unsupported": { "pseudo": 1 },
+          "hidden": ["Text near the end"]
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="tall">
+      <div id="late"><p>Text near the end</p><div></div></div>
+    </div>
+  </body>
+</html>

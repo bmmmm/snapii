@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>vector inline</title>
+    <!--
+      An inline box paints one background per line fragment: the <mark>
+      wraps onto a second line, and a box over both lines' extent would
+      colour what lies between. The <code> has rounded ends on one line.
+    -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; background: rgb(255, 255, 255); }
+      #cap { width: 260px; }
+      p { margin: 0 0 8px; }
+      mark { background: rgb(255, 230, 0); }
+      code { padding: 0 2px; border-radius: 3px; background: rgb(225, 225, 225); font: inherit; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Some text with a highlighted phrase that", "wraps and more.", "Code: a.b.c() here"],
+        "vector": { "maxPatchArea": 0, "unsupported": {} }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>Some text with <mark>a highlighted phrase that wraps</mark> and more.</p>
+      <p>Code: <code>a.b.c()</code> here</p>
+    </main>
+  </body>
+</html>

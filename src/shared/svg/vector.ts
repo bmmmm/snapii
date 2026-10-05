@@ -10,6 +10,7 @@
 // the boxes there would paint is already in its pixels.
 
 import { unionArea } from "../geometry.ts";
+import { SPIKE_VECTOR } from "../spike.ts";
 import type {
   DocRect,
   Paint,
@@ -32,11 +33,8 @@ export interface VectorRenderInput extends RenderInput {
 
 // A viewer without the page's fonts keeps at least the kind of face.
 const FALLBACK_FAMILY = "sans-serif";
-// textLength pins each run's width; "spacing" reaches it by spacing the glyphs
-// as CSS letter-spacing does and keeps their shape. Measured 2026-10-04 (text
-// only, diffRatio vs the page, Playwright Firefox/Chromium): within 0.01 pt of
-// spacingAndGlyphs or better, letter-spacing.html 8.9 % vs 11.1 % and 7.0 % vs 9.4 %.
-const LENGTH_ADJUST = "spacing";
+// textLength pins each run's width; visible glyphs keep their shape (V1).
+const LENGTH_ADJUST = SPIKE_VECTOR.visibleTextLengthAdjust;
 
 const channel = (v: number): string =>
   Number.isFinite(v) ? String(Math.round(Math.min(255, Math.max(0, v)))) : "0";
@@ -64,12 +62,14 @@ function fitRadii(w: number, h: number, radii: Radii): Radii {
   // A corner with either radius zero is square (css-backgrounds-3 § 5.2).
   const square = radii.map(([x, y]) => (x > 0 && y > 0 ? [x, y] : [0, 0])) as Radii;
   const [tl, tr, br, bl] = square;
+  // A side whose radii sum to zero sets no limit; a side of length zero sets them to zero.
+  const side = (length: number, sum: number) => (sum > 0 ? Math.max(0, length) / sum : 1);
   const f = Math.min(
     1,
-    w / (tl[0] + tr[0]) || 1,
-    h / (tr[1] + br[1]) || 1,
-    w / (br[0] + bl[0]) || 1,
-    h / (bl[1] + tl[1]) || 1,
+    side(w, tl[0] + tr[0]),
+    side(h, tr[1] + br[1]),
+    side(w, br[0] + bl[0]),
+    side(h, bl[1] + tl[1]),
   );
   return f >= 1 ? square : (square.map(([x, y]) => [x * f, y * f]) as Radii);
 }
@@ -88,11 +88,17 @@ function shape(box: DocRect, radii: Radii | undefined, attrs: string): string {
     const [rx, ry] = r[0];
     return `<rect ${geo} rx="${fmt(rx)}"${ry === rx ? "" : ` ry="${fmt(ry)}"`}${tail}`;
   }
+  return `<path d="${pathData(box, r)}"${tail}`;
+}
+
+/** Path data of a box with these (already fitted) radii, clockwise from the top-left corner. */
+function pathData(box: DocRect, r: Radii): string {
+  const { x, y, width: w, height: h } = box;
   const [tl, tr, br, bl] = r;
   // A square corner needs no segment: the side lines already meet there.
   const arc = ([rx, ry]: [number, number], ex: number, ey: number) =>
     rx > 0 ? `A${fmt(rx)} ${fmt(ry)} 0 0 1 ${fmt(ex)} ${fmt(ey)}` : "";
-  const d = [
+  return [
     `M${fmt(x + tl[0])} ${fmt(y)}`,
     `H${fmt(x + w - tr[0])}`,
     arc(tr, x + w, y + tr[1]),
@@ -104,7 +110,32 @@ function shape(box: DocRect, radii: Radii | undefined, attrs: string): string {
     arc(tl, x + tl[0], y),
     "Z",
   ].join("");
-  return `<path d="${d}"${tail}`;
+}
+
+/**
+ * A border of unequal widths in one colour: the box minus its padding box,
+ * whose corners curve by the outer radius less the adjoining widths
+ * (css-backgrounds-3 § 5.3).
+ */
+function ringLine(
+  op: Extract<SceneOp, { op: "rect" }>,
+  widths: [number, number, number, number],
+  paint: Paint,
+): string {
+  const [t, rt, b, l] = widths;
+  const outer = op.radii ? fitRadii(op.width, op.height, op.radii) : NO_RADII;
+  const inner = outer.map(([x, y], i) => [
+    Math.max(0, x - (i === 0 || i === 3 ? l : rt)),
+    Math.max(0, y - (i < 2 ? t : b)),
+  ]) as Radii;
+  const box = {
+    x: op.x + l,
+    y: op.y + t,
+    width: Math.max(0, op.width - l - rt),
+    height: Math.max(0, op.height - t - b),
+  };
+  const d = `${pathData(op, outer)}${pathData(box, fitRadii(box.width, box.height, inner))}`;
+  return `<path d="${d}" fill-rule="evenodd" ${paintAttrs(paint, "fill")}/>`;
 }
 
 /** Hands out clip ids in order of first use; one <clipPath> per distinct shape. */
@@ -147,6 +178,8 @@ function rectLines(op: Extract<SceneOp, { op: "rect" }>): string[] {
       );
     }
   }
+  const border = op.border;
+  if (border?.widths.some((w) => w > 0)) out.push(ringLine(op, border.widths, border.paint));
   return out;
 }
 
@@ -183,11 +216,16 @@ export function vectorRenderer(input: VectorRenderInput): string {
     paints.set(run, scene.text[i] ?? null);
   });
   const paint = (run: TextRun): string => {
+    // Without its edge space a visible run's glyphs close up on the next
+    // run's (V2): the run preserves it itself, the layer's does not count.
+    const own = SPIKE_VECTOR.edgeSpaceNeedsOwnPreserve && /^ | $/.test(run.text);
+    const edge = own ? 'xml:space="preserve" ' : "";
     const p = paints.get(run);
-    if (!p) return TRANSPARENT;
-    return p.clip
-      ? `${paintAttrs(p.fill, "fill")} clip-path="url(#${clips.id(p.clip)})"`
-      : paintAttrs(p.fill, "fill");
+    if (!p) return `${edge}${TRANSPARENT}`;
+    const attrs = [paintAttrs(p.fill, "fill")];
+    if (p.letterSpacing) attrs.push(`letter-spacing="${fmt(p.letterSpacing)}"`);
+    if (p.clip) attrs.push(`clip-path="url(#${clips.id(p.clip)})"`);
+    return `${edge}${attrs.join(" ")}`;
   };
   const text = textLayerLines(input.runs, {
     paint,

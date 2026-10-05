@@ -248,6 +248,32 @@ test("vector: textLength pins each run on <text>, never on <tspan>, by spacing; 
   assert.equal(attr(runEl(root, "in a patch"), "font-family"), "serif");
 });
 
+test("vector: a run with a space at either end preserves it on its own <text>; letter-spacing is written", () => {
+  const runs = [
+    makeRun({ text: "Some text with ", line: 0 }),
+    makeRun({ text: " here", x: 120, line: 0 }),
+    makeRun({ text: "inner space", x: 0, line: 1 }),
+  ];
+  const scene: Scene = {
+    ...makeScene(),
+    text: [
+      { fill: { r: 0, g: 0, b: 0, a: 1 }, letterSpacing: 8 },
+      null,
+      { fill: { r: 0, g: 0, b: 0, a: 1 } },
+    ],
+  };
+  const root = parseXml(render({ runs, scene }));
+  const [lead, trail, inner] = ["Some text with ", " here", "inner space"].map((t) => runEl(root, t));
+  assert.ok(lead && trail && inner);
+  assert.equal(attr(lead, "xml:space"), "preserve");
+  assert.equal(attr(trail, "xml:space"), "preserve");
+  assert.equal(inner.attrs.has("xml:space"), false);
+  assert.equal(attr(lead, "letter-spacing"), "8");
+  assert.equal(inner.attrs.has("letter-spacing"), false);
+  // The invisible run keeps its space too, and stays transparent.
+  assert.equal(attr(trail, "fill-opacity"), "0");
+});
+
 test("vector: a run that overhangs its clip is clipped, the others are not", () => {
   const root = parseXml(render());
   const cut = runEl(root, "overhang");
@@ -367,6 +393,25 @@ test("vector: an overlap on any one side shrinks all radii by the same factor", 
   ]);
 });
 
+test("vector: a side of length zero leaves no room for radii", () => {
+  const shapes = shapesOf([
+    box({
+      width: 0,
+      height: 20,
+      radii: [
+        [5, 5],
+        [0, 0],
+        [0, 0],
+        [5, 5],
+      ],
+    }),
+  ]);
+  assert.equal(named(shapes, "path").length, 0);
+  const [only] = named(shapes, "rect");
+  assert.ok(only);
+  assert.equal(only.attrs.has("rx"), false);
+});
+
 test("vector: a corner with one radius zero is square; equal elliptical corners stay a <rect> with rx and ry", () => {
   const shapes = shapesOf([
     box({
@@ -448,6 +493,38 @@ test("vector: clips of the same rect but other radii get their own clipPath", ()
     ["c0 <rect", "c1 <rect"],
   );
   assert.ok(svg.includes('<clipPath id="c1"><rect x="1" y="1" width="50" height="50" rx="3"/>'));
+});
+
+test("vector: a one-colour border of unequal widths is the ring between the box and its padding box", () => {
+  const paint = { r: 80, g: 80, b: 160, a: 1 };
+  const shapes = shapesOf([
+    {
+      op: "rect",
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 40,
+      radii: [
+        [20, 20],
+        [20, 20],
+        [20, 20],
+        [20, 20],
+      ],
+      border: { widths: [2, 10, 2, 10], paint },
+    },
+    { op: "rect", x: 0, y: 50, width: 50, height: 20, border: { widths: [0, 0, 0, 0], paint } },
+  ]);
+  const paths = named(shapes, "path");
+  assert.equal(paths.length, 1, "a border of zero widths draws nothing");
+  const ring = paths[0] as XEl;
+  assert.equal(attr(ring, "fill-rule"), "evenodd");
+  assert.equal(attr(ring, "fill"), "rgb(80,80,160)");
+  // Outer box with radius 20, padding box 10..90 x 2..38 with radii 20-10=10 by 20-2=18.
+  assert.equal(
+    attr(ring, "d"),
+    "M20 0H80A20 20 0 0 1 100 20V20A20 20 0 0 1 80 40H20A20 20 0 0 1 0 20V20A20 20 0 0 1 20 0Z" +
+      "M20 2H80A10 18 0 0 1 90 20V20A10 18 0 0 1 80 38H20A10 18 0 0 1 10 20V20A10 18 0 0 1 20 2Z",
+  );
 });
 
 test("vector: groups carry their clip and opacity; an opaque group gets no opacity", () => {
