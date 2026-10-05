@@ -204,8 +204,13 @@ const countOps = (ops: readonly SceneOp[]): number =>
 /** The whole document: canvas, boxes, patches, link areas, text layer, metadata. */
 export function vectorRenderer(input: VectorRenderInput): string {
   const { page, region, scene } = input;
-  const w = fmt(region.width);
-  const h = fmt(region.height);
+  // Whole pixels: Chromium draws an SVG document of a fractional size
+  // resampled, every shape, glyph and patch pixel a little blurred (measured
+  // on Linux, 2026-10-05: 168.56 px wide 9.7 % of the pixels off, 169 px wide
+  // none). The content keeps its region-relative place; the canvas colour
+  // fills the strip of less than a pixel, as the page goes on there.
+  const w = fmt(Math.ceil(region.width - 0.005));
+  const h = fmt(Math.ceil(region.height - 0.005));
   const lang = page.lang ? ` xml:lang="${xmlAttr(page.lang)}"` : "";
   const desc = `Region of ${page.url} captured ${page.capturedAt} by snapii ${input.extensionVersion}. Shapes and text are vector; parts that could not be converted are pixels. Text is selectable; links are clickable.`;
   const clips = new Clips();

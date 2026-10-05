@@ -201,6 +201,24 @@ test("vector: layers bottom to top — canvas, shapes, patches, links, text", ()
   );
 });
 
+test("vector: a fractional region gets a whole-pixel document (Chromium blurs fractional ones), the canvas filling it", () => {
+  const base = makeInput();
+  const root = parseXml(render({ region: { ...base.region, width: 168.5625, height: 100.0000001 } }));
+  assert.deepEqual(
+    ["width", "height", "viewBox"].map((k) => attr(root, k)),
+    ["169", "100", "0 0 169 100"],
+  );
+  const canvas = byId(root, "canvas");
+  assert.deepEqual([attr(canvas, "width"), attr(canvas, "height")], ["169", "100"]);
+  // Up, never to the nearest: the region's last fraction of a pixel stays in the document.
+  assert.equal(attr(parseXml(render({ region: { ...base.region, width: 168.4 } })), "width"), "169");
+  // The record keeps the selection as it was.
+  const m = /"selection":\{[^}]*"width":([\d.]+)/.exec(
+    render({ region: { ...base.region, width: 168.5625 } }),
+  );
+  assert.equal(m?.[1], "168.5625");
+});
+
 test("vector: one text layer, every run exactly once, in line order", () => {
   const root = parseXml(render());
   assert.equal(named(root, "g").filter((g) => g.attrs.get("id") === "text").length, 1);

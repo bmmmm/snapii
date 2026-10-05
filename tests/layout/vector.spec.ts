@@ -240,7 +240,12 @@ for (const file of fixtures) {
     );
     const { capture } = col;
     const scene: Scene = col.scene;
-    const ref = await page.screenshot({ clip: capture, fullPage: true, scale: "css" });
+    // Whole pixels: Chromium scales a screenshot of a fractional width to whole
+    // pixels (Firefox cuts), and the patches come out of this picture, so a
+    // fractional clip would resample them once more in the comparison (a
+    // DejaVu Sans Mono region on Linux is 168.5625 px wide).
+    const shotSize = { width: Math.floor(capture.width), height: Math.floor(capture.height) };
+    const ref = await page.screenshot({ clip: { ...capture, ...shotSize }, fullPage: true, scale: "css" });
     const tiles = await cropTiles(page, ref, scene.patches);
     const runs = runsRelativeTo(col.runs, capture);
     const svg = await page.evaluate((input) => window.__snapii.renderVector(input), {
@@ -308,7 +313,7 @@ for (const file of fixtures) {
       };
     }, svg);
     const shot = await page.screenshot({
-      clip: { x: 0, y: 0, width: capture.width, height: capture.height },
+      clip: { x: 0, y: 0, ...shotSize },
       scale: "css",
     });
     const diff = await diffRatio(page, ref, shot);
