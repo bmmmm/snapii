@@ -667,6 +667,18 @@ test("vector: gradient stops are numbers only: offsets and alpha clamped to 0-1,
   );
 });
 
+test("vector: stop offsets keep the precision a long gradient line needs", () => {
+  // 50 px and 60 px on a line of 100 000 px; a hard stop at 1003 px of 2000.
+  const stops = [0.0005, 0.0006, 0.5015, 1].map((offset) => ({ offset, paint: { r: 0, g: 0, b: 0, a: 1 } }));
+  const root = parseXml(
+    render({ scene: { ...makeScene(), ops: [box({ gradient: { from: [0, 0], to: [0, 1], stops } })] } }),
+  );
+  assert.deepEqual(
+    named(root, "stop").map((s) => attr(s, "offset")),
+    ["0.0005", "0.0006", "0.5015", "1"],
+  );
+});
+
 test("vector: output is deterministic and ends in a single newline", () => {
   assert.equal(render(), render());
   assert.ok(render().endsWith("</svg>\n"));

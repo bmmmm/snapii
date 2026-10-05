@@ -140,6 +140,9 @@ function ringLine(
 }
 
 const unit = (v: number): number => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
+// A stop's offset is a share of the gradient line, which can be thousands of
+// px long: fmt's two decimals would move it by up to half a percent of that.
+const offset = (v: number): string => String(Number(unit(v).toFixed(6)));
 
 /** Hands out clip and gradient ids in order of first use; one definition per distinct one. */
 class Defs {
@@ -164,7 +167,7 @@ class Defs {
         const p = s.paint;
         const a = unit(p.a);
         const opacity = a >= 1 ? "" : ` stop-opacity="${fmt(a)}"`;
-        return `<stop offset="${fmt(unit(s.offset))}" stop-color="rgb(${channel(p.r)},${channel(p.g)},${channel(p.b)})"${opacity}/>`;
+        return `<stop offset="${offset(s.offset)}" stop-color="rgb(${channel(p.r)},${channel(p.g)},${channel(p.b)})"${opacity}/>`;
       });
       return [
         id,
