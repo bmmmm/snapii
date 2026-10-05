@@ -667,6 +667,67 @@ test("vector: gradient stops are numbers only: offsets and alpha clamped to 0-1,
   );
 });
 
+test("vector: a box shadow is its shape, blurred by half its CSS radius, clipped to outside the box; ids count per kind", () => {
+  const shadow = (over: Partial<SceneOp & { op: "shadow" }>): SceneOp => ({
+    op: "shadow",
+    x: 10,
+    y: 22,
+    width: 100,
+    height: 40,
+    blur: 6,
+    paint: { r: 0, g: 0, b: 0, a: 0.5 },
+    cut: { x: 10, y: 20, width: 100, height: 40 },
+    ...over,
+  });
+  const root = parseXml(
+    render({
+      scene: {
+        ...makeScene(),
+        ops: [
+          { op: "group", clip: { x: 1, y: 1, width: 5, height: 5 }, children: [] },
+          shadow({}),
+          // No blur: no filter.
+          shadow({ blur: 0, x: 200 }),
+        ],
+      },
+    }),
+  );
+  const [filter] = named(root, "filter");
+  assert.ok(filter);
+  // Three standard deviations (9) and a pixel beyond the shape.
+  assert.deepEqual(
+    ["id", "filterUnits", "x", "y", "width", "height", "color-interpolation-filters"].map((k) =>
+      attr(filter, k),
+    ),
+    ["f0", "userSpaceOnUse", "0", "12", "120", "60", "sRGB"],
+  );
+  assert.equal(attr(named(filter, "feGaussianBlur")[0] as XEl, "stdDeviation"), "3");
+  assert.equal(named(root, "filter").length, 1);
+  // The clip: the blur's reach, less the box (even-odd).
+  const clips = named(root, "clipPath");
+  assert.deepEqual(
+    // The group's clip, the two shadows' (the text layer's own follow).
+    clips.slice(0, 3).map((c) => attr(c, "id")),
+    ["c0", "c1", "c2"],
+  );
+  const cut = named(clips[1] as XEl, "path")[0] as XEl;
+  assert.equal(attr(cut, "clip-rule"), "evenodd");
+  assert.equal(attr(cut, "d"), "M0 12H120V72H0V12ZM10 20H110V60H10V20Z");
+  const shapes = named(byId(root, "shapes"), "rect");
+  assert.deepEqual(
+    shapes.map((r) => [
+      attr(r, "fill"),
+      attr(r, "fill-opacity"),
+      r.attrs.get("filter") ?? null,
+      attr(r, "clip-path"),
+    ]),
+    [
+      ["rgb(0,0,0)", "0.5", "url(#f0)", "url(#c1)"],
+      ["rgb(0,0,0)", "0.5", null, "url(#c2)"],
+    ],
+  );
+});
+
 test("vector: stop offsets keep the precision a long gradient line needs", () => {
   // 50 px and 60 px on a line of 100 000 px; a hard stop at 1003 px of 2000.
   const stops = [0.0005, 0.0006, 0.5015, 1].map((offset) => ({ offset, paint: { r: 0, g: 0, b: 0, a: 1 } }));

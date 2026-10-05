@@ -7,6 +7,7 @@ import {
   intersect,
   lineIndexOf,
   linksRelativeTo,
+  minus,
   runsRelativeTo,
   union,
 } from "../../src/shared/geometry.ts";
@@ -22,6 +23,21 @@ test("intersect: overlap, touching edges and disjoint rects", () => {
 
 test("union: smallest rect around both", () => {
   assert.deepEqual(union(R(0, 0, 10, 10), R(20, 5, 5, 20)), R(0, 0, 25, 25));
+});
+
+test("minus: the bands of a rect around a hole, none where the hole reaches the edge", () => {
+  // A hole inside: above, below, left, right.
+  assert.deepEqual(minus(R(0, 0, 10, 10), R(2, 3, 4, 5)), [
+    R(0, 0, 10, 3),
+    R(0, 8, 10, 2),
+    R(0, 3, 2, 5),
+    R(6, 3, 4, 5),
+  ]);
+  // A hole over the top-left corner and beyond: only below and right remain.
+  assert.deepEqual(minus(R(0, 0, 10, 10), R(-5, -5, 10, 10)), [R(0, 5, 10, 5), R(5, 0, 5, 5)]);
+  // No overlap: the whole rect; a hole over all of it: nothing.
+  assert.deepEqual(minus(R(0, 0, 10, 10), R(20, 0, 5, 5)), [R(0, 0, 10, 10)]);
+  assert.deepEqual(minus(R(0, 0, 10, 10), R(-1, -1, 12, 12)), []);
 });
 
 test("groupIntoLines: bidi fragments of one line merge, lines stay apart", () => {

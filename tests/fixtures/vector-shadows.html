@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>vector shadows</title>
+    <!--
+      Outer box shadows drawn as blurred shapes outside their box: a card, two
+      shadows with negative spread (Tailwind's shadow-md), a rounded box with
+      spread, a box without background (the inside stays empty, CSS paints
+      the shadow only outside the box), a spread ring without blur (a focus
+      ring), a pill, a shadow cut by an ancestor's overflow, two rings of
+      their own colours (the first on top), negative spreads that leave no
+      shadow across or down, and the shadow of a bar above the capture that
+      reaches into it.
+      Patches ("box-shadow"): an inset shadow, and a shadow on an inline box
+      across two lines.
+    -->
+    <style>
+      body { margin: 0; padding: 20px 30px; font: 16px/1.5 serif; background: rgb(255, 255, 255); }
+      #cap { width: 460px; padding-top: 4px; }
+      p { margin: 0 0 8px; }
+      .row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; margin: 16px 0 24px; }
+      .row > div { width: 100px; height: 44px; background: rgb(255, 255, 255); }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Shadows drawn as shapes.", "Shadowed card", "Inline shadow", "on two lines", "After the shadows."],
+        "vector": {
+          "tolerance": 0.005,
+          "unsupported": { "box-shadow": 2 },
+          "maxPatchArea": 0.1,
+          "hidden": ["Inline shadow", "on two lines"],
+          "visible": ["Shadows drawn as shapes.", "Shadowed card", "After the shadows."]
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div style="height: 8px; margin-bottom: 4px; background: rgb(240, 240, 240); box-shadow: 0 14px 12px rgba(0, 0, 0, 0.6)"></div>
+    <main id="cap">
+      <p>Shadows drawn as shapes.</p>
+      <div class="row">
+        <div style="box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5)">Shadowed card</div>
+        <div style="box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3)"></div>
+        <div style="border-radius: 12px; box-shadow: 0 0 8px 4px rgba(0, 0, 255, 0.4)"></div>
+        <div style="background: transparent; border: 1px solid rgb(0, 0, 0); box-shadow: 4px 4px 0 rgb(255, 0, 0)"></div>
+        <div style="box-shadow: 0 0 0 3px rgb(0, 128, 0)"></div>
+        <div style="border-radius: 9999px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4)"></div>
+        <div style="overflow: hidden; padding: 4px; background: rgb(250, 250, 210)"><div style="height: 36px; background: rgb(255, 255, 255); box-shadow: 0 0 12px 6px rgba(255, 0, 0, 0.6)"></div></div>
+        <div style="box-shadow: 0 0 0 4px rgb(255, 0, 0), 0 0 0 8px rgb(0, 0, 255)"></div>
+        <div style="box-shadow: 0 0 0 -30px rgb(255, 0, 0)"></div>
+        <div style="width: 20px; height: 80px; box-shadow: 0 0 0 -15px rgb(255, 0, 0)"></div>
+      </div>
+      <div class="row">
+        <div style="box-shadow: inset 0 -2px 0 rgb(0, 0, 0)"></div>
+      </div>
+      <p><span style="box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5)">Inline shadow<br />on two lines</span></p>
+      <p>After the shadows.</p>
+    </main>
+  </body>
+</html>

@@ -15,7 +15,7 @@
 //      the text); vector.hidden runs are transparent, vector.visible ones
 //      painted
 //   V4 (G5) well-formed; no <script>, <foreignObject> or on* attribute;
-//      url() only for generated clip and gradient ids; images only as base64 png, jpeg,
+//      url() only for generated clip, gradient and filter ids; images only as base64 png, jpeg,
 //      webp or gif data URLs
 //   V5 every picture the scene drew from an <img> or <canvas> has at most the
 //      pixels of its box at the page's density (+1 rounding): the part that
@@ -112,12 +112,12 @@ test("diffRatio: same pixels 0, a moved block more, a different size refused", a
 
 test("over the patch budget, patches merge before the text's visibility is decided", async ({ page }) => {
   await page.goto("/fixtures/smoke.html");
-  // 2 100 patched boxes (a box shadow each) between words: more than MAX_PATCHES.
+  // 2 100 patched boxes (a filter each) between words: more than MAX_PATCHES.
   await page.evaluate(() => {
     const words = Array.from(
       { length: 2100 },
       (_, i) =>
-        `w${i} <i style="display:inline-block;width:6px;height:6px;box-shadow:0 0 0 1px rgb(255,0,0)"></i>`,
+        `w${i} <i style="display:inline-block;width:6px;height:6px;background:rgb(255,0,0);filter:opacity(1)"></i>`,
     );
     document.body.innerHTML = `<main id="cap" style="width:600px;font:12px/16px serif">${words.join(" ")}</main>`;
   });
@@ -594,6 +594,89 @@ test("outlines: a negative offset shrinks the box down to its centre at most, as
   );
 });
 
+test("shadows: the box moved and grown by the spread, corners grown as CSS grows them, cut out at the box", async ({
+  page,
+}) => {
+  // 100 x 40 at (20, 20) of the region, radius 10 and 2; spread 4 at (5, 6).
+  const scene = await sceneOf(
+    page,
+    '<main id="cap" style="display:flow-root;width:300px;height:200px"><div style="margin:20px;width:100px;height:40px;border-radius:10px 2px 10px 10px;box-shadow:5px 6px 3px 4px rgb(0, 0, 0)"></div>' +
+      '<div style="margin:20px;width:100px;height:40px;border-radius:40px 0 0 20px;box-shadow:0 0 0 4px rgb(0, 0, 0)"></div></main>',
+  );
+  const shadows = (ops: Scene["ops"]): Scene["ops"] =>
+    ops.flatMap((op) => (op.op === "group" ? shadows(op.children) : op.op === "shadow" ? [op] : []));
+  const [s, t] = shadows(scene.ops);
+  // Radii that overlap (40 + 20 on a side of 40) shrink to 2/3 first, as CSS
+  // uses them, and only then grow by the spread.
+  expect(t?.op === "shadow" && t.radii?.map((c) => c.map((n) => Math.round(n * 1000) / 1000))).toEqual([
+    [30.667, 30.667],
+    [0, 0],
+    [0, 0],
+    [17.333, 17.333],
+  ]);
+  const r = (n: number) => Math.round(n * 1000) / 1000;
+  expect(s?.op === "shadow" && [s.x, s.y, s.width, s.height, s.blur, s.radii?.map((c) => c.map(r))]).toEqual([
+    21,
+    22,
+    108,
+    48,
+    3,
+    // 10 + 4; 2 < 4: 2 + 4 * (1 + (1/2 - 1)^3) = 5.5.
+    [
+      [14, 14],
+      [5.5, 5.5],
+      [14, 14],
+      [14, 14],
+    ],
+  ]);
+  expect(s?.op === "shadow" && s.cut).toEqual({
+    x: 20,
+    y: 20,
+    width: 100,
+    height: 40,
+    radii: [
+      [10, 10],
+      [2, 2],
+      [10, 10],
+      [10, 10],
+    ],
+  });
+});
+
+test("shadows: an opaque one painted later hides the text under its solid part, a see-through or blurred edge does not", async ({
+  page,
+}) => {
+  // A line of text (centre 12 px down), and a bar above it whose shadow falls on it:
+  // bar at y -20..-10, shadow 32 px down, spread 6: y 6..28.
+  const scene = async (shadow: string, box = "top:-20px;height:10px;background:rgb(255,255,255)") =>
+    sceneOf(
+      page,
+      `<main id="cap" style="position:relative;width:300px;font:16px/24px serif"><p style="margin:0">Words under a shadow</p><div style="position:absolute;left:0;width:300px;${box};box-shadow:${shadow}"></div></main>`,
+    );
+  const painted = (s: Scene) => s.text.map((t) => t !== null);
+  expect(painted(await scene("0 32px 0 6px rgb(0, 0, 255)"))).toEqual([false]);
+  expect(painted(await scene("0 32px 0 6px rgba(0, 0, 255, 0.5)"))).toEqual([true]);
+  // Blurred by 8: solid only from 8 px inside the shape (y 14..20), the line's centre is above.
+  expect(painted(await scene("0 32px 8px 6px rgb(0, 0, 255)"))).toEqual([true]);
+  // A see-through box right over the line, an opaque ring round it: the
+  // shadow is not painted inside its box, so the line still shows.
+  expect(painted(await scene("0 0 0 6px rgb(0, 0, 255)", "top:0;height:24px"))).toEqual([true]);
+});
+
+test("shadows: a rounded opaque one hides no text outside its curve", async ({ page }) => {
+  // A round avatar (100 x 100) with a hard shadow 20 px right and down: the
+  // shadow is a circle round (70, 70) of radius 50. A letter painted before
+  // it, centred about (104, 112), lies outside that circle (54 px from its
+  // centre) but inside the shadow's square: the page shows it.
+  const scene = await sceneOf(
+    page,
+    '<main id="cap" style="position:relative;width:200px;height:160px">' +
+      '<p style="position:absolute;left:100px;top:100px;margin:0;font:16px/24px serif">T</p>' +
+      '<div style="position:absolute;left:0;top:0;width:100px;height:100px;border-radius:50%;background:rgb(255,255,255);box-shadow:20px 20px 0 0 rgb(0,0,0)"></div></main>',
+  );
+  expect(scene.text.map((t) => t !== null)).toEqual([true]);
+});
+
 test("gradients: the page's own body, its background not on the canvas (the root has one), is drawn", async ({
   page,
 }) => {
@@ -817,7 +900,7 @@ for (const file of fixtures) {
     expect.soft(/<script|<foreignObject/i.test(svg), "V4 no script, no foreignObject").toBe(false);
     expect.soft(got.eventAttrs, "V4 no event attributes").toEqual([]);
     for (const m of svg.matchAll(/url\(([^)]*)\)/g))
-      expect.soft(m[1], "V4 url() only for clip and gradient ids").toMatch(/^#[cg]\d+$/);
+      expect.soft(m[1], "V4 url() only for clip, gradient and filter ids").toMatch(/^#[cgf]\d+$/);
     for (const m of svg.matchAll(/href="([^"]*)"/g)) {
       if (m[1]?.startsWith("data:"))
         expect.soft(m[1], "V4 image data URLs").toMatch(/^data:image\/(png|jpeg|webp|gif);base64,/);

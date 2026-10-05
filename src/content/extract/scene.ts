@@ -19,7 +19,7 @@
 // is made region-relative at the end.
 
 import { parseColor } from "../../shared/color.ts";
-import { intersect, union } from "../../shared/geometry.ts";
+import { intersect, minus, union } from "../../shared/geometry.ts";
 import { fitRadii } from "../../shared/svg/vector.ts";
 import type {
   DocRect,
@@ -40,6 +40,7 @@ import { createHtml, setImportant } from "../overlay/styles.ts";
 import type { RunSource } from "./collect.ts";
 import { type FrameContext, flatParent, walkFlatTree } from "./flat-tree.ts";
 import { linearGradient } from "./gradient.ts";
+import { outerShadows, type Shadow, spreadRadius } from "./shadow.ts";
 import { Layout } from "./visibility.ts";
 
 export interface SceneOptions {
@@ -251,6 +252,9 @@ function translateOp(op: SceneOp, dx: number, dy: number): SceneOp {
       children: op.children.map((c) => translateOp(c, dx, dy)),
     };
   }
+  if (op.op === "shadow") {
+    return { ...op, x: op.x + dx, y: op.y + dy, cut: { ...op.cut, x: op.cut.x + dx, y: op.cut.y + dy } };
+  }
   return { ...op, x: op.x + dx, y: op.y + dy };
 }
 
@@ -269,6 +273,8 @@ class Builder {
   readonly #pictures = new Map<Box, { op: Extract<SceneOp, { op: "image" }>; opaque: boolean }>();
   /** Background gradients that are drawn, over each box's origin box. */
   readonly #gradients = new Map<Box, LinearGradient>();
+  /** Outer box shadows that are drawn, the top one first. */
+  readonly #shadows = new Map<Box, Shadow[]>();
   #picturePixels = 0;
   #pictureChars = 0;
   #seq = 0;
@@ -464,7 +470,7 @@ class Builder {
       if (cs.backgroundImage.includes("url(")) return "background-image";
       if (!this.#gradient(b)) return "gradient";
     }
-    if (cs.boxShadow !== "none") return "box-shadow";
+    if (cs.boxShadow !== "none" && !this.#shadow(b)) return "box-shadow";
     const text = b.kids.some((k) => !isBox(k) && k.data.trim() !== "");
     if (
       text &&
@@ -637,6 +643,14 @@ class Builder {
     const g = linearGradient(cs.backgroundImage, origin.width, origin.height);
     if (g) this.#gradients.set(b, g);
     return g;
+  }
+
+  /** Keeps b's outer shadows when SVG draws them alike: on one box, not across an inline box's lines. */
+  #shadow(b: Box): boolean {
+    if (this.#fragments(b).length > 1) return false;
+    const shadows = outerShadows(b.cs.boxShadow);
+    if (shadows) this.#shadows.set(b, shadows);
+    return shadows !== null;
   }
 
   #bordersDrawable(b: Box): boolean {
@@ -940,8 +954,52 @@ class Builder {
     if (!clip) return;
     if (el === el.ownerDocument.documentElement && b.ctx.frame) this.#frameCanvas(b, out);
     const frags = this.#fragments(b);
-    if (!frags.some((f) => intersect(f, this.region) && intersect(f, clip))) return;
+    // A shadow reaches beyond the box: a box outside the region can cast one into it.
+    const shadows = this.#shadows.get(b);
+    const ink = shadows ? inkMargin(cs) : 0;
+    const inked = (f: DocRect): DocRect => ({
+      x: f.x - ink,
+      y: f.y - ink,
+      width: f.width + 2 * ink,
+      height: f.height + 2 * ink,
+    });
+    if (!frags.some((f) => intersect(inked(f), this.region) && intersect(inked(f), clip))) return;
     const ops: SceneOp[] = [];
+    if (shadows) {
+      // Below the background, the last one lowest; only on a box of one fragment (#shadow).
+      const frag = frags[0] as DocRect;
+      const all = this.#radii(cs, frag);
+      const radii = all && fitRadii(frag.width, frag.height, all);
+      for (const s of [...shadows].reverse()) {
+        const box = {
+          x: frag.x + s.x - s.spread,
+          y: frag.y + s.y - s.spread,
+          width: frag.width + 2 * s.spread,
+          height: frag.height + 2 * s.spread,
+        };
+        // A negative spread larger than the box leaves no shadow.
+        if (box.width <= 0 || box.height <= 0) continue;
+        const r = radii?.map(([x, y]) => [spreadRadius(x, s.spread), spreadRadius(y, s.spread)]) as
+          | Radii
+          | undefined;
+        ops.push({
+          op: "shadow",
+          ...box,
+          ...(r ? { radii: r } : {}),
+          blur: s.blur,
+          paint: s.paint,
+          cut: { ...frag, ...(radii ? { radii } : {}) },
+        });
+        // An opaque shadow hides the text under its solid part: the shape less
+        // the blur (where the Gaussian covers 97.7 %), as a plus that keeps out
+        // of the rounded corners, less the box it is cut from.
+        const core = inset(box, s.blur, s.blur, s.blur, s.blur);
+        const rx = r ? Math.max(...r.map(([x]) => x)) : 0;
+        const ry = r ? Math.max(...r.map(([, y]) => y)) : 0;
+        for (const part of [inset(core, ry, 0, ry, 0), inset(core, 0, rx, 0, rx)])
+          for (const band of minus(part, frag)) this.#opaque(band, clip, s.paint);
+      }
+    }
     const single = frags.length === 1;
     const rtl = cs.direction === "rtl";
     const borders = sides(cs);
@@ -995,7 +1053,7 @@ class Builder {
     }
     this.#outlineOp(b, frags, ops);
     if (ops.length === 0) return;
-    const extent = frags.reduce(union);
+    const extent = inked(frags.reduce(union));
     out.push(...(this.#needsClip(clip, extent) ? [{ op: "group" as const, clip, children: ops }] : ops));
   }
 

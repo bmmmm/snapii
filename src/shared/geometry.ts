@@ -29,6 +29,19 @@ export function union(a: DocRect, b: DocRect): DocRect {
   return { x, y, width: Math.max(right(a), right(b)) - x, height: Math.max(bottom(a), bottom(b)) - y };
 }
 
+/** The parts of `r` outside `hole`: up to four bands (above, below, left, right of it). */
+export function minus(r: DocRect, hole: DocRect): DocRect[] {
+  const h = intersect(r, hole);
+  if (!h) return [r];
+  const out: DocRect[] = [];
+  if (h.y > r.y) out.push({ x: r.x, y: r.y, width: r.width, height: h.y - r.y });
+  if (bottom(h) < bottom(r))
+    out.push({ x: r.x, y: bottom(h), width: r.width, height: bottom(r) - bottom(h) });
+  if (h.x > r.x) out.push({ x: r.x, y: h.y, width: h.x - r.x, height: h.height });
+  if (right(h) < right(r)) out.push({ x: right(h), y: h.y, width: right(r) - right(h), height: h.height });
+  return out;
+}
+
 export function unionAll(rects: readonly DocRect[]): DocRect | null {
   let out: DocRect | null = null;
   for (const r of rects) out = out ? union(out, r) : r;

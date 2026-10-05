@@ -147,6 +147,16 @@ function isOp(x: unknown, depth: number, budget: { left: number }): boolean {
           isPaint(border.paint)))
     );
   }
+  if (x.op === "shadow") {
+    return (
+      isRect(x) &&
+      (x.radii === undefined || isRadii(x.radii)) &&
+      isNum(x.blur) &&
+      x.blur >= 0 &&
+      isPaint(x.paint) &&
+      isClip(x.cut)
+    );
+  }
   if (x.op === "image") return isRect(x) && isStr(x.dataURL) && IMAGE_DATA_URL.test(x.dataURL);
   if (x.op === "group") {
     return (

@@ -144,17 +144,53 @@ const unit = (v: number): number => (Number.isFinite(v) ? Math.min(1, Math.max(0
 // px long: fmt's two decimals would move it by up to half a percent of that.
 const offset = (v: number): string => String(Number(unit(v).toFixed(6)));
 
-/** Hands out clip and gradient ids in order of first use; one definition per distinct one. */
+/** How far a blur of this CSS radius reaches beyond its shape: three standard deviations (σ = radius / 2), and a pixel. */
+const blurReach = (blur: number): number => 1.5 * blur + 1;
+
+/** Hands out clip, gradient and filter ids in order of first use; one definition per distinct one. */
 class Defs {
   #ids = new Map<string, string>();
   #clips = 0;
   #gradients = 0;
+  #filters = 0;
   #defs: string[] = [];
 
   clip(clip: SceneClip): string {
     return this.#id(["clip", clip.x, clip.y, clip.width, clip.height, clip.radii ?? null], () => {
       const id = `c${this.#clips++}`;
       return [id, `<clipPath id="${id}">${shape(clip, clip.radii, "")}</clipPath>`];
+    });
+  }
+
+  /** Everything inside `outer` but outside `cut` (rounded where it has radii). */
+  cutOut(outer: DocRect, cut: SceneClip): string {
+    const key = ["cut", outer.x, outer.y, outer.width, outer.height, cut.x, cut.y, cut.width, cut.height];
+    return this.#id([...key, cut.radii ?? null], () => {
+      const id = `c${this.#clips++}`;
+      const inner = pathData(cut, cut.radii ? fitRadii(cut.width, cut.height, cut.radii) : NO_RADII);
+      return [
+        id,
+        `<clipPath id="${id}"><path d="${pathData(outer, NO_RADII)}${inner}" clip-rule="evenodd"/></clipPath>`,
+      ];
+    });
+  }
+
+  /** A Gaussian blur of a CSS blur radius over `box`, its region as far as the blur reaches. */
+  blur(box: DocRect, blur: number): string {
+    const reach = blurReach(blur);
+    const r = {
+      x: box.x - reach,
+      y: box.y - reach,
+      width: box.width + 2 * reach,
+      height: box.height + 2 * reach,
+    };
+    return this.#id(["blur", r.x, r.y, r.width, r.height, blur], () => {
+      const id = `f${this.#filters++}`;
+      const region = `x="${fmt(r.x)}" y="${fmt(r.y)}" width="${fmt(r.width)}" height="${fmt(r.height)}"`;
+      return [
+        id,
+        `<filter id="${id}" filterUnits="userSpaceOnUse" ${region} color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="${fmt(blur / 2)}"/></filter>`,
+      ];
     });
   }
 
@@ -224,8 +260,25 @@ function rectLines(op: Extract<SceneOp, { op: "rect" }>, defs: Defs): string[] {
   return out;
 }
 
+/** An outer box shadow: blurred, and only outside the box that casts it, as CSS paints it. */
+function shadowLines(op: Extract<SceneOp, { op: "shadow" }>, defs: Defs): string[] {
+  const blur = Number.isFinite(op.blur) ? Math.max(0, op.blur) : 0;
+  const reach = blurReach(blur);
+  const outer = {
+    x: op.x - reach,
+    y: op.y - reach,
+    width: op.width + 2 * reach,
+    height: op.height + 2 * reach,
+  };
+  const attrs = [paintAttrs(op.paint, "fill")];
+  if (blur > 0) attrs.push(`filter="url(#${defs.blur(op, blur)})"`);
+  attrs.push(`clip-path="url(#${defs.cutOut(outer, op.cut)})"`);
+  return [shape(op, op.radii, attrs.join(" "))];
+}
+
 function opLines(op: SceneOp, defs: Defs): string[] {
   if (op.op === "rect") return rectLines(op, defs);
+  if (op.op === "shadow") return shadowLines(op, defs);
   if (op.op === "image") {
     return [
       `<image x="${fmt(op.x)}" y="${fmt(op.y)}" width="${fmt(op.width)}" height="${fmt(op.height)}" preserveAspectRatio="none" xlink:href="${xmlAttr(op.dataURL)}"/>`,

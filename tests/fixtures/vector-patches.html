@@ -5,15 +5,15 @@
     <title>vector patches</title>
     <!--
       One element per reason vector output takes as pixels: a transform, a
-      filter, a box shadow, a form control, a dashed border, a text shadow
-      (images: vector-images.html, gradients: vector-gradients.html). Each is
-      one patch and its text runs are invisible (the pixels show them); the
-      plain paragraph between them stays vector, as does the box with a
-      linear gradient. A black overlay clipped away entirely by its own clip-path
-      paints nothing and must not hide "Wiped text", nor may a visually
-      hidden label show; one clipped to half its width is a patch ("effect").
-      The bar above the capture casts its shadow into it: a patch strip, though
-      the bar itself lies outside.
+      filter, a form control, a dashed border, a text shadow (images:
+      vector-images.html, gradients: vector-gradients.html, box shadows:
+      vector-shadows.html). Each is one patch and its text runs are invisible
+      (the pixels show them); the plain paragraph between them stays vector,
+      as do the boxes with a linear gradient and an outer shadow, and the
+      shadow the bar above the capture casts into it. A black overlay clipped
+      away entirely by its own clip-path paints nothing and must not hide
+      "Wiped text", nor may a visually hidden label show; one clipped to half
+      its width is a patch ("effect").
       A file input at opacity 0 (a styled upload button's trick) is not painted
       and is no patch over the text under it.
       The half-transparent badge lies over a link: its link area (it
@@ -51,13 +51,19 @@
           "unsupported": {
             "transform": 1,
             "effect": 2,
-            "box-shadow": 2,
             "form": 1,
             "border": 1,
             "text-effect": 1
           },
-          "hidden": ["Translated box", "Blurred box", "Shadowed box", "Dashed border", "Shadowed text"],
-          "visible": ["Plain text", "Gradient box", "Wiped text", "Under an invisible input", "Linked words"]
+          "hidden": ["Translated box", "Blurred box", "Dashed border", "Shadowed text"],
+          "visible": [
+            "Plain text",
+            "Shadowed box",
+            "Gradient box",
+            "Wiped text",
+            "Under an invisible input",
+            "Linked words"
+          ]
         }
       }
     </script>

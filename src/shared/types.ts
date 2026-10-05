@@ -121,6 +121,22 @@ export type SceneOp =
       border?: { widths: [number, number, number, number]; paint: Paint };
     }
   | {
+      /**
+       * An outer box shadow: the rect (the box moved and grown by the
+       * spread) filled and blurred, painted only outside `cut` (the box).
+       */
+      op: "shadow";
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      radii?: Radii;
+      /** CSS blur radius in px; the Gaussian's standard deviation is half of it. */
+      blur: number;
+      paint: Paint;
+      cut: SceneClip;
+    }
+  | {
       op: "image";
       x: number;
       y: number;
