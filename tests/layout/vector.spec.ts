@@ -483,6 +483,25 @@ test("pictures: an ancestor's rounded clip leaves an opaque one opaque: it hides
   expect(pictureOps(scene.ops).map((op) => /^data:image\/(\w+)/.exec(op.dataURL)?.[1])).toEqual(["jpeg"]);
 });
 
+test("pictures longer than a canvas side may be are patches, not a failed scene or a lost picture", async ({
+  page,
+}) => {
+  // 66 000 device px across, one high: beyond 65 535 Firefox throws and Chromium reads back nothing.
+  await page.addInitScript(() => {
+    window.prepare = () => {
+      const c = document.querySelector("canvas") as HTMLCanvasElement;
+      (c.getContext("2d") as CanvasRenderingContext2D).fillRect(0, 0, 1000, 1);
+    };
+  });
+  const scene = await sceneOf(
+    page,
+    '<main id="cap" style="width:66000px"><canvas width="1000" height="1" style="display:block;width:66000px;height:1px"></canvas>' +
+      '<img style="display:block;width:66000px;height:1px" src="/fixtures/images/quadrants.png">' +
+      '<img style="display:block;width:1px;height:66000px" src="/fixtures/images/quadrants.png"></main>',
+  );
+  expect(scene.unsupported).toEqual({ budget: 3 });
+});
+
 test("pictures over the pixel budget are patches, counted before anything is drawn", async ({ page }) => {
   // Three blank canvases of 6 Mpx: the first two are drawn (and read back
   // empty), the third would take the pictures past 16 Mi px.

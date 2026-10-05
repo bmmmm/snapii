@@ -88,6 +88,9 @@ const MAX_OPS = 150_000;
 // than this to draw and read back. Beyond either, a picture is a patch.
 const MAX_PICTURE_CHARS = 32 * 1024 * 1024;
 const MAX_PICTURE_PIXELS = 16 * 1024 * 1024;
+// The longest canvas side both engines draw on: beyond it Firefox throws and
+// Chromium reads back nothing (measured 2026-10-05).
+const MAX_PICTURE_SIDE = 65_535;
 
 /** The walk ran out of budget: the region becomes one patch. */
 class OverBudget extends Error {}
@@ -524,6 +527,7 @@ class Builder {
     const dpr = this.doc.defaultView?.devicePixelRatio ?? 1;
     const w = Math.max(1, Math.round(visible.width * dpr));
     const h = Math.max(1, Math.round(visible.height * dpr));
+    if (w > MAX_PICTURE_SIDE || h > MAX_PICTURE_SIDE) return "budget";
     if (this.#picturePixels + w * h > MAX_PICTURE_PIXELS) return "budget";
     this.#picturePixels += w * h;
 
