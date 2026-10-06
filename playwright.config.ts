@@ -10,6 +10,7 @@ export default defineConfig({
   // Pinned, not defaulted: Playwright imports whatever it matches, and the
   // default pattern would also collect the node:test suites in tests/unit.
   testMatch: "**/*.spec.ts",
+  globalSetup: "./tests/layout/global-setup.ts",
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [["html", { open: "never" }], ["list"]] : "list",
