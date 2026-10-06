@@ -25,6 +25,7 @@ const VALID: { [K in keyof Settings]: (x: unknown) => x is Settings[K] } = {
   saveFolder: isFolder,
   occlusionCheck: isBool,
   textFragment: isBool,
+  removeTrackers: isBool,
   ocr: isBool,
   output: (x): x is Settings["output"] => x === "raster" || x === "vector",
 };

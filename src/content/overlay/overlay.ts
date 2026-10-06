@@ -16,7 +16,7 @@ export interface Selection {
   element?: Element;
 }
 
-export type ToolbarAction = "save" | "copy-text" | "copy-link";
+export type ToolbarAction = "save" | "copy-text" | "copy-link" | "copy-page-link";
 
 export interface OverlayHandle {
   readonly host: HTMLElement;

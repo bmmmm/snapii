@@ -42,6 +42,7 @@ async function run(
   menuShortcut = "",
   refuseUpdate = false,
   store: Record<string, unknown> = {},
+  os = "linux",
 ): Promise<Run> {
   const seen: string[] = [];
   const calls: string[] = [];
@@ -52,14 +53,15 @@ async function run(
       getURL: (p: string) => `moz-extension://uuid/${p}`,
       getManifest: () => ({
         version: "0.0.0",
-        commands: { "start-capture": { suggested_key: { default: "Alt+Shift+S" } } },
+        commands: { "start-capture": { suggested_key: { default: "Ctrl+Alt+S", mac: "MacCtrl+Alt+S" } } },
       }),
+      getPlatformInfo: async () => ({ os }),
       onMessage: event("runtime.onMessage"),
     },
     commands: {
       onCommand: event("commands.onCommand"),
       getAll: async () => [
-        { name: "start-capture", shortcut: "Alt+Shift+S" },
+        { name: "start-capture", shortcut: os === "mac" ? "MacCtrl+Alt+S" : "Ctrl+Alt+S" },
         { name: "_execute_action", shortcut: menuShortcut },
       ],
       update: async (c: { name: string; shortcut: string }) => {
@@ -103,6 +105,15 @@ test("background: without the commands API (Firefox for Android) the other liste
 
 test("background: a key left on the toolbar-action command moves to the capture command at startup", async () => {
   const { calls } = await run([], "Alt+Shift+Y");
+  assert.deepEqual(calls, [
+    "update:start-capture:Alt+Shift+Y",
+    "reset:_execute_action",
+    'store:{"legacyShortcutMoved":true}',
+  ]);
+});
+
+test("background: on macOS the capture command still has its default when it is MacCtrl+Alt+S, so the left key moves", async () => {
+  const { calls } = await run([], "Alt+Shift+Y", false, {}, "mac");
   assert.deepEqual(calls, [
     "update:start-capture:Alt+Shift+Y",
     "reset:_execute_action",

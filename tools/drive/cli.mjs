@@ -5,7 +5,7 @@
 // and disconnects; Firefox, its tabs and the add-on stay between calls.
 //
 //   pnpm drive start [--headed] [--dpr 2] [--width 1280 --height 800] [--port N] [--force]
-//   pnpm drive open <url> | snap ... | save | copy-text | copy-link | ... | stop
+//   pnpm drive open <url> | snap ... | save | copy-text | copy-link | copy-page-link | ... | stop
 //
 // State (profile, downloads, screenshots, Firefox log, state.json) lives in
 // SNAPII_DRIVE_DIR, default /tmp/snapii-drive-<hash of the repo path>: stable
@@ -730,7 +730,8 @@ State dir: ${DIR} (SNAPII_DRIVE_DIR overrides). Global: --timeout <ms> (default 
                                   open the overlay (the start-capture shortcut; --popup: the toolbar
                                   popup's Capture region) and select
   popup                           open the toolbar popup: what it shows + screenshot, then close it
-  save | copy-text | copy-link    click the toolbar button, wait for the toast
+  save | copy-text | copy-link | copy-page-link
+                                  click the toolbar button, wait for the toast
   cancel | key <name|Mod+name> [--times N] | click x y | scroll x y
   screenshot [file.png]           content viewport at device px
   eval [--system] <js>            in the page; an expression, or statements with return (--system:
@@ -750,6 +751,7 @@ const COMMANDS = {
   save,
   "copy-text": () => withDriver((d) => copy(d, "copy-text")),
   "copy-link": () => withDriver((d) => copy(d, "copy-link")),
+  "copy-page-link": () => withDriver((d) => copy(d, "copy-page-link")),
   cancel,
   key,
   click,

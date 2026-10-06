@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The toolbar button's popup: start a capture in the tab the popup belongs to,
-// three quick toggles and the save folder on the same storage.sync values as
+// four quick toggles and the save folder on the same storage.sync values as
 // the options page, and the way to all settings. Opening the popup grants activeTab for that tab
 // (measured, tests/glue/popup.test.mjs), so the probe below may run there and
 // the background can inject the content script after the click.
@@ -12,8 +12,8 @@ import { checkFolder, describeFolderProblem } from "../shared/folder.ts";
 import { ariaShortcut, CAPTURE_COMMAND, formatShortcut } from "../shared/shortcut.ts";
 import type { FromPopup, StartResult } from "../shared/types.ts";
 
-type ToggleKey = "ocr" | "textFragment" | "saveAs";
-const TOGGLES: ToggleKey[] = ["ocr", "textFragment", "saveAs"];
+type ToggleKey = "ocr" | "textFragment" | "removeTrackers" | "saveAs";
+const TOGGLES: ToggleKey[] = ["ocr", "textFragment", "removeTrackers", "saveAs"];
 
 function byId<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);

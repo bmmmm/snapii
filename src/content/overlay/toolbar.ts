@@ -3,12 +3,13 @@
 // short-lived toast shown after the overlay is gone.
 import { adoptStyles, createHtml, styleHost, TOAST_CSS } from "./styles.ts";
 
-export type ToolbarButton = "save" | "copy-text" | "copy-link" | "cancel";
+export type ToolbarButton = "save" | "copy-text" | "copy-link" | "copy-page-link" | "cancel";
 
 const BUTTONS: [ToolbarButton, string][] = [
   ["save", "Save SVG"],
   ["copy-text", "Copy text"],
-  ["copy-link", "Copy link"],
+  ["copy-link", "Copy element link"],
+  ["copy-page-link", "Copy page link"],
   ["cancel", "Cancel"],
 ];
 

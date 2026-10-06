@@ -33,7 +33,7 @@ the same time; 10 would collide with the Chromium suite's 8470–8479 and
 
 | # | Item | Status |
 |---|---|---|
-| 1 | Toolbar button → popup → Capture region, and Alt+Shift+S, open the overlay; Escape leaves no `snapii-overlay` node | auto (tests/glue/overlay.test.mjs: item 1; the popup itself: tests/glue/popup.test.mjs) + human 1h |
+| 1 | Toolbar button → popup → Capture region, and the shortcut (Ctrl+Alt+S; macOS Control+Option+S), open the overlay; Escape leaves no `snapii-overlay` node | auto (tests/glue/overlay.test.mjs: item 1; the popup itself: tests/glue/popup.test.mjs) + human 1h |
 | 2 | Hover highlights; ArrowUp/ArrowDown walk the ancestors | auto (tests/glue/overlay.test.mjs: item 2) |
 | 3 | Element save → file in the download folder; opened in Firefox, select-all + copy gives the paragraph; links open | auto (tests/glue/save.test.mjs: item 3) + human 3h |
 | 4 | Drag across paragraphs → the SVG text has both | auto (tests/glue/save.test.mjs: item 4) |
@@ -95,8 +95,8 @@ keys through the popup's TextInputProcessor),
 `layout.css.devPixelsPerPx = 2` instead of a Retina screen, a temp download
 directory, and a headless in-process clipboard. Hence these human steps:
 
-**1h — real shortcut.** On the inline-links page press Alt+Shift+S on the
-keyboard (macOS: Option+Shift+S): the overlay appears with the hint
+**1h — real shortcut.** On the inline-links page press Ctrl+Alt+S on the
+keyboard (macOS: Control+Option+S): the overlay appears with the hint
 "Click an element or drag an area · ↑ ↓ parent/child · Esc cancels". Press
 Escape. Open the Browser Toolbox' inspector (or run
 `document.querySelectorAll("snapii-overlay").length` in the page console):
@@ -137,7 +137,7 @@ clipboard.
 
 **9h — real click and display.** On
 `http://127.0.0.1:8438/glue/fixtures/article.html` scroll to the last
-paragraph ("Piezoelectric quartz …"), click it, click **Copy link**: toast
+paragraph ("Piezoelectric quartz …"), click it, click **Copy element link**: toast
 "Copied link", the overlay closes. Paste the URL into a new tab's address
 bar and press Enter: the page opens scrolled to that paragraph, which is
 highlighted. Optional:
@@ -146,7 +146,7 @@ paste it into Chrome — the same paragraph is highlighted.
 **10h — AMO and PDF viewer (need network / a PDF).** Open
 `https://addons.mozilla.org/`, click the snapii button: the popup's
 **Capture region** is disabled and below it "snapii cannot capture this page:
-…". Press Alt+Shift+S instead: the button shows "×" for 3 s and its tooltip
+…". Press Ctrl+Alt+S (macOS: Control+Option+S) instead: the button shows "×" for 3 s and its tooltip
 says the same. Same for a PDF opened in Firefox's viewer. Browser console
 (Cmd+Shift+J): no error from snapii.
 

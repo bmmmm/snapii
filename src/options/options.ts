@@ -26,6 +26,7 @@ type FormKey =
   | "saveFolder"
   | "occlusionCheck"
   | "textFragment"
+  | "removeTrackers"
   | "ocr"
   | "output";
 const FORM_KEYS: FormKey[] = [
@@ -35,6 +36,7 @@ const FORM_KEYS: FormKey[] = [
   "saveFolder",
   "occlusionCheck",
   "textFragment",
+  "removeTrackers",
   "ocr",
   "output",
 ];
@@ -104,6 +106,7 @@ function render(s: Settings): void {
   folderProblem(null);
   checkbox("occlusionCheck").checked = s.occlusionCheck;
   checkbox("textFragment").checked = s.textFragment;
+  checkbox("removeTrackers").checked = s.removeTrackers;
   checkbox("ocr").checked = s.ocr;
   syncOcrEnabled();
 }
@@ -147,6 +150,7 @@ form.addEventListener("change", (event) => {
     el.name === "saveAs" ||
     el.name === "occlusionCheck" ||
     el.name === "textFragment" ||
+    el.name === "removeTrackers" ||
     el.name === "ocr"
   ) {
     void save(el.name, el.checked);

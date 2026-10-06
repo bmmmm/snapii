@@ -7,7 +7,7 @@
 // moves to the capture command, unless the user chose a key for that one
 // themselves, and the menu command is reset to unbound.
 
-import { CAPTURE_COMMAND, MENU_COMMAND } from "../shared/shortcut.ts";
+import { CAPTURE_COMMAND, MENU_COMMAND, suggestedKeyFor } from "../shared/shortcut.ts";
 
 const DONE_KEY = "legacyShortcutMoved";
 
@@ -20,7 +20,7 @@ export interface LegacyShortcutDeps {
   /** The key bound to the capture command, "" when none. */
   captureShortcut(): Promise<string>;
   /** The capture command's key in the manifest: what it has until the user changes it. */
-  readonly captureDefault: string;
+  captureDefault(): Promise<string>;
   setCaptureShortcut(shortcut: string): Promise<void>;
   resetMenuShortcut(): Promise<void>;
 }
@@ -38,7 +38,13 @@ const browserDeps = (): LegacyShortcutDeps => ({
   async captureShortcut() {
     return (await browser.commands.getAll()).find((c) => c.name === CAPTURE_COMMAND)?.shortcut ?? "";
   },
-  captureDefault: browser.runtime.getManifest().commands?.[CAPTURE_COMMAND]?.suggested_key?.default ?? "",
+  async captureDefault() {
+    const platform = (await browser.runtime.getPlatformInfo()).os === "mac" ? "mac" : "other";
+    return suggestedKeyFor(
+      browser.runtime.getManifest().commands?.[CAPTURE_COMMAND]?.suggested_key,
+      platform,
+    );
+  },
   async setCaptureShortcut(shortcut) {
     await browser.commands.update({ name: CAPTURE_COMMAND, shortcut });
   },
@@ -59,7 +65,7 @@ export async function moveLegacyShortcut(deps: LegacyShortcutDeps = browserDeps(
   if (legacy !== "") {
     // Only an unset or default capture key gives way: another one is the user's own choice.
     const current = await deps.captureShortcut();
-    if (current === "" || current === deps.captureDefault) await deps.setCaptureShortcut(legacy);
+    if (current === "" || current === (await deps.captureDefault())) await deps.setCaptureShortcut(legacy);
     await deps.resetMenuShortcut();
   }
   await deps.markDone();

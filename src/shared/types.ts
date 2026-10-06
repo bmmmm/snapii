@@ -321,6 +321,8 @@ export interface Settings {
   saveFolder: string;
   occlusionCheck: boolean;
   textFragment: boolean;
+  /** Copy element link and Copy page link drop tracking parameters (utm_*, fbclid, …) from the address. */
+  removeTrackers: boolean;
   /** Recognise text in images (Tesseract, in the background page). */
   ocr: boolean;
   /** "vector": shapes and visible text, pixels only where they cannot be had (beta); "raster": the screenshot. */

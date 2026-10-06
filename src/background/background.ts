@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The background both browsers share: the toolbar popup's "Capture region" (a
-// `start-capture` message) or the keyboard shortcut (Alt+Shift+S) injects the
+// `start-capture` message) or the keyboard shortcut (the start-capture command) injects the
 // content script into the tab and starts a capture session there; the content
 // script's `save` message comes back here to be captured, rendered and
 // downloaded. Called at the top level of each entry so the listeners wake the

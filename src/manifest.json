@@ -10,7 +10,7 @@
     "default_popup": "popup.html"
   },
   "commands": {
-    "start-capture": { "suggested_key": { "default": "Alt+Shift+S" }, "description": "Capture a region" },
+    "start-capture": { "suggested_key": { "default": "Ctrl+Alt+S", "mac": "MacCtrl+Alt+S" }, "description": "Capture a region" },
     "_execute_action": { "description": "Open the snapii menu" }
   },
   "background": { "scripts": ["background.js"] },

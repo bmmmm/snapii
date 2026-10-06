@@ -56,7 +56,7 @@ type TestWindow = Window & {
   __paraClicks: number;
 };
 
-const TOOLBAR_LABELS = ["Save SVG", "Copy text", "Copy link", "Cancel"];
+const TOOLBAR_LABELS = ["Save SVG", "Copy text", "Copy element link", "Copy page link", "Cancel"];
 const NOW = "2026-10-01T12:00:00.000Z";
 
 /**
@@ -263,7 +263,7 @@ test("(d) an ok reply removes the host and shows the saved toast", async ({ page
 /** Clicks a toolbar button and waits for its toast (none: does not wait). */
 async function clickButton(
   page: Page,
-  action: "save" | "copy-text" | "copy-link",
+  action: "save" | "copy-text" | "copy-link" | "copy-page-link",
   toast?: string,
 ): Promise<void> {
   const button = await page.evaluate((action) => {
@@ -359,6 +359,78 @@ test("copy link: the text-fragment URL of the picked paragraph, as plain text an
   expect(await calls(page)).toEqual([]);
 });
 
+test("copy page link: the page's address without trackers and without a text directive, as plain text and as a titled link", async ({
+  page,
+}) => {
+  await load(page, "/fixtures/overlay.html?id=7&utm_source=news&fbclid=abc#top");
+  await begin(page, { ok: true, filename: "x.svg" });
+  await pickElement(page, "para");
+  await clickButton(page, "copy-page-link", "Copied page link, tracking removed");
+  const [clip] = await clips(page);
+  const base = await page.evaluate(() => location.origin + location.pathname);
+  // The selection's text fragment is not part of it, however the paragraph would link.
+  expect(clip?.plain).toBe(`${base}?id=7#top`);
+  expect(clip?.html).toBe(`<a href="${base}?id=7#top">overlay</a>`);
+  // Like Copy link, a copied page link is the end of the capture.
+  expect(await hostState(page)).toEqual({ attached: false, display: null });
+  expect(await page.evaluate(() => (window as unknown as TestWindow).__session.isOpen())).toBe(false);
+});
+
+test("copy page link: an address with nothing to remove does not claim tracking was removed", async ({
+  page,
+}) => {
+  await load(page);
+  await begin(page, { ok: true, filename: "x.svg" });
+  await pickElement(page, "para");
+  await clickButton(page, "copy-page-link", "Copied page link");
+  const url = await page.evaluate(() => location.href);
+  expect((await clips(page))[0]?.plain).toBe(url);
+});
+
+test("copy page link: title and address are escaped in the html", async ({ page }) => {
+  await load(page, "/fixtures/overlay.html?a=1&b=2");
+  await page.evaluate(() => {
+    document.title = "<b>Fish & chips</b>";
+  });
+  await begin(page, { ok: true, filename: "x.svg" });
+  await pickElement(page, "para");
+  await clickButton(page, "copy-page-link", "Copied page link");
+  const [clip] = await clips(page);
+  const base = await page.evaluate(() => location.origin + location.pathname);
+  expect(clip?.plain).toBe(`${base}?a=1&b=2`);
+  expect(clip?.html).toBe(`<a href="${base}?a=1&amp;b=2">&lt;b&gt;Fish &amp; chips&lt;/b&gt;</a>`);
+});
+
+test("copy element link: the text fragment hangs on the address without trackers; a plain fragment stays", async ({
+  page,
+}) => {
+  await load(page, "/fixtures/overlay.html?id=7&utm_source=news#top");
+  await begin(page, { ok: true, filename: "x.svg" });
+  await pickElement(page, "para");
+  await clickButton(page, "copy-link", "Copied link");
+  const base = await page.evaluate(() => location.origin + location.pathname);
+  expect((await clips(page))[0]?.plain).toBe(
+    `${base}?id=7#top:~:text=some%20paragraph%20text%20with%20a%20link%20inside.`,
+  );
+});
+
+test("removeTrackers off: both links keep the address's parameters as written", async ({ page }) => {
+  const settings = { ...DEFAULT_SETTINGS, removeTrackers: false };
+  await load(page, "/fixtures/overlay.html?id=7&utm_source=news");
+  await begin(page, { ok: true, filename: "x.svg" }, settings);
+  await pickElement(page, "para");
+  await clickButton(page, "copy-page-link", "Copied page link");
+  const url = await page.evaluate(() => location.href);
+  expect((await clips(page))[0]?.plain).toBe(url);
+
+  await begin(page, { ok: true, filename: "x.svg" }, settings);
+  await pickElement(page, "para");
+  await clickButton(page, "copy-link", "Copied link");
+  expect((await clips(page))[0]?.plain).toBe(
+    `${url}#:~:text=some%20paragraph%20text%20with%20a%20link%20inside.`,
+  );
+});
+
 test("save: the model carries the paragraph's text-fragment URL with status SUCCESS", async ({ page }) => {
   await load(page);
   await begin(page, { ok: true, filename: "x.svg" });
@@ -371,6 +443,31 @@ test("save: the model carries the paragraph's text-fragment URL with status SUCC
   expect(call?.model.page.textFragmentURL).toBe(
     `${call?.model.page.url}#:~:text=some%20paragraph%20text%20with%20a%20link%20inside.`,
   );
+});
+
+test("save keeps the trackers in the model's addresses: removeTrackers is for the copied links only", async ({
+  page,
+}) => {
+  await load(page, "/fixtures/overlay.html?id=7&utm_source=news");
+  await begin(page, { ok: true, filename: "x.svg" });
+  await pickElement(page, "para");
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await calls(page)).length).toBe(1);
+  const [call] = await calls(page);
+  const url = await page.evaluate(() => location.href);
+  expect(call?.model.page.url).toBe(url);
+  expect(call?.model.page.textFragmentURL).toBe(
+    `${url}#:~:text=some%20paragraph%20text%20with%20a%20link%20inside.`,
+  );
+});
+
+test("copy element link without a text fragment: the page address, trackers removed", async ({ page }) => {
+  await load(page, "/fixtures/overlay.html?id=7&utm_source=news");
+  await begin(page, { ok: true, filename: "x.svg" }, { ...DEFAULT_SETTINGS, textFragment: false });
+  await pickElement(page, "para");
+  await clickButton(page, "copy-link", "Copied page link");
+  const base = await page.evaluate(() => location.origin + location.pathname);
+  expect((await clips(page))[0]?.plain).toBe(`${base}?id=7`);
 });
 
 test("save with the text-fragment setting off: DISABLED and no URL", async ({ page }) => {
@@ -577,7 +674,7 @@ test("copy text of text only in a shadow tree: the HTML is the plain text as a p
   });
 });
 
-for (const action of ["copy-text", "copy-link"] as const) {
+for (const action of ["copy-text", "copy-link", "copy-page-link"] as const) {
   test(`a failed clipboard write on ${action} shows the copy-failed toast and keeps the overlay`, async ({
     page,
   }) => {

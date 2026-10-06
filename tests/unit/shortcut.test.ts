@@ -10,6 +10,7 @@ import {
   type Platform,
   type ShortcutKeyEvent,
   type ShortcutProblem,
+  suggestedKeyFor,
   validateShortcut,
 } from "../../src/shared/shortcut.ts";
 
@@ -302,4 +303,12 @@ test("ariaShortcut: the aria-keyshortcuts value (Ctrl is Command on macOS, MacCt
   assert.equal(ariaShortcut("Ctrl+Space", "other"), "Control+Space");
   assert.equal(ariaShortcut("F7", "other"), "F7");
   assert.equal(ariaShortcut("", "mac"), "");
+});
+
+test("suggestedKeyFor: the platform's own manifest key, else the default", () => {
+  const key = { default: "Ctrl+Alt+S", mac: "MacCtrl+Alt+S" };
+  assert.equal(suggestedKeyFor(key, "mac"), "MacCtrl+Alt+S");
+  assert.equal(suggestedKeyFor(key, "other"), "Ctrl+Alt+S");
+  assert.equal(suggestedKeyFor({ default: "Alt+Shift+S" }, "mac"), "Alt+Shift+S");
+  assert.equal(suggestedKeyFor(undefined, "mac"), "");
 });

@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { after, afterEach, before, test } from "node:test";
+import { clearClipboard, readClipboard } from "../../tools/marionette/helpers.mjs";
 import { ADDON_ID, sleep, startGlue } from "./env.mjs";
 
 const PAGE = "/glue/fixtures/page.html";
@@ -136,12 +137,12 @@ test("toolbar click on a never-clicked tab: popup with Capture region focused, t
     assert.equal(await g.hasActiveTab(), true);
     assert.equal(state.capture.disabled, false);
     assert.equal(state.status, "");
-    assert.equal(state.shortcut, display("Alt+Shift+S", "⌥⇧S"));
-    assert.equal(state.capture.text, `Capture region ${display("Alt+Shift+S", "⌥⇧S")}`);
+    assert.equal(state.shortcut, display("Ctrl+Alt+S", "⌃⌥S"));
+    assert.equal(state.capture.text, `Capture region ${display("Ctrl+Alt+S", "⌃⌥S")}`);
     // Screen readers get the shortcut as such, not the glyphs as part of the name.
-    assert.equal(state.keyshortcuts, "Alt+Shift+S");
+    assert.equal(state.keyshortcuts, "Control+Alt+S");
     assert.equal(state.shortcutHidden, true);
-    assert.deepEqual(state.toggles, { ocr: false, textFragment: true, saveAs: false });
+    assert.deepEqual(state.toggles, { ocr: false, textFragment: true, removeTrackers: true, saveAs: false });
     assert.deepEqual(state.folder, { value: "", error: "", invalid: false });
     // The commit is missing from a build without git.
     assert.match(state.about, /^snapii \d+\.\d+\.\d+ · (?:[0-9a-f]{7,}.* · )?built .* · Firefox \d+/);
@@ -186,12 +187,42 @@ test("toggles write storage.sync at once; the next save follows them; the popup 
   assert.equal(file.svg.capture.ocr.status, "no-areas");
 
   const again = await g.openPopup();
-  assert.deepEqual(again.toggles, { ocr: true, textFragment: false, saveAs: false });
+  assert.deepEqual(again.toggles, { ocr: true, textFragment: false, removeTrackers: true, saveAs: false });
   await g.s.clickInPopup('input[name="ocr"]');
   await g.until(async () => ((await storedInPopup()).ocr === false ? true : null), "OCR off in storage.sync");
   await closePopup();
   const off = await saveCard();
   assert.equal(off.svg.capture.ocr.status, "disabled");
+  await clearStored();
+});
+
+test("the Remove trackers toggle: stored off, the next Copy page link keeps the trackers; the popup shows it next time", async () => {
+  await clearStored();
+  await g.open(`${PAGE}?id=7&utm_source=news&fbclid=abc#top`);
+  await g.openPopup();
+  await g.s.clickInPopup('input[name="removeTrackers"]');
+  await g.until(
+    async () => ((await storedInPopup()).removeTrackers === false ? true : null),
+    "the toggle in storage.sync",
+  );
+  await closePopup();
+  assert.deepEqual(await stored(), { removeTrackers: false });
+
+  await g.startOverlay();
+  await g.move(310, 290);
+  await g.click(310, 290);
+  await clearClipboard(g.s);
+  await g.clickToolbar("copy-page-link");
+  const clip = await g.until(async () => {
+    const c = await readClipboard(g.s);
+    return c["text/plain"] ? c : null;
+  }, "the clipboard to be written");
+  assert.equal(clip["text/plain"], `${g.base}${PAGE}?id=7&utm_source=news&fbclid=abc#top`);
+  await g.until(async () => (await g.overlayPresent()) === 0, "the overlay to close");
+
+  const again = await g.openPopup();
+  assert.equal(again.toggles.removeTrackers, false);
+  await closePopup();
   await clearStored();
 });
 
@@ -383,7 +414,7 @@ test("the start-capture shortcut on a never-clicked tab: activeTab from the comm
     assert.equal(await g.hasActiveTab(), false);
     const before = g.svgFiles();
     const key = await g.startOverlay("shortcut");
-    assert.deepEqual(key, { key: "S", modifiers: "alt,shift" });
+    assert.deepEqual(key, { key: "S", modifiers: process.platform === "darwin" ? "alt,control" : "accel,alt" });
     assert.equal(await g.hasActiveTab(), true);
     assert.equal(await g.s.popupCount(), 0);
     await g.move(310, 290);

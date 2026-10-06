@@ -9,6 +9,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { checkFolder } from "../../src/shared/folder.ts";
+import { clearClipboard, readClipboard } from "../../tools/marionette/helpers.mjs";
 import { ADDON_ID, decodeDataUrl, ROOT, startGlue } from "./env.mjs";
 
 const PAGE = "/glue/fixtures/page.html";
@@ -141,6 +142,7 @@ test("the form shows the defaults, the quality slider is only enabled for JPEG",
       saveAs: box("saveAs"),
       occlusionCheck: box("occlusionCheck"),
       textFragment: box("textFragment"),
+      removeTrackers: box("removeTrackers"),
     };`);
   assert.deepEqual(state, {
     disabled: true,
@@ -148,6 +150,7 @@ test("the form shows the defaults, the quality slider is only enabled for JPEG",
     saveAs: false,
     occlusionCheck: false,
     textFragment: true,
+    removeTrackers: true,
   });
   await clickOn('input[name="format"][value="jpeg"]');
   await saved();
@@ -458,4 +461,29 @@ test("the folder rules agree with downloads.download: what they accept it takes,
     () => existsSync(join(g.downloads, "firefox-probe/pct/100_/probe.svg")),
     "the folder Firefox made of 100%",
   );
+});
+
+test("Remove trackers in the options page: Copy page link drops them by default and keeps them once switched off", async () => {
+  const copyPageLink = async () => {
+    await g.open(`${PAGE}?id=7&utm_source=news&fbclid=abc#top`);
+    await g.startOverlay();
+    await g.move(310, 290);
+    await g.click(310, 290);
+    await clearClipboard(g.s);
+    await g.clickToolbar("copy-page-link");
+    const clip = await g.until(async () => {
+      const c = await readClipboard(g.s);
+      return c["text/plain"] ? c : null;
+    }, "the clipboard to be written");
+    return clip["text/plain"];
+  };
+  await openWith({});
+  assert.equal(await copyPageLink(), `${g.base}${PAGE}?id=7#top`);
+  assert.equal(await g.until(() => g.toast(), "the toast"), "Copied page link, tracking removed");
+
+  await g.open(optionsUrl);
+  await clickOn('input[name="removeTrackers"]');
+  await saved();
+  assert.deepEqual(await stored(), { removeTrackers: false });
+  assert.equal(await copyPageLink(), `${g.base}${PAGE}?id=7&utm_source=news&fbclid=abc#top`);
 });

@@ -199,7 +199,7 @@ export class Driver {
     }
   }
 
-  /** Clicks a button of the overlay's toolbar ("save", "copy-text", "copy-link", "cancel"). */
+  /** Clicks a button of the overlay's toolbar ("save", "copy-text", "copy-link", "copy-page-link", "cancel"). */
   async clickToolbar(action) {
     const button = await this.until(
       async () => (await this.toolbar()).find((b) => b.action === action),

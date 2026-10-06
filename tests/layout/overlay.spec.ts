@@ -271,7 +271,7 @@ test("toolbar: below the selection; Save SVG and Copy text report the selection 
       labels: [...root.querySelectorAll(".toolbar button")].map((b) => b.textContent),
     };
   });
-  expect(buttons.labels).toEqual(["Save SVG", "Copy text", "Copy link", "Cancel"]);
+  expect(buttons.labels).toEqual(["Save SVG", "Copy text", "Copy element link", "Copy page link", "Cancel"]);
   expect(buttons.toolbar.y).toBe(PARA.y - 150 + PARA.height + GAP);
   // Layout rounding differs per platform (550.0000152587891 on Linux CI).
   expect(buttons.toolbar.x + buttons.toolbar.width).toBeCloseTo(PARA.x + PARA.width, 2);

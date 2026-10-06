@@ -35,7 +35,7 @@ async function highlight() {
 
 const strip = ({ shot: _, ...r }) => r;
 
-test("item 1: toolbar popup's Capture region and Alt+Shift+S open the overlay; Escape leaves no snapii-overlay; starting again closes it", async () => {
+test("item 1: toolbar popup's Capture region and the capture shortcut open the overlay; Escape leaves no snapii-overlay; starting again closes it", async () => {
   await g.open(PAGE);
   assert.equal(await g.overlayPresent(), 0);
   // Toolbar button, then a real click on "Capture region" in its popup.
@@ -46,7 +46,7 @@ test("item 1: toolbar popup's Capture region and Alt+Shift+S open the overlay; E
   await g.until(async () => (await g.overlayPresent()) === 0, "Escape to remove the overlay");
 
   const shortcut = await g.startOverlay("shortcut");
-  assert.deepEqual(shortcut, { key: "S", modifiers: "alt,shift" });
+  assert.deepEqual(shortcut, { key: "S", modifiers: process.platform === "darwin" ? "alt,control" : "accel,alt" });
   assert.equal(await g.overlayPresent(), 1);
   await g.key("Escape");
   await g.until(async () => (await g.overlayPresent()) === 0, "Escape to remove the overlay");

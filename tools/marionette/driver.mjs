@@ -76,7 +76,7 @@ export class Driver {
     return (await this.s.send("WebDriver:ExecuteScript", { script, args, sandbox: "system" })).value;
   }
 
-  /** Clicks a button of the overlay's toolbar ("save", "copy-text", "copy-link", "cancel"). */
+  /** Clicks a button of the overlay's toolbar ("save", "copy-text", "copy-link", "copy-page-link", "cancel"). */
   async clickToolbar(action) {
     const c = await this.system(
       `const b = document.querySelector("snapii-overlay")?.openOrClosedShadowRoot
@@ -129,7 +129,7 @@ export class Driver {
   /**
    * Starts (or, with the overlay open, ends) a capture session the way a user
    * does, with the activeTab grant that comes with it: `shortcut` fires the
-   * start-capture key (Alt+Shift+S by default), `popup` clicks the toolbar
+   * start-capture key (Ctrl+Alt+S by default, MacCtrl+Alt+S on macOS), `popup` clicks the toolbar
    * button and then "Capture region" in the popup, and waits until the popup
    * has closed (it does once the background has started; a refused start
    * keeps it open with the reason). Returns the shortcut's <key> attributes,
@@ -185,7 +185,12 @@ export class Driver {
         keyshortcuts: $("capture").getAttribute("aria-keyshortcuts"),
         shortcutHidden: $("capture-shortcut").getAttribute("aria-hidden") === "true",
         status: $("status").textContent,
-        toggles: { ocr: box("ocr"), textFragment: box("textFragment"), saveAs: box("saveAs") },
+        toggles: {
+          ocr: box("ocr"),
+          textFragment: box("textFragment"),
+          removeTrackers: box("removeTrackers"),
+          saveAs: box("saveAs"),
+        },
         folder: {
           value: $("folder").value,
           error: $("folder-error").hidden ? "" : $("folder-error").textContent,

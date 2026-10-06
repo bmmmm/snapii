@@ -3,6 +3,7 @@
 // request or clipboard write → toast. Free of `browser.*` so the layout
 // harness can run it in page context with stubbed sendSave/writeClipboard;
 // main.ts wires the real messaging and clipboard.
+import { cleanPageUrl } from "../shared/cleanurl.ts";
 import { linksRelativeTo, runsRelativeTo } from "../shared/geometry.ts";
 import { runsToPlainText } from "../shared/plaintext.ts";
 import { fragmentToCleanHtml, type SNode, toSNodes } from "../shared/sanitize.ts";
@@ -64,6 +65,8 @@ const LATE_ERROR_TOAST = "The selection was captured, but no SVG came of it. Sta
 const COPY_FAILED_TOAST = "Copy failed. Try again";
 const NO_TEXT_TOAST = "No text in the selection";
 const COPIED_TEXT_TOAST = "Copied text";
+const COPIED_PAGE_LINK_TOAST = "Copied page link";
+const COPIED_CLEAN_LINK_TOAST = "Copied page link, tracking removed";
 
 /** Copy link's toast per fragment status: a page link says less than a text link, so the toast says why. */
 const LINK_TOAST: Record<FragmentStatus, string> = {
@@ -291,11 +294,15 @@ export function startSession(deps: SessionDeps): SessionHandle {
     });
   }
 
-  function fragmentFor(selection: Selection, sources: readonly RunSource[]): Fragment {
+  function fragmentFor(
+    selection: Selection,
+    sources: readonly RunSource[],
+    pageURL = location.href,
+  ): Fragment {
     if (!deps.settings.textFragment) return { url: null, status: "DISABLED" };
     const range = selectionRange(selection, selection.mode === "drag" ? anchorSources(sources) : sources);
     if (!range) return { url: null, status: "INVALID_SELECTION" };
-    return textFragmentURL(range, location.href);
+    return textFragmentURL(range, pageURL);
   }
 
   async function save(selection: Selection): Promise<void> {
@@ -414,14 +421,26 @@ export function startSession(deps: SessionDeps): SessionHandle {
     const sources = selection.mode === "drag" ? (await collect(selection)).sources : [];
     // As in copyText: no clipboard write for a session cancelled meanwhile.
     if (!open) return;
-    const fragment = fragmentFor(selection, sources);
-    const href = fragment.url ?? location.href;
+    const page = cleanPageUrl(location.href, deps.settings.removeTrackers);
+    const fragment = fragmentFor(selection, sources, page);
+    const href = fragment.url ?? page;
     const title = document.title.trim() || href;
     await deps.writeClipboard({
       plain: href,
       html: `<a href="${escapeAttr(href)}">${escapeText(title)}</a>`,
     });
     notify(LINK_TOAST[fragment.status]);
+  }
+
+  /** The page's address, without tracking parameters when the setting says so; it reads nothing of the selection. */
+  async function copyPageLink(): Promise<void> {
+    const href = cleanPageUrl(location.href, deps.settings.removeTrackers);
+    const title = document.title.trim() || href;
+    await deps.writeClipboard({
+      plain: href,
+      html: `<a href="${escapeAttr(href)}">${escapeText(title)}</a>`,
+    });
+    notify(href === location.href ? COPIED_PAGE_LINK_TOAST : COPIED_CLEAN_LINK_TOAST);
   }
 
   async function onAction(action: ToolbarAction, selection: Selection): Promise<void> {
@@ -432,7 +451,7 @@ export function startSession(deps: SessionDeps): SessionHandle {
       try {
         if (action === "copy-text") await copyText(selection);
         else {
-          await copyLink(selection);
+          await (action === "copy-page-link" ? copyPageLink() : copyLink(selection));
           close();
         }
       } catch (e) {

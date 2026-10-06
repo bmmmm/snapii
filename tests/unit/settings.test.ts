@@ -17,6 +17,7 @@ const GOOD: Settings = {
   saveFolder: "Pages/snapii",
   occlusionCheck: true,
   textFragment: false,
+  removeTrackers: false,
   ocr: true,
   output: "vector",
 };
@@ -75,6 +76,9 @@ const BAD: Array<[keyof Settings, unknown]> = [
   ["occlusionCheck", 0],
   ["textFragment", "false"],
   ["textFragment", {}],
+  ["removeTrackers", "false"],
+  ["removeTrackers", 0],
+  ["removeTrackers", null],
   ["ocr", "true"],
   ["ocr", 1],
   ["ocr", null],

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { type LegacyShortcutDeps, moveLegacyShortcut } from "../../src/background/legacy-shortcut.ts";
 
-const DEFAULT_KEY = "Alt+Shift+S";
+const DEFAULT_KEY = "Ctrl+Alt+S";
 
 /** Stubbed browser calls, each logged in the order they start. */
 function deps(state: { done?: boolean; menu?: string; capture?: string }, failAt?: "set" | "reset") {
@@ -24,7 +24,9 @@ function deps(state: { done?: boolean; menu?: string; capture?: string }, failAt
       log.push("captureShortcut");
       return state.capture ?? DEFAULT_KEY;
     },
-    captureDefault: DEFAULT_KEY,
+    async captureDefault() {
+      return DEFAULT_KEY;
+    },
     async setCaptureShortcut(shortcut) {
       log.push(`setCapture:${shortcut}`);
       if (failAt === "set") throw new Error("refused");

@@ -21,6 +21,18 @@ export const MENU_COMMAND = "_execute_action";
 
 export type Platform = "mac" | "other";
 
+/**
+ * A command's key in the manifest for one platform: its own entry, else
+ * "default". macOS has its own because "Ctrl" there is Command, and the key
+ * wanted is the Control key (MacCtrl).
+ */
+export function suggestedKeyFor(
+  suggested: { default?: string; mac?: string } | undefined,
+  platform: Platform,
+): string {
+  return (platform === "mac" ? suggested?.mac : undefined) ?? suggested?.default ?? "";
+}
+
 /** The fields of a KeyboardEvent the conversion reads. */
 export interface ShortcutKeyEvent {
   key: string;

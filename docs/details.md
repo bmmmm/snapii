@@ -318,5 +318,5 @@ Permissions, and why each one is declared:
 | `activeTab` | Access to the current tab, granted only when you click the button (opening its menu) or press the shortcut: injecting the overlay and capturing the visible tab; the menu also uses it to check whether snapii can run on the page. There are **no host permissions** (no "access your data for all websites"), so snapii cannot touch a tab you did not click. |
 | `scripting` | Injecting the content script on demand (the manifest has no `content_scripts`, nothing runs on a page until you start snapii there). |
 | `downloads` | Saving the SVG. |
-| `clipboardWrite` | Copy text and Copy link, also on pages without a secure origin. |
+| `clipboardWrite` | Copy text, Copy element link and Copy page link, also on pages without a secure origin. |
 | `storage` | The settings above, and the one-time flag. |

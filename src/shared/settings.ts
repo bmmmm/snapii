@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS: Settings = {
   saveFolder: "",
   occlusionCheck: false,
   textFragment: true,
+  removeTrackers: true,
   // Opt-in: every save with images then starts an 8 MB engine (dist/ocr/).
   ocr: false,
   // The raster file is the public contract; vector output is opt-in while it is in beta.

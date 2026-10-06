@@ -22,17 +22,21 @@ Status: **beta** (0.2.0) — see [Install](#install).
   time) in one file.
 - **Copy text** — the selection as clean text and simple HTML, without hidden
   text or scripts.
-- **Copy link** — a link that opens the page, jumps to the start of the
-  selection and highlights it (`#:~:text=`).
+- **Copy element link** — a link that opens the page, jumps to the start of
+  the selection and highlights it (`#:~:text=`).
+- **Copy page link** — the page's own address, without a text-fragment link.
+- **Without trackers** — both links leave out tracking parameters (`utm_*`,
+  `fbclid`, `gclid` and similar); can be switched off.
 - **Text in images (OCR)** — optional: words inside pictures, banners and
   canvases become selectable too, recognised offline (German + English).
   Real page text always wins.
-- **Your shortcut** — Alt+Shift+S by default starts a capture at once,
-  changeable right in snapii's settings (in Chromium: in the browser's
-  shortcut settings).
+- **Your shortcut** — Ctrl+Alt+S by default (Control+Option+S on macOS) starts
+  a capture at once, changeable right in snapii's settings. Chromium does not
+  load an extension with that default, so there it is Alt+Shift+S, changed in
+  the browser's shortcut settings.
 - **A small menu on the button** — start a capture, switch OCR, the
-  text-fragment link and the save-as dialog on or off, and pick the save
-  folder, right there.
+  text-fragment link, tracker removal and the save-as dialog on or off, and
+  pick the save folder, right there.
 - **Shapes and text (beta)** — optional output that writes backgrounds,
   borders, linear gradients and outer shadows as SVG shapes with visible text
   instead of one picture, and embeds images as their pixels: much smaller for
@@ -90,7 +94,8 @@ What differs from Firefox:
    snapii cannot run on (Firefox's own pages, addons.mozilla.org, the PDF
    viewer) the menu says why.
 2. Hover and click an element, or drag a rectangle. Escape cancels.
-3. Choose **Save SVG**, **Copy text** or **Copy link**.
+3. Choose **Save SVG**, **Copy text**, **Copy element link** or **Copy page
+   link**.
 
 Open the saved `.svg` in a browser to select text and follow links. Needs
 Firefox 157 or newer.

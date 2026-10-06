@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { manifestFor } from "../../src/shared/manifest.ts";
+import { suggestedKeyFor, validateShortcut } from "../../src/shared/shortcut.ts";
 
 const manifest = JSON.parse(readFileSync(new URL("../../src/manifest.json", import.meta.url), "utf8"));
 
@@ -44,9 +45,16 @@ test("manifest: the toolbar button opens popup.html; the shortcut is its own com
   // With a popup, _execute_action would only open the popup: the default key
   // belongs to start-capture, which the background handles in commands.onCommand.
   assert.deepEqual(manifest.commands["start-capture"], {
-    suggested_key: { default: "Alt+Shift+S" },
+    suggested_key: { default: "Ctrl+Alt+S", mac: "MacCtrl+Alt+S" },
     description: "Capture a region",
   });
+  // Control+Option+S on a Mac, Ctrl+Alt+S elsewhere; both are keys the browser accepts.
+  const key = manifest.commands["start-capture"].suggested_key;
+  assert.equal(suggestedKeyFor(key, "mac"), "MacCtrl+Alt+S");
+  assert.equal(suggestedKeyFor(key, "other"), "Ctrl+Alt+S");
+  for (const platform of ["mac", "other"] as const) {
+    assert.deepEqual(validateShortcut(suggestedKeyFor(key, platform)), { ok: true });
+  }
   // Declared without a key, so a user can bind "open the popup" in about:addons.
   assert.deepEqual(manifest.commands._execute_action, { description: "Open the snapii menu" });
   assert.deepEqual(Object.keys(manifest.commands).sort(), ["_execute_action", "start-capture"]);
@@ -91,16 +99,20 @@ test("manifest for Chromium: no Gecko block, a minimum version, PNG icons", () =
   }
 });
 
-test("manifest for Chromium: commands, popup, options page and CSP are the Firefox ones", () => {
+test("manifest for Chromium: the capture command keeps Alt+Shift+S, which Chromium loads; nothing else of the commands changes", () => {
   const chromium = manifestFor("chromium", manifest, "1.2.3");
-  for (const key of [
-    "manifest_version",
-    "name",
-    "description",
-    "commands",
-    "options_ui",
-    "content_security_policy",
-  ]) {
+  const commands = chromium.commands as Record<string, unknown>;
+  assert.deepEqual(commands["start-capture"], {
+    suggested_key: { default: "Alt+Shift+S" },
+    description: "Capture a region",
+  });
+  assert.deepEqual(commands._execute_action, manifest.commands._execute_action);
+  assert.deepEqual(Object.keys(commands).sort(), ["_execute_action", "start-capture"]);
+});
+
+test("manifest for Chromium: popup, options page and CSP are the Firefox ones", () => {
+  const chromium = manifestFor("chromium", manifest, "1.2.3");
+  for (const key of ["manifest_version", "name", "description", "options_ui", "content_security_policy"]) {
     assert.deepEqual(chromium[key], manifest[key], key);
   }
 });
