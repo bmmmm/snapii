@@ -18,7 +18,7 @@ import {
 } from "../../src/content/extract/collect.ts";
 import { collectLinkAreas } from "../../src/content/extract/images.ts";
 import { buildScene } from "../../src/content/extract/scene.ts";
-import { textFragmentURL } from "../../src/content/fragment.ts";
+import { GENERATION_TIMEOUT_MS, textFragmentURL } from "../../src/content/fragment.ts";
 import { startOverlay } from "../../src/content/overlay/overlay.ts";
 import { showToast } from "../../src/content/overlay/toolbar.ts";
 import { sessionToggle, startSession } from "../../src/content/session.ts";
@@ -125,6 +125,7 @@ const harness = {
   renderVector: vectorRenderer,
   debug: { collectTextRunsDetailed, sliceRect, probeBaseline, captureRect },
   textFragmentURL,
+  GENERATION_TIMEOUT_MS,
   cloneVisibleRange,
   toSNodes,
   fragmentToCleanHtml,

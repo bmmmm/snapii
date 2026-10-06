@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>fragment flood</title>
+    <style>
+      body { margin: 0; padding: 0 20px; font: 16px/1.5 serif; }
+      main { width: 760px; }
+      h2 { font-size: 20px; margin: 0; }
+      p { margin: 0; }
+      .kicker { display: block; }
+      article { margin-bottom: 12px; }
+    </style>
+    <!-- fragment.spec: a large front page where almost every text recurs.
+         8,000 teasers of a kicker, one of seven headlines, the same blurb and
+         the same "Read more" link. A range from a "Read more" has no
+         passage of its own, and every candidate the generator tries recurs
+         thousands of times. -->
+    <script type="application/json" id="expect">
+      {
+        "capture": "#t1",
+        "lines": [
+          "Politics",
+          "Headline number 1 about the situation",
+          "A short blurb on the topic with a few words that recur often.",
+          "Read more"
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <main id="feed"></main>
+    <script>
+      // Built while parsing: the page is complete at load.
+      const feed = document.getElementById("feed");
+      for (let i = 1; i <= 8000; i++) {
+        const a = document.createElement("article");
+        a.id = `t${i}`;
+        a.innerHTML =
+          '<span class="kicker">Politics</span>' +
+          `<h2>Headline number ${i % 7} about the situation</h2>` +
+          "<p>A short blurb on the topic with a few words that recur often.</p>" +
+          '<a href="#">Read more</a>';
+        feed.append(a);
+      }
+    </script>
+  </body>
+</html>
