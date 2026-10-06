@@ -170,7 +170,7 @@ pnpm drive start                      # builds dist/, launches Firefox (--headed
 pnpm drive open https://example.org/
 pnpm drive snap --element 'main p'    # or --drag x1 y1 x2 y2; --up N walks to ancestors; --popup
 pnpm drive popup                      # the toolbar menu: what it shows + screenshot
-pnpm drive save                       # or copy-text / copy-link: toast, file summary, clipboard
+pnpm drive save                       # or copy-text / copy-link / copy-page-link: toast, file summary, clipboard
 pnpm drive screenshot                 # PNG path; also console, eval, click, key, scroll, timing
 pnpm drive stop
 ```

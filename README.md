@@ -82,7 +82,7 @@ What differs from Firefox:
 - **Save SVG takes what is visible.** Chromium lets an extension capture the
   viewport only, so a selection that reaches beyond it cannot be saved: the
   overlay says so, and scrolling the selection fully into view makes Save
-  available again. Copy text and Copy link work for any selection. With
+  available again. Copy text and both links work for any selection. With
   Shapes and text output only the parts saved as pixels must be visible.
 - **The shortcut is changed in the browser**, at `chrome://extensions/shortcuts`
   (the settings page shows the current one and links there).
@@ -106,8 +106,8 @@ The most used ones (three switches and the save folder) are in the button's
 menu; all of them under **All settings…** there (or `about:addons` → snapii →
 Preferences): output (a picture with selectable text, or shapes and text),
 image format and JPEG quality, save-as dialog, save folder, skip covered text,
-text-fragment links, OCR for text in images (off by default), and the keyboard
-shortcut.
+text-fragment links, tracker removal from copied links, OCR for text in images
+(off by default), and the keyboard shortcut.
 
 The **save folder** is a folder name inside Firefox's Downloads folder, such as
 `snapii` or `Pages/snapii`, created when needed; empty means the Downloads

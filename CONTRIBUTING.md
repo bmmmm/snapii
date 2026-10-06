@@ -56,13 +56,13 @@ other environment variables and the interactive driver are in
 | `src/content/overlay/` | The selection overlay, hover pick, toolbar and toast, styled to survive hostile pages |
 | `src/content/extract/` | DOM → text runs (`collect.ts`, `lines.ts`, `baseline.ts`, `visibility.ts`, `flat-tree.ts`), link and image areas, the clean clone for Copy text |
 | `src/content/extract/scene.ts` | Vector output: the region's boxes, pictures and patches in paint order, and how each text run is painted; `extract/gradient.ts` and `extract/shadow.ts` read computed gradients and box shadows |
-| `src/content/fragment.ts`, `clipboard.ts` | Copy link's text-fragment URL; Copy text and Copy link on the clipboard |
+| `src/content/fragment.ts`, `clipboard.ts` | Copy element link's text-fragment URL; Copy text and both links on the clipboard |
 | `src/content/shadow.ts` | Shadow roots and assigned slots as a content script sees them, closed ones included, in either browser |
 | `src/shared/svg/` | The renderer (`build.ts`), the vector renderer (`vector.ts`), the metadata block (`metadata.ts`), XML escaping (`xml.ts`) |
 | `src/shared/types.ts` | Data contracts between content script, background and renderer, `Settings` |
 | `src/shared/messages.ts` | Runtime validation of every message the background receives |
 | `src/shared/settings.ts` | `DEFAULT_SETTINGS` |
-| `src/shared/*.ts` (rest) | Pure helpers: geometry, tiling, capture strategy, pick heuristic, toolbar placement, links, whitespace and plain text, HTML sanitising for Copy text, text directives, OCR geometry, file name, save-folder rules, shortcut syntax, CSS colours as numbers (`color.ts`), the version line (`about.ts`) |
+| `src/shared/*.ts` (rest) | Pure helpers: geometry, tiling, capture strategy, pick heuristic, toolbar placement, links, tracker removal from copied links (`cleanurl.ts`), whitespace and plain text, HTML sanitising for Copy text, text directives, OCR geometry, file name, save-folder rules, shortcut syntax, CSS colours as numbers (`color.ts`), the version line (`about.ts`) |
 | `src/shared/spike.ts` | Platform facts measured on Firefox 157 and on Chromium 151/153 (the headers say how); never edit by hand without a new measurement |
 | `src/shared/manifest.ts`, `target.ts` | The manifest each browser gets; which browser a bundle was built for (`TARGET`, set by the build) |
 | `src/shared/viewport.ts` | Chromium only: whether a region fits the viewport and where it lies in the captured picture |
@@ -98,7 +98,7 @@ Firefox 157.0`): it names the exact build and the Firefox version.
 - **snapii does not work on a site** — *does it work on example.org?* If not,
   it is the installation or the Firefox setup; if so, it is the site. Plus the
   exact message snapii showed.
-- **Copy text or Copy link gives the wrong result** — for links, *does
+- **Copy text or Copy element link gives the wrong result** — for links, *does
   Firefox's own Copy Link to Highlight work for the same passage?* If not, the
   page resists text links; if so, snapii's link is at fault. For Copy text,
   where it was pasted: rich editors get the HTML flavour, plain fields the

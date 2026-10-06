@@ -207,7 +207,7 @@ models ship in the add-on (8.3 MB of the unpacked add-on), nothing is downloaded
 - Photos are harder than graphics: on a Wikipedia photo of a road sign it
   read "Auf 1200" of "Auf 1200 m"; small, slanted or non-German/English text
   is often missed.
-- **Copy text** and **Copy link** stay DOM-only.
+- **Copy text** and **Copy element link** stay DOM-only.
 
 ## Viewers
 
