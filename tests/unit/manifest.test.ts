@@ -45,12 +45,14 @@ test("manifest: the toolbar button opens popup.html; the shortcut is its own com
   // With a popup, _execute_action would only open the popup: the default key
   // belongs to start-capture, which the background handles in commands.onCommand.
   assert.deepEqual(manifest.commands["start-capture"], {
-    suggested_key: { default: "Ctrl+Alt+S", mac: "MacCtrl+Alt+S" },
+    suggested_key: { default: "Ctrl+Alt+S", mac: "Command+Shift+E" },
     description: "Capture a region",
   });
-  // Control+Option+S on a Mac, Ctrl+Alt+S elsewhere; both are keys the browser accepts.
+  // Command+Shift+E on a Mac (free there; Ctrl+Shift+E elsewhere is Firefox's
+  // Network Monitor, and a built-in key wins), Ctrl+Alt+S elsewhere; both are
+  // keys the browser accepts.
   const key = manifest.commands["start-capture"].suggested_key;
-  assert.equal(suggestedKeyFor(key, "mac"), "MacCtrl+Alt+S");
+  assert.equal(suggestedKeyFor(key, "mac"), "Command+Shift+E");
   assert.equal(suggestedKeyFor(key, "other"), "Ctrl+Alt+S");
   for (const platform of ["mac", "other"] as const) {
     assert.deepEqual(validateShortcut(suggestedKeyFor(key, platform)), { ok: true });
@@ -99,11 +101,11 @@ test("manifest for Chromium: no Gecko block, a minimum version, PNG icons", () =
   }
 });
 
-test("manifest for Chromium: the capture command keeps Alt+Shift+S, which Chromium loads; nothing else of the commands changes", () => {
+test("manifest for Chromium: the capture command keeps Alt+Shift+S, which Chromium loads, and the Mac key; nothing else of the commands changes", () => {
   const chromium = manifestFor("chromium", manifest, "1.2.3");
   const commands = chromium.commands as Record<string, unknown>;
   assert.deepEqual(commands["start-capture"], {
-    suggested_key: { default: "Alt+Shift+S" },
+    suggested_key: { default: "Alt+Shift+S", mac: "Command+Shift+E" },
     description: "Capture a region",
   });
   assert.deepEqual(commands._execute_action, manifest.commands._execute_action);

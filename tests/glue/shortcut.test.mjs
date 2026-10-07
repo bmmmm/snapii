@@ -22,8 +22,8 @@ const ENTER = "\uE007";
 let g;
 let optionsUrl;
 let mac;
-// The manifest's key: Control+Option+S on a Mac, Ctrl+Alt+S elsewhere. The <key> modifiers are
-// measured on macOS ("alt,control"); elsewhere read from Firefox's source (Ctrl is "accel",
+// The manifest's key: Command+Shift+E on a Mac, Ctrl+Alt+S elsewhere. The <key> modifiers are
+// measured on macOS ("accel,shift"); elsewhere read from Firefox's source (Ctrl is "accel",
 // ShortcutUtils.getModifiersAttribute sorts), not run.
 let DEFAULT;
 let SHOWN;
@@ -37,9 +37,9 @@ before(async () => {
   optionsUrl = `moz-extension://${host}/options.html`;
   await g.open(optionsUrl);
   mac = await inPage(`return (await window.wrappedJSObject.browser.runtime.getPlatformInfo()).os === "mac";`);
-  DEFAULT = mac ? "MacCtrl+Alt+S" : "Ctrl+Alt+S";
-  SHOWN = mac ? "⌃⌥S" : "Ctrl+Alt+S";
-  DEFAULT_ELEMENT = { key: "S", modifiers: mac ? "alt,control" : "accel,alt" };
+  DEFAULT = mac ? "Command+Shift+E" : "Ctrl+Alt+S";
+  SHOWN = mac ? "⇧⌘E" : "Ctrl+Alt+S";
+  DEFAULT_ELEMENT = mac ? { key: "E", modifiers: "accel,shift" } : { key: "S", modifiers: "accel,alt" };
 });
 after(async () => {
   await g?.close();

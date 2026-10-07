@@ -22,19 +22,24 @@ export const MINIMUM_CHROME_VERSION = "151";
  * Chromium does not load an extension whose command default is Ctrl+Alt+<key>
  * (nor MacCtrl+Alt+<key> as the Mac one; measured on Chromium 151, the service
  * worker never starts), so it keeps the key the capture command had before
- * the Firefox default moved. The user can bind any key in chrome://extensions/shortcuts.
+ * the Firefox default moved. The Mac key is Command+Shift+<key>, which it
+ * takes as is. The user can bind any key in chrome://extensions/shortcuts.
  */
-const CHROMIUM_CAPTURE_KEY = { default: "Alt+Shift+S" };
+const CHROMIUM_CAPTURE_DEFAULT = "Alt+Shift+S";
 
 export function manifestFor(target: BuildTarget, source: Manifest, version: string): Manifest {
   if (target === "firefox") return { ...source, version };
   const { browser_specific_settings: _gecko, ...shared } = source;
   const commands = source.commands as Record<string, Manifest>;
+  const capture = commands["start-capture"] ?? {};
   return {
     ...shared,
     commands: {
       ...commands,
-      "start-capture": { ...commands["start-capture"], suggested_key: CHROMIUM_CAPTURE_KEY },
+      "start-capture": {
+        ...capture,
+        suggested_key: { ...(capture.suggested_key as Manifest), default: CHROMIUM_CAPTURE_DEFAULT },
+      },
     },
     version,
     minimum_chrome_version: MINIMUM_CHROME_VERSION,

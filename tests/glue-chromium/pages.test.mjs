@@ -10,7 +10,7 @@ import { startGlue } from "./env.mjs";
 
 // What commands.getAll() reports for the default binding: Chromium on macOS
 // gives the key in its symbol form.
-const SHORTCUT = process.platform === "darwin" ? "⌥⇧S" : "Alt+Shift+S";
+const SHORTCUT = process.platform === "darwin" ? "⇧⌘E" : "Alt+Shift+S";
 
 let g;
 before(async () => {

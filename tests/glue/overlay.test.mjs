@@ -46,7 +46,10 @@ test("item 1: toolbar popup's Capture region and the capture shortcut open the o
   await g.until(async () => (await g.overlayPresent()) === 0, "Escape to remove the overlay");
 
   const shortcut = await g.startOverlay("shortcut");
-  assert.deepEqual(shortcut, { key: "S", modifiers: process.platform === "darwin" ? "alt,control" : "accel,alt" });
+  assert.deepEqual(
+    shortcut,
+    process.platform === "darwin" ? { key: "E", modifiers: "accel,shift" } : { key: "S", modifiers: "accel,alt" },
+  );
   assert.equal(await g.overlayPresent(), 1);
   await g.key("Escape");
   await g.until(async () => (await g.overlayPresent()) === 0, "Escape to remove the overlay");

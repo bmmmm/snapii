@@ -129,7 +129,7 @@ export class Driver {
   /**
    * Starts (or, with the overlay open, ends) a capture session the way a user
    * does, with the activeTab grant that comes with it: `shortcut` fires the
-   * start-capture key (Ctrl+Alt+S by default, MacCtrl+Alt+S on macOS), `popup` clicks the toolbar
+   * start-capture key (Ctrl+Alt+S by default, Command+Shift+E on macOS), `popup` clicks the toolbar
    * button and then "Capture region" in the popup, and waits until the popup
    * has closed (it does once the background has started; a refused start
    * keeps it open with the reason). Returns the shortcut's <key> attributes,

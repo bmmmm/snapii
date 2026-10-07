@@ -33,7 +33,7 @@ the same time; 10 would collide with the Chromium suite's 8470–8479 and
 
 | # | Item | Status |
 |---|---|---|
-| 1 | Toolbar button → popup → Capture region, and the shortcut (Ctrl+Alt+S; macOS Control+Option+S), open the overlay; Escape leaves no `snapii-overlay` node | auto (tests/glue/overlay.test.mjs: item 1; the popup itself: tests/glue/popup.test.mjs) + human 1h |
+| 1 | Toolbar button → popup → Capture region, and the shortcut (Ctrl+Alt+S; macOS ⇧⌘E), open the overlay; Escape leaves no `snapii-overlay` node | auto (tests/glue/overlay.test.mjs: item 1; the popup itself: tests/glue/popup.test.mjs) + human 1h |
 | 2 | Hover highlights; ArrowUp/ArrowDown walk the ancestors; Q W E R act on the hovered or selected element, F cancels | auto (tests/glue/overlay.test.mjs: item 2 for F; the letters in both browsers: tests/layout/overlay.spec.ts "Q W E R act …", tests/layout/session.spec.ts "W on a hovered paragraph …") |
 | 3 | Element save → file in the download folder; opened in Firefox, select-all + copy gives the paragraph; links open | auto (tests/glue/save.test.mjs: item 3) + human 3h |
 | 4 | Drag across paragraphs → the SVG text has both | auto (tests/glue/save.test.mjs: item 4) |
@@ -69,7 +69,7 @@ refused).
 Human steps there (load `dist-chromium/` via `chrome://extensions` → Developer
 mode → Load unpacked):
 
-- **C1h: real shortcut.** Press Alt+Shift+S on a web page: the overlay opens
+- **C1h: real shortcut.** Press Alt+Shift+S (macOS: ⇧⌘E) on a web page: the overlay opens
   without the popup (the key press itself grants `activeTab`; the tests can
   only fire the command as an event). On `chrome://extensions` the toolbar
   button shows "×" and the reason for three seconds.
@@ -96,7 +96,7 @@ keys through the popup's TextInputProcessor),
 directory, and a headless in-process clipboard. Hence these human steps:
 
 **1h — real shortcut.** On the inline-links page press Ctrl+Alt+S on the
-keyboard (macOS: Control+Option+S): the overlay appears with the hint
+keyboard (macOS: ⇧⌘E): the overlay appears with the hint
 "Click an element or drag an area · ↑ ↓ parent/child · Q W E R act on it · Esc cancels". Press
 Escape. Open the Browser Toolbox' inspector (or run
 `document.querySelectorAll("snapii-overlay").length` in the page console):
@@ -146,7 +146,7 @@ paste it into Chrome — the same paragraph is highlighted.
 **10h — AMO and PDF viewer (need network / a PDF).** Open
 `https://addons.mozilla.org/`, click the snapii button: the popup's
 **Capture region** is disabled and below it "snapii cannot capture this page:
-…". Press Ctrl+Alt+S (macOS: Control+Option+S) instead: the button shows "×" for 3 s and its tooltip
+…". Press Ctrl+Alt+S (macOS: ⇧⌘E) instead: the button shows "×" for 3 s and its tooltip
 says the same. Same for a PDF opened in Firefox's viewer. Browser console
 (Cmd+Shift+J): no error from snapii.
 

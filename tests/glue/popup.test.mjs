@@ -137,10 +137,10 @@ test("toolbar click on a never-clicked tab: popup with Capture region focused, t
     assert.equal(await g.hasActiveTab(), true);
     assert.equal(state.capture.disabled, false);
     assert.equal(state.status, "");
-    assert.equal(state.shortcut, display("Ctrl+Alt+S", "⌃⌥S"));
-    assert.equal(state.capture.text, `Capture region ${display("Ctrl+Alt+S", "⌃⌥S")}`);
+    assert.equal(state.shortcut, display("Ctrl+Alt+S", "⇧⌘E"));
+    assert.equal(state.capture.text, `Capture region ${display("Ctrl+Alt+S", "⇧⌘E")}`);
     // Screen readers get the shortcut as such, not the glyphs as part of the name.
-    assert.equal(state.keyshortcuts, "Control+Alt+S");
+    assert.equal(state.keyshortcuts, display("Control+Alt+S", "Meta+Shift+E"));
     assert.equal(state.shortcutHidden, true);
     assert.deepEqual(state.toggles, { ocr: false, textFragment: true, removeTrackers: true, saveAs: false });
     assert.deepEqual(state.folder, { value: "", error: "", invalid: false });
@@ -414,7 +414,10 @@ test("the start-capture shortcut on a never-clicked tab: activeTab from the comm
     assert.equal(await g.hasActiveTab(), false);
     const before = g.svgFiles();
     const key = await g.startOverlay("shortcut");
-    assert.deepEqual(key, { key: "S", modifiers: process.platform === "darwin" ? "alt,control" : "accel,alt" });
+    assert.deepEqual(
+      key,
+      process.platform === "darwin" ? { key: "E", modifiers: "accel,shift" } : { key: "S", modifiers: "accel,alt" },
+    );
     assert.equal(await g.hasActiveTab(), true);
     assert.equal(await g.s.popupCount(), 0);
     await g.move(310, 290);

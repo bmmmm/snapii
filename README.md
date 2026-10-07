@@ -32,10 +32,10 @@ Status: **beta** (0.2.0) — see [Install](#install).
 - **Text in images (OCR)** — optional: words inside pictures, banners and
   canvases become selectable too, recognised offline (German + English).
   Real page text always wins.
-- **Your shortcut** — Ctrl+Alt+S by default (Control+Option+S on macOS) starts
-  a capture at once, changeable right in snapii's settings. Chromium does not
-  load an extension with that default, so there it is Alt+Shift+S, changed in
-  the browser's shortcut settings.
+- **Your shortcut** — Ctrl+Alt+S by default (⇧⌘E on macOS) starts a capture
+  at once, changeable right in snapii's settings. Chromium does not load an
+  extension with the Ctrl+Alt default, so there it is Alt+Shift+S (⇧⌘E on
+  macOS too), changed in the browser's shortcut settings.
 - **A small menu on the button** — start a capture, switch OCR, the
   text-fragment link, tracker removal and the save-as dialog on or off, and
   pick the save folder, right there.
