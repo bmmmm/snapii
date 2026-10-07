@@ -21,6 +21,11 @@ test("xmlAttr: additionally escapes the double quote", () => {
   assert.equal(xmlAttr("&"), "&amp;");
 });
 
+test("xmlAttr: tab, newline and carriage return survive attribute-value normalization as references", () => {
+  assert.equal(xmlAttr("a\tb\nc\rd"), "a&#9;b&#10;c&#13;d");
+  assert.equal(xmlText("a\tb\nc\rd"), "a\tb\nc\rd");
+});
+
 // XML 1.0 (5th ed.) Char, written out independently of the implementation.
 const isXmlChar = (cp: number): boolean =>
   cp === 0x9 ||

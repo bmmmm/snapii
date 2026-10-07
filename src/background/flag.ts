@@ -17,6 +17,9 @@ export interface FlagDeps {
 
 export const ERROR_BADGE_MS = 3000;
 
+// One notice per tab at a time: a second shortcut press restarts the clock.
+const timers = new Map<number, ReturnType<typeof setTimeout>>();
+
 export async function flagTab(
   action: FlagDeps,
   tabId: number,
@@ -25,9 +28,14 @@ export async function flagTab(
 ): Promise<void> {
   await action.setTitle({ tabId, title: `snapii cannot capture this page: ${reason}` });
   await action.setBadgeText({ tabId, text: "×" });
-  setTimeout(() => {
-    // The tab may be gone by then; nothing to restore in that case.
-    action.setBadgeText({ tabId, text: null }).catch(() => {});
-    action.setTitle({ tabId, title: null }).catch(() => {});
-  }, badgeMs);
+  clearTimeout(timers.get(tabId));
+  timers.set(
+    tabId,
+    setTimeout(() => {
+      timers.delete(tabId);
+      // The tab may be gone by then; nothing to restore in that case.
+      action.setBadgeText({ tabId, text: null }).catch(() => {});
+      action.setTitle({ tabId, title: null }).catch(() => {});
+    }, badgeMs),
+  );
 }

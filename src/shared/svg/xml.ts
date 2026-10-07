@@ -13,9 +13,17 @@ export function xmlText(s: string): string {
   return s.replace(INVALID_XML_CHARS, "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-/** As {@link xmlText}, plus `"` — for double-quoted attribute values. */
+/**
+ * As {@link xmlText}, plus `"` — for double-quoted attribute values. Tab,
+ * newline and carriage return become references: a parser normalizes the
+ * literal ones to spaces (XML 1.0 § 3.3.3).
+ */
 export function xmlAttr(s: string): string {
-  return xmlText(s).replace(/"/g, "&quot;");
+  return xmlText(s)
+    .replace(/"/g, "&quot;")
+    .replace(/\t/g, "&#9;")
+    .replace(/\n/g, "&#10;")
+    .replace(/\r/g, "&#13;");
 }
 
 /**

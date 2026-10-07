@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { rasterTextRenderer, renderTextLayer } from "../../src/shared/svg/build.ts";
+import { fmt } from "../../src/shared/svg/xml.ts";
 import type { LinkArea, RasterTile, RenderInput, TextRun } from "../../src/shared/types.ts";
 import { attr, byId, elements, isSeparator, named, parseXml, textOf, type XEl } from "./xml-reader.ts";
 
@@ -484,4 +485,10 @@ test("svg: OCR runs go into their own invisible <g id=ocr> after the DOM layer, 
   assert.ok(domLayer(out).startsWith(domLayer(plain).trimEnd()));
   // No runs (nothing recognised, or OCR off): no group at all.
   assert.ok(!render({ ocr: { runs: [], info: { ...OCR_INFO, words: 0 } } }).includes('id="ocr"'));
+});
+
+test("svg: a line of 200 000 runs renders (no argument spread over the runs)", () => {
+  const runs = Array.from({ length: 200_000 }, (_, i) => makeRun({ x: i * 10, line: 0 }));
+  const svg = renderTextLayer(runs, { visible: false });
+  assert.ok(svg.includes(`x="${fmt(199_999 * 10 + 10)}"`), "the separator sits at the line's right end");
 });

@@ -93,7 +93,8 @@ function runText(run: TextRun, opts: TextLayerOptions): string {
 // Keeps copied words of consecutive lines apart. Placed at the line's right
 // end so its own small box sits beside the line, not at the origin.
 function lineSeparator(lineRuns: TextRun[]): string {
-  const x = Math.max(...lineRuns.map((r) => r.x + r.width));
+  // A loop, not a spread: a line of some 10^5 runs would overflow the argument stack.
+  const x = lineRuns.reduce((max, r) => Math.max(max, r.x + r.width), Number.NEGATIVE_INFINITY);
   const y = lineRuns[lineRuns.length - 1]?.y ?? 0;
   return `<text x="${fmt(x)}" y="${fmt(y)}"> </text>`;
 }

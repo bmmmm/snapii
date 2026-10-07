@@ -69,3 +69,17 @@ test("flagTab: a tab that is gone when the notice ends leaves no unhandled rejec
   await sleep(30); // node:test fails the test on an unhandled rejection
   assert.equal(restoreCalls, 2);
 });
+
+test("flagTab: a second notice on the same tab outlives the first one's timer", async () => {
+  const h = harness();
+  await flagTab(h.action, 7, "a", 5);
+  await flagTab(h.action, 7, "b", 40);
+  await sleep(20);
+  assert.equal(
+    h.log.filter((e) => e === "badge:null").length,
+    0,
+    "the first timer must not clear the second notice",
+  );
+  await sleep(40);
+  assert.equal(h.log.filter((e) => e === "badge:null").length, 1);
+});
