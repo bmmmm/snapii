@@ -267,6 +267,61 @@ test("a click on nothing pickable clears the selection: hover state, no toolbar"
   expect(await actions(page)).toEqual([]);
 });
 
+test("Q W E R act on the selection and on a hovered element; F cancels; a modifier, busy and nothing hovered are ignored", async ({
+  page,
+}) => {
+  await start(page);
+  const toolbarHidden = () =>
+    page.evaluate(() => {
+      const tb = (window as unknown as TestWindow).__roots["snapii-overlay"]?.querySelector(".toolbar");
+      return tb instanceof HTMLElement ? tb.hidden : null;
+    });
+  const para = (action: string): Act => ({ action, mode: "element", rect: PARA, id: "para" });
+  // Hover, then one key: the hovered element is selected and acted on.
+  await page.mouse.move(200, 250);
+  await expect.poll(() => box(page)).toEqual(PARA);
+  expect(await toolbarHidden()).toBe(true);
+  await page.keyboard.press("w");
+  expect(await actions(page)).toEqual([para("copy-text")]);
+  expect(await toolbarHidden()).toBe(false);
+  // On the selection every key acts; the capital counts the same.
+  await page.keyboard.press("q");
+  await page.keyboard.press("e");
+  await page.keyboard.press("r");
+  await page.keyboard.press("Shift+W");
+  expect(await actions(page)).toEqual([
+    para("copy-text"),
+    para("save"),
+    para("copy-link"),
+    para("copy-page-link"),
+    para("copy-text"),
+  ]);
+  // Busy: no action, no cancel. Alt (a browser shortcut; Alt+Q is no menu mnemonic): no action.
+  await page.evaluate(() => (window as unknown as TestWindow).__handle.setBusy(true));
+  await page.keyboard.press("q");
+  await page.keyboard.press("f");
+  expect(await page.evaluate(() => document.querySelector("snapii-overlay"))).not.toBeNull();
+  await page.evaluate(() => (window as unknown as TestWindow).__handle.setBusy(false));
+  await page.keyboard.press("Alt+q");
+  expect((await actions(page)).length).toBe(5);
+  // Nothing hovered: the key selects nothing and does nothing.
+  await clickAt(page, 5, 5);
+  expect(await box(page)).toBeNull();
+  await page.keyboard.press("w");
+  expect((await actions(page)).length).toBe(5);
+  expect(await box(page)).toBeNull();
+  // F cancels like Escape, and the page never sees F's keyup.
+  await page.evaluate(() => {
+    const w = window as unknown as TestWindow;
+    w.__pageEvents = 0;
+    document.addEventListener("keyup", () => w.__pageEvents++, true);
+  });
+  await page.keyboard.press("f");
+  expect(await page.evaluate(() => document.querySelector("snapii-overlay"))).toBeNull();
+  expect(await page.evaluate(() => (window as unknown as TestWindow).__cancelled)).toBe(1);
+  expect(await page.evaluate(() => (window as unknown as TestWindow).__pageEvents)).toBe(0);
+});
+
 test("Escape removes the host and calls onCancel", async ({ page }) => {
   await start(page);
   await page.mouse.move(200, 250);
@@ -291,13 +346,21 @@ test("toolbar: below the selection; Save SVG and Copy text report the selection 
       toolbar: rectOf(".toolbar"),
       save: rectOf('[data-action="save"]'),
       text: rectOf('[data-action="copy-text"]'),
-      labels: [...root.querySelectorAll(".toolbar button")].map((b) => b.textContent),
+      // The label is the first text node; the key badge follows it.
+      labels: [...root.querySelectorAll(".toolbar button")].map((b) => b.firstChild?.textContent),
+      keys: [...root.querySelectorAll(".toolbar button")].map((b) => b.querySelector("kbd")?.textContent),
+      aria: [...root.querySelectorAll(".toolbar button")].map((b) => b.getAttribute("aria-keyshortcuts")),
     };
   });
   expect(buttons.labels).toEqual(["Save SVG", "Copy text", "Copy element link", "Copy page link", "Cancel"]);
+  expect(buttons.keys).toEqual(["Q", "W", "E", "R", "F"]);
+  expect(buttons.aria).toEqual(["Q", "W", "E", "R", "F"]);
   expect(buttons.toolbar.y).toBe(PARA.y - 150 + PARA.height + GAP);
-  // Layout rounding differs per platform (550.0000152587891 on Linux CI).
-  expect(buttons.toolbar.x + buttons.toolbar.width).toBeCloseTo(PARA.x + PARA.width, 2);
+  // Five buttons with their key badges are wider than the paragraph's right
+  // edge: right-aligned (tests/unit/place.test.ts) the toolbar would start
+  // left of the viewport, so it is clamped to its left edge.
+  expect(buttons.toolbar.width).toBeGreaterThan(PARA.x + PARA.width);
+  expect(buttons.toolbar.x).toBe(0);
   expect(await actions(page)).toEqual([]);
   await clickAt(page, buttons.save.x + 5, buttons.save.y + 5);
   await clickAt(page, buttons.text.x + 5, buttons.text.y + 5);
@@ -390,6 +453,7 @@ test("page-dispatched (untrusted) events neither select nor act; real input stil
     ["mousemove", 400, 700],
     ["mouseup", 400, 700],
     ["keydown", "Enter"],
+    ["keydown", "w"],
   ]);
   expect(await box(page)).toBeNull();
   expect(await actions(page)).toEqual([]);

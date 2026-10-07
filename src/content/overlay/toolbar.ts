@@ -5,13 +5,25 @@ import { adoptStyles, createHtml, styleHost, TOAST_CSS } from "./styles.ts";
 
 export type ToolbarButton = "save" | "copy-text" | "copy-link" | "copy-page-link" | "cancel";
 
-const BUTTONS: [ToolbarButton, string][] = [
-  ["save", "Save SVG"],
-  ["copy-text", "Copy text"],
-  ["copy-link", "Copy element link"],
-  ["copy-page-link", "Copy page link"],
-  ["cancel", "Cancel"],
+// Action, label and its key: the left hand's top row in toolbar order, so
+// after the capture shortcut nothing needs the mouse.
+const BUTTONS: [ToolbarButton, string, string][] = [
+  ["save", "Save SVG", "Q"],
+  ["copy-text", "Copy text", "W"],
+  ["copy-link", "Copy element link", "E"],
+  ["copy-page-link", "Copy page link", "R"],
+  ["cancel", "Cancel", "F"],
 ];
+
+/**
+ * The button a bare key press stands for, or null. Matched on `key` (the
+ * character typed, so the badge is what the user presses on any layout);
+ * Shift and Caps Lock give the capital, which counts the same.
+ */
+export function buttonForKey(key: string): ToolbarButton | null {
+  const upper = key.toUpperCase();
+  return BUTTONS.find(([, , k]) => k === upper)?.[0] ?? null;
+}
 
 export interface Toolbar {
   readonly el: HTMLElement;
@@ -32,10 +44,15 @@ export function createToolbar(): Toolbar {
   el.setAttribute("role", "toolbar");
   el.setAttribute("aria-label", "snapii");
   el.hidden = true;
-  const buttons = BUTTONS.map(([action, label]) => {
+  const buttons = BUTTONS.map(([action, label, key]) => {
     const b = createHtml("button");
     b.type = "button";
-    b.textContent = label;
+    const kbd = createHtml("kbd");
+    kbd.textContent = key;
+    // The badge is decoration; aria-keyshortcuts carries the key.
+    kbd.setAttribute("aria-hidden", "true");
+    b.append(label, kbd);
+    b.setAttribute("aria-keyshortcuts", key);
     b.dataset.action = action;
     if (action === "save") b.className = "primary";
     el.append(b);

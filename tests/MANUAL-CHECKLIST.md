@@ -34,7 +34,7 @@ the same time; 10 would collide with the Chromium suite's 8470–8479 and
 | # | Item | Status |
 |---|---|---|
 | 1 | Toolbar button → popup → Capture region, and the shortcut (Ctrl+Alt+S; macOS Control+Option+S), open the overlay; Escape leaves no `snapii-overlay` node | auto (tests/glue/overlay.test.mjs: item 1; the popup itself: tests/glue/popup.test.mjs) + human 1h |
-| 2 | Hover highlights; ArrowUp/ArrowDown walk the ancestors | auto (tests/glue/overlay.test.mjs: item 2) |
+| 2 | Hover highlights; ArrowUp/ArrowDown walk the ancestors; Q W E R act on the hovered or selected element, F cancels | auto (tests/glue/overlay.test.mjs: item 2 for F; the letters in both browsers: tests/layout/overlay.spec.ts "Q W E R act …", tests/layout/session.spec.ts "W on a hovered paragraph …") |
 | 3 | Element save → file in the download folder; opened in Firefox, select-all + copy gives the paragraph; links open | auto (tests/glue/save.test.mjs: item 3) + human 3h |
 | 4 | Drag across paragraphs → the SVG text has both | auto (tests/glue/save.test.mjs: item 4) |
 | 5 | Below-the-fold selection behaves per D1 (captured, not clipped) | auto (tests/glue/offscreen.test.mjs: item 5a, item 5b) + human 5h |
@@ -97,7 +97,7 @@ directory, and a headless in-process clipboard. Hence these human steps:
 
 **1h — real shortcut.** On the inline-links page press Ctrl+Alt+S on the
 keyboard (macOS: Control+Option+S): the overlay appears with the hint
-"Click an element or drag an area · ↑ ↓ parent/child · Esc cancels". Press
+"Click an element or drag an area · ↑ ↓ parent/child · Q W E R act on it · Esc cancels". Press
 Escape. Open the Browser Toolbox' inspector (or run
 `document.querySelectorAll("snapii-overlay").length` in the page console):
 0 nodes. Click the toolbar button: the popup opens with **Capture region**

@@ -95,6 +95,14 @@ export const OVERLAY_CSS = `
   white-space: nowrap;
 }
 .toolbar button:hover { background: #e8e8ed; }
+.toolbar button kbd {
+  margin-left: 6px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font: 11px/1 system-ui, sans-serif;
+  background: rgba(0, 0, 0, 0.08);
+}
+.toolbar button.primary kbd { background: rgba(255, 255, 255, 0.25); }
 .toolbar button.primary { background: ${ACCENT}; color: #fff; }
 .toolbar button.primary:hover { background: #0060df; }
 .toolbar button:disabled { opacity: 0.5; cursor: progress; }

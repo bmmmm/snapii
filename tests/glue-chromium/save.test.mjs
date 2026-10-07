@@ -204,7 +204,9 @@ test("vector output with a patch beyond the viewport: the toast says so and noth
     assert.equal(await g.until(() => g.toast(), "the toast"), VECTOR_NOTICE);
     assert.equal(await g.overlayPresent(), true);
     assert.deepEqual(g.svgFiles(), before);
-    await g.key("Escape");
+    // The toolbar's F key closes it like Escape, as a real key event.
+    await g.key("f");
+    await g.until(async () => !(await g.overlayPresent()), "F to remove the overlay");
 
     await g.scrollTo(2900);
     // #below in client px now: 100,100 to 700,500.

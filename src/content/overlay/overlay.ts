@@ -7,7 +7,7 @@ import { placeToolbar } from "../../shared/place.ts";
 import type { DocRect } from "../../shared/types.ts";
 import { clampedRect, docRectOf, parentOf, pickAt, visibleViewport } from "./pick.ts";
 import { adoptStyles, createHtml, OVERLAY_CSS, setImportant, styleHost } from "./styles.ts";
-import { createToolbar, type ToolbarButton } from "./toolbar.ts";
+import { buttonForKey, createToolbar, type ToolbarButton } from "./toolbar.ts";
 
 export interface Selection {
   mode: "element" | "drag";
@@ -35,7 +35,7 @@ export const DRAG_THRESHOLD = 40;
 
 type State = "hover" | "pressed" | "dragging" | "selected";
 
-const HINT_TEXT = "Click an element or drag an area · ↑ ↓ parent/child · Esc cancels";
+const HINT_TEXT = "Click an element or drag an area · ↑ ↓ parent/child · Q W E R act on it · Esc cancels";
 
 // Swallowed so the page never reacts while the overlay is up. Pointer events
 // are only stopped, not default-prevented: preventDefault on pointerdown would
@@ -191,19 +191,20 @@ export function startOverlay(opts: {
   }
 
   /**
-   * The overlay is gone before Escape's keyup arrives; without this the page
-   * would still see that keyup (e.g. a modal closing on Escape).
+   * The overlay is gone before the keyup of the key that closed it arrives;
+   * without this the page would still see that keyup (e.g. a modal closing
+   * on Escape, a video going fullscreen on F).
    */
-  function swallowEscapeKeyup(): void {
+  function swallowKeyup(key: string): void {
     const off = (): void => window.removeEventListener("keyup", onKeyup, true);
     const onKeyup = (e: KeyboardEvent): void => {
-      if (e.key !== "Escape") return;
+      if (e.key !== key) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       off();
     };
     window.addEventListener("keyup", onKeyup, true);
-    // A keyup lost to a focus change must not eat a later Escape of the page.
+    // A keyup lost to a focus change must not eat a later press of the page.
     setTimeout(off, 1000);
   }
 
@@ -313,7 +314,7 @@ export function startOverlay(opts: {
       case "Escape":
         e.preventDefault();
         if (busy) break;
-        swallowEscapeKeyup();
+        swallowKeyup(e.key);
         cancel();
         break;
       case "Enter":
@@ -330,6 +331,31 @@ export function startOverlay(opts: {
         e.preventDefault();
         if (!busy) walk(e.key === "ArrowUp");
         break;
+      default: {
+        // A letter with Ctrl, Meta or Alt is a browser shortcut (⌘W closes the tab).
+        if (e.ctrlKey || e.metaKey || e.altKey) break;
+        const button = buttonForKey(e.key);
+        if (!button) break;
+        e.preventDefault();
+        if (busy) break;
+        if (button === "cancel") {
+          swallowKeyup(e.key);
+          cancel();
+          break;
+        }
+        // On a hovered element the key selects it first: hover, then one
+        // key, is the whole gesture.
+        if (state === "hover") {
+          flushHover();
+          if (!hovered) break;
+          selectElement(hovered);
+        }
+        if (state !== "selected") break;
+        // A copied link closes the overlay before the key comes up.
+        swallowKeyup(e.key);
+        runAction(button);
+        break;
+      }
     }
   }
 

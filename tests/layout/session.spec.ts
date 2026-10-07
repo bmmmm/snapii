@@ -341,6 +341,26 @@ test("copy text: visible text as plain + clean HTML; the overlay stays, nothing 
   expect(await calls(page)).toEqual([]);
 });
 
+test("W on a hovered paragraph copies its text; the overlay stays for the next key", async ({ page }) => {
+  await load(page);
+  await begin(page, { ok: true, filename: "x.svg" });
+  const r = await page.evaluate(() => {
+    const b = document.getElementById("para")?.getBoundingClientRect();
+    return b ? { x: b.x + 10, y: b.y + b.height / 2 } : null;
+  });
+  if (!r) throw new Error("no #para");
+  await page.mouse.move(r.x, r.y);
+  await expect.poll(() => toolbarRect(page)).toBeNull();
+  await page.keyboard.press("w");
+  await expect.poll(() => toastText(page)).toBe("Copied text");
+  const [clip, ...rest] = await clips(page);
+  expect(rest).toEqual([]);
+  expect(clip?.plain).toBe("Some paragraph text with a link inside.");
+  expect(await hostState(page)).toEqual({ attached: true, display: "block" });
+  expect(await toolbarRect(page)).not.toBeNull();
+  expect(await calls(page)).toEqual([]);
+});
+
 test("copy link: the text-fragment URL of the picked paragraph, as plain text and as a titled link; the overlay closes", async ({
   page,
 }) => {

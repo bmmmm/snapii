@@ -17,7 +17,9 @@ Status: **beta** (0.2.0) — see [Install](#install).
 ## Features
 
 - **Pick or drag** — hover an element and click, walk up/down with ↑/↓, or drag
-  any rectangle (in Firefox also beyond the visible part of the page).
+  any rectangle (in Firefox also beyond the visible part of the page). Every
+  button has a key — Q, W, E, R and F, the letters on the buttons — so after
+  the shortcut the mouse can stay where it is.
 - **Save SVG** — picture + invisible text layer + links + metadata (source URL,
   time) in one file.
 - **Copy text** — the selection as clean text and simple HTML, without hidden
@@ -95,7 +97,9 @@ What differs from Firefox:
    viewer) the menu says why.
 2. Hover and click an element, or drag a rectangle. Escape cancels.
 3. Choose **Save SVG**, **Copy text**, **Copy element link** or **Copy page
-   link**.
+   link** — or press the letter shown on the button: **Q** saves, **W** copies
+   the text, **E** and **R** copy the element or page link, **F** cancels. The
+   letters work on a hovered element too, before you click it.
 
 Open the saved `.svg` in a browser to select text and follow links. Needs
 Firefox 157 or newer.

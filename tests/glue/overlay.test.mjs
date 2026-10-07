@@ -59,7 +59,7 @@ test("item 1: toolbar popup's Capture region and the capture shortcut open the o
   await g.until(async () => (await g.overlayPresent()) === 0, "the second shortcut to close the overlay");
 });
 
-test("item 2: hover highlights the element under the pointer; ArrowUp/ArrowDown walk the ancestors", async () => {
+test("item 2: hover highlights the element under the pointer; ArrowUp/ArrowDown walk the ancestors; F cancels", async () => {
   await g.open(PAGE);
   await g.startOverlay();
   await g.move(center(PARA).x, center(PARA).y);
@@ -75,7 +75,9 @@ test("item 2: hover highlights the element under the pointer; ArrowUp/ArrowDown 
   assert.deepEqual(strip(await highlight()), CARD);
   await g.key("ArrowDown");
   assert.deepEqual(strip(await highlight()), PARA);
-  await g.key("Escape");
+  // The toolbar's keys are real key events here, not Playwright's.
+  await g.key("f");
+  await g.until(async () => (await g.overlayPresent()) === 0, "F to remove the overlay");
 });
 
 for (const [name, url] of [
