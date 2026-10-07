@@ -13,6 +13,7 @@
           "Before shadow.",
           "Shadow intro slotted span shadow outro.",
           "Deep shadow text.",
+          "Fallback text.",
           "Default slotted text.",
           "After shadow."
         ],
@@ -29,6 +30,7 @@
           <div>
             <template shadowrootmode="open"><p>Deep shadow text.</p></template>
           </div>
+          <p><slot name="empty">Fallback text.</slot></p>
           <div><slot></slot></div>
         </template>
         <span slot="s">slotted span</span>

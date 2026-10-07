@@ -198,6 +198,39 @@ test("the skipped subtree (the overlay) is not in the scene", async ({ page }) =
   expect(fills.skipped).toBe(0);
 });
 
+// Closed trees as the Chromium content script reaches them (see closed-shadow.spec.ts):
+// both the forwarding slot and the slot it is assigned to are found through the stub.
+test("text forwarded through two closed shadow trees is painted in the inner slot's colour", async ({
+  page,
+}) => {
+  await page.goto("/fixtures/smoke.html");
+  await page.addScriptTag({ path: "dist-test/harness.js" });
+  const got = await page.evaluate(async () => {
+    const closed = new WeakMap<Element, ShadowRoot>();
+    (window as Window & { browser?: unknown }).browser = {
+      dom: { openOrClosedShadowRoot: (el: Element) => closed.get(el) ?? el.shadowRoot },
+    };
+    document.body.innerHTML =
+      '<main id="cap" style="font: 16px/1.5 serif; width: 300px"><x-outer>forwarded text</x-outer></main>';
+    const outer = document.querySelector("x-outer") as HTMLElement;
+    const outerRoot = outer.attachShadow({ mode: "closed" });
+    closed.set(outer, outerRoot);
+    outerRoot.innerHTML = "<x-inner><slot></slot></x-inner>";
+    const inner = outerRoot.querySelector("x-inner") as HTMLElement;
+    const innerRoot = inner.attachShadow({ mode: "closed" });
+    closed.set(inner, innerRoot);
+    innerRoot.innerHTML = '<div style="color: rgb(0, 120, 0)"><slot></slot></div>';
+
+    const h = window.__snapii;
+    const capture = h.debug.captureRect("#cap");
+    const { runs, sources } = await h.debug.collectTextRunsDetailed(document, capture, {});
+    const scene = h.buildScene(document, capture, { runs, sources });
+    return { texts: runs.map((r) => r.text), paints: scene.text.map((t) => t?.fill ?? null) };
+  });
+  expect(got.texts).toEqual(["forwarded text"]);
+  expect(got.paints).toEqual([{ r: 0, g: 120, b: 0, a: 1 }]);
+});
+
 /** The scene of #cap after `html` replaced the smoke page's body (and its pictures loaded). */
 async function sceneOf(page: Page, html: string, encoding?: { format: "png" | "jpeg"; jpegQuality: number }) {
   await page.goto("/fixtures/smoke.html");

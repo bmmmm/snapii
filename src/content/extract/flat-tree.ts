@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Walks the flat tree, the tree the user actually sees: shadow roots instead
-// of their hosts' light children, slots replaced by what is assigned to them,
-// same-origin iframes entered in place. Node-type checks use nodeType and
+// of their hosts' light children, slots followed by what is assigned to them
+// (a slot forwarded into another slot is yielded on the way, as flatParent
+// names it), same-origin iframes entered in place. Node-type checks use nodeType and
 // localName because instanceof fails across iframe realms.
 
 import { assignedSlotOf, shadowRootOf } from "../shadow.ts";
@@ -97,8 +98,10 @@ export function* walkFlatTree(root: Document | Element, opts: WalkOptions = {}):
     if (shadow) {
       stack.push({ list: shadow.childNodes, i: 0, ctx });
     } else if (el.localName === "slot" && isShadowRoot(el.getRootNode())) {
-      // flatten: nested slots resolve to their content, empty slots to fallback.
-      stack.push({ list: (el as HTMLSlotElement).assignedNodes({ flatten: true }), i: 0, ctx });
+      // Not flattened: a forwarded slot is a node here too, so what it carries
+      // finds it as flatParent. An empty slot shows its fallback children.
+      const assigned = (el as HTMLSlotElement).assignedNodes();
+      stack.push({ list: assigned.length > 0 ? assigned : el.childNodes, i: 0, ctx });
     } else {
       stack.push({ list: el.childNodes, i: 0, ctx });
     }
