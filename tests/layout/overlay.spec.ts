@@ -212,6 +212,29 @@ test("wheel-scrolling during a drag extends the rect", async ({ page }) => {
   expect((await actions(page))[0]?.rect).toEqual({ x: 300, y: 300, width: 9, height: 240 });
 });
 
+test("a selected fixed element keeps its box on screen while the page scrolls, and is saved where it is", async ({
+  page,
+}) => {
+  await start(page);
+  const vh = page.viewportSize()?.height ?? 0;
+  const fixed = { x: 0, y: vh - 50, width: 200, height: 50 };
+  await clickAt(page, 100, vh - 25);
+  await expect.poll(() => box(page)).toEqual(fixed);
+  // The box keeps its client position until the overlay handles the scroll
+  // event, which Chromium fires a frame after scrollTo: wait for it, or Enter
+  // would save the rect of before.
+  const scrolled = page.evaluate(
+    () => new Promise<void>((done) => addEventListener("scroll", () => done(), { once: true })),
+  );
+  await scrollTo(page, 500);
+  await scrolled;
+  await expect.poll(() => box(page)).toEqual(fixed);
+  await page.keyboard.press("Enter");
+  expect(await actions(page)).toEqual([
+    { action: "save", mode: "element", rect: { ...fixed, y: fixed.y + 500 }, id: "fixed" },
+  ]);
+});
+
 test("a 39 px move stays a click and selects the hovered element", async ({ page }) => {
   await start(page);
   await page.mouse.move(200, 250);

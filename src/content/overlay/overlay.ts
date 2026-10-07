@@ -339,9 +339,13 @@ export function startOverlay(opts: {
 
   function onScroll(): void {
     // Content under a still pointer changes; a drag grows with the scroll
-    // because its end point is pointer + scroll offset.
+    // because its end point is pointer + scroll offset; a fixed or sticky
+    // element moves with it, so its document rect is read anew.
     if (state === "hover") scheduleHover();
-    else render();
+    else {
+      if (selection?.element?.isConnected) selection.rect = docRectOf(selection.element);
+      render();
+    }
   }
 
   const listeners: [EventTarget, string, EventListener, AddEventListenerOptions][] = [
