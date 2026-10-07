@@ -6,7 +6,7 @@ import { adoptStyles, createHtml, styleHost, TOAST_CSS } from "./styles.ts";
 export type ToolbarButton = "save" | "copy-text" | "copy-link" | "copy-page-link" | "cancel";
 
 // Action, label and its key: the left hand's top row in toolbar order, so
-// after the capture shortcut nothing needs the mouse.
+// hovering an element and one key is the whole gesture.
 const BUTTONS: [ToolbarButton, string, string][] = [
   ["save", "Save SVG", "Q"],
   ["copy-text", "Copy text", "W"],
@@ -16,9 +16,10 @@ const BUTTONS: [ToolbarButton, string, string][] = [
 ];
 
 /**
- * The button a bare key press stands for, or null. Matched on `key` (the
- * character typed, so the badge is what the user presses on any layout);
- * Shift and Caps Lock give the capital, which counts the same.
+ * The button a bare key press stands for, or null. Matched on `key`, the
+ * character typed, so the badge is what the user presses on QWERTZ and AZERTY
+ * alike (a layout without Latin letters has no key for it); Shift and Caps
+ * Lock give the capital, which counts the same.
  */
 export function buttonForKey(key: string): ToolbarButton | null {
   const upper = key.toUpperCase();

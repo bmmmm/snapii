@@ -112,7 +112,7 @@ test("background: a key left on the toolbar-action command moves to the capture 
   ]);
 });
 
-test("background: on macOS the capture command still has its default when it is MacCtrl+Alt+S, so the left key moves", async () => {
+test("background: on macOS the capture command still has its default (MacCtrl+Alt+S in this fixture), so the left key moves", async () => {
   const { calls } = await run([], "Alt+Shift+Y", false, {}, "mac");
   assert.deepEqual(calls, [
     "update:start-capture:Alt+Shift+Y",

@@ -296,27 +296,44 @@ test("Q W E R act on the selection and on a hovered element; F cancels; a modifi
     para("copy-page-link"),
     para("copy-text"),
   ]);
-  // Busy: no action, no cancel. Alt (a browser shortcut; Alt+Q is no menu mnemonic): no action.
+  // Busy: no action, no cancel.
   await page.evaluate(() => (window as unknown as TestWindow).__handle.setBusy(true));
   await page.keyboard.press("q");
   await page.keyboard.press("f");
   expect(await page.evaluate(() => document.querySelector("snapii-overlay"))).not.toBeNull();
   await page.evaluate(() => (window as unknown as TestWindow).__handle.setBusy(false));
+  // A modifier makes it a browser shortcut: no action. (Alt+Q is no menu
+  // mnemonic; Ctrl+Q would quit Firefox on Linux, Meta+W close the tab.)
   await page.keyboard.press("Alt+q");
+  await page.keyboard.press("Control+e");
+  await page.keyboard.press("Meta+e");
   expect((await actions(page)).length).toBe(5);
+  // Auto-repeat (a second keydown before the keyup) is one action, not two.
+  await page.keyboard.down("w");
+  await page.keyboard.down("w");
+  await page.keyboard.up("w");
+  expect((await actions(page)).length).toBe(6);
   // Nothing hovered: the key selects nothing and does nothing.
   await clickAt(page, 5, 5);
   expect(await box(page)).toBeNull();
   await page.keyboard.press("w");
-  expect((await actions(page)).length).toBe(5);
+  expect((await actions(page)).length).toBe(6);
   expect(await box(page)).toBeNull();
-  // F cancels like Escape, and the page never sees F's keyup.
+  // F cancels like Escape, and the page never sees its keyup, whichever
+  // case the keyup has (Shift+F: keydown and keyup "F"). The Shift keyup
+  // itself does reach the page: a modifier alone is not swallowed.
   await page.evaluate(() => {
     const w = window as unknown as TestWindow;
     w.__pageEvents = 0;
-    document.addEventListener("keyup", () => w.__pageEvents++, true);
+    document.addEventListener(
+      "keyup",
+      (e) => {
+        if (e.key !== "Shift") w.__pageEvents++;
+      },
+      true,
+    );
   });
-  await page.keyboard.press("f");
+  await page.keyboard.press("Shift+F");
   expect(await page.evaluate(() => document.querySelector("snapii-overlay"))).toBeNull();
   expect(await page.evaluate(() => (window as unknown as TestWindow).__cancelled)).toBe(1);
   expect(await page.evaluate(() => (window as unknown as TestWindow).__pageEvents)).toBe(0);
@@ -361,6 +378,19 @@ test("toolbar: below the selection; Save SVG and Copy text report the selection 
   // left of the viewport, so it is clamped to its left edge.
   expect(buttons.toolbar.width).toBeGreaterThan(PARA.x + PARA.width);
   expect(buttons.toolbar.x).toBe(0);
+  // With room to its left the toolbar is right-aligned to the selection.
+  await clickAt(page, 1000, 150); // #art at client y -50..350
+  await expect.poll(() => box(page)).toEqual({ ...ART, y: ART.y - 150 });
+  const art = await page.evaluate(() => {
+    const root = (window as unknown as TestWindow).__roots["snapii-overlay"] as ShadowRoot;
+    const r = (root.querySelector(".toolbar") as HTMLElement).getBoundingClientRect();
+    return { x: r.x, width: r.width };
+  });
+  expect(art.width).toBeLessThan(ART.width + ART.x);
+  // Layout rounding differs per platform (550.0000152587891 on Linux CI).
+  expect(art.x + art.width).toBeCloseTo(ART.x + ART.width, 2);
+  await clickAt(page, 200, 100);
+  await expect.poll(() => box(page)).toEqual({ ...PARA, y: PARA.y - 150 });
   expect(await actions(page)).toEqual([]);
   await clickAt(page, buttons.save.x + 5, buttons.save.y + 5);
   await clickAt(page, buttons.text.x + 5, buttons.text.y + 5);
@@ -471,7 +501,10 @@ test("page-dispatched (untrusted) events neither select nor act; real input stil
     ["mouseup", save.x, save.y],
     ["click", save.x, save.y],
     ["keydown", "Enter"],
+    ["keydown", "w"],
+    ["keydown", "e"],
     ["keydown", "ArrowUp"],
+    ["keydown", "f"],
     ["keydown", "Escape"],
   ]);
   expect(await actions(page)).toEqual([]);

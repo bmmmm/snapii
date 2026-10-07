@@ -18,8 +18,8 @@ Status: **beta** (0.2.0) — see [Install](#install).
 
 - **Pick or drag** — hover an element and click, walk up/down with ↑/↓, or drag
   any rectangle (in Firefox also beyond the visible part of the page). Every
-  button has a key — Q, W, E, R and F, the letters on the buttons — so after
-  the shortcut the mouse can stay where it is.
+  button has a key — Q, W, E, R and F, the letters on the buttons — so
+  hovering an element and one key is the whole gesture.
 - **Save SVG** — picture + invisible text layer + links + metadata (source URL,
   time) in one file.
 - **Copy text** — the selection as clean text and simple HTML, without hidden

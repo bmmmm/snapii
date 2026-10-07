@@ -361,6 +361,34 @@ test("W on a hovered paragraph copies its text; the overlay stays for the next k
   expect(await calls(page)).toEqual([]);
 });
 
+test("E on a hovered paragraph copies its link and closes the overlay; the page never sees E's keyup", async ({
+  page,
+}) => {
+  await load(page);
+  await begin(page, { ok: true, filename: "x.svg" });
+  const r = await page.evaluate(() => {
+    const b = document.getElementById("para")?.getBoundingClientRect();
+    return b ? { x: b.x + 10, y: b.y + b.height / 2 } : null;
+  });
+  if (!r) throw new Error("no #para");
+  await page.evaluate(() => {
+    const w = window as unknown as TestWindow & { __keyups: number };
+    w.__keyups = 0;
+    document.addEventListener("keyup", () => w.__keyups++, true);
+  });
+  await page.mouse.move(r.x, r.y);
+  await expect.poll(() => toolbarRect(page)).toBeNull();
+  // The copy is async: the overlay closes while E is still down, in the
+  // real timing of a press as well as with a held key.
+  await page.keyboard.down("e");
+  await expect.poll(() => toastText(page)).toBe("Copied link");
+  expect(await hostState(page)).toEqual({ attached: false, display: null });
+  await page.keyboard.up("e");
+  const [clip] = await clips(page);
+  expect(clip?.plain).toMatch(/#:~:text=/);
+  expect(await page.evaluate(() => (window as unknown as { __keyups: number }).__keyups)).toBe(0);
+});
+
 test("copy link: the text-fragment URL of the picked paragraph, as plain text and as a titled link; the overlay closes", async ({
   page,
 }) => {

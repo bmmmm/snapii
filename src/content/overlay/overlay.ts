@@ -41,7 +41,7 @@ const HINT_TEXT = "Click an element or drag an area · ↑ ↓ parent/child · Q
 // are only stopped, not default-prevented: preventDefault on pointerdown would
 // suppress the compatibility mouse events the state machine runs on.
 const MOUSE_EVENTS = ["mousedown", "mousemove", "mouseup", "click", "dblclick", "auxclick", "contextmenu"];
-const STOP_ONLY_EVENTS = ["pointerdown", "pointermove", "pointerup", "keyup", "keypress"];
+const STOP_ONLY_EVENTS = ["pointerdown", "pointermove", "pointerup", "keypress"];
 const PREVENT_EVENTS = ["selectstart", "dragstart"];
 
 export function startOverlay(opts: {
@@ -81,6 +81,8 @@ export function startOverlay(opts: {
   let toolbarPress: ToolbarButton | null = null;
   let frame = 0;
   let blocked: string | null = null;
+  /** Lower-cased key of a handled keydown whose keyup has not arrived yet. */
+  let held: string | null = null;
 
   const page = (): { x: number; y: number } => ({ x: pointer.x + scrollX, y: pointer.y + scrollY });
 
@@ -193,12 +195,13 @@ export function startOverlay(opts: {
   /**
    * The overlay is gone before the keyup of the key that closed it arrives;
    * without this the page would still see that keyup (e.g. a modal closing
-   * on Escape, a video going fullscreen on F).
+   * on Escape, a page shortcut listening on keyup). Case-insensitive: a
+   * Shift released first turns the keyup of "F" into "f".
    */
   function swallowKeyup(key: string): void {
     const off = (): void => window.removeEventListener("keyup", onKeyup, true);
     const onKeyup = (e: KeyboardEvent): void => {
-      if (e.key !== key) return;
+      if (e.key.toLowerCase() !== key) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       off();
@@ -314,7 +317,7 @@ export function startOverlay(opts: {
       case "Escape":
         e.preventDefault();
         if (busy) break;
-        swallowKeyup(e.key);
+        held = "escape";
         cancel();
         break;
       case "Enter":
@@ -337,9 +340,10 @@ export function startOverlay(opts: {
         const button = buttonForKey(e.key);
         if (!button) break;
         e.preventDefault();
-        if (busy) break;
+        // Auto-repeat would copy again on every repeat.
+        if (busy || e.repeat) break;
+        held = e.key.toLowerCase();
         if (button === "cancel") {
-          swallowKeyup(e.key);
           cancel();
           break;
         }
@@ -350,10 +354,7 @@ export function startOverlay(opts: {
           if (!hovered) break;
           selectElement(hovered);
         }
-        if (state !== "selected") break;
-        // A copied link closes the overlay before the key comes up.
-        swallowKeyup(e.key);
-        runAction(button);
+        if (state === "selected") runAction(button);
         break;
       }
     }
@@ -361,6 +362,11 @@ export function startOverlay(opts: {
 
   function onStop(e: Event): void {
     e.stopImmediatePropagation();
+  }
+
+  function onKeyup(e: KeyboardEvent): void {
+    e.stopImmediatePropagation();
+    if (held !== null && e.key.toLowerCase() === held) held = null;
   }
 
   function onScroll(): void {
@@ -394,6 +400,7 @@ export function startOverlay(opts: {
       { capture: true },
     ]),
     [window, "keydown", onKey as EventListener, { capture: true }],
+    [window, "keyup", onKeyup as EventListener, { capture: true }],
     [window, "scroll", onScroll, { capture: true, passive: true }],
     [window, "resize", onScroll, { passive: true }],
   ];
@@ -404,6 +411,8 @@ export function startOverlay(opts: {
     destroyed = true;
     if (frame) cancelAnimationFrame(frame);
     for (const [t, type, fn, o] of listeners) t.removeEventListener(type, fn, o);
+    // Closed by a key still down (Escape, F, or a copied link's E or R).
+    if (held !== null) swallowKeyup(held);
     host.remove();
   }
 
