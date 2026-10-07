@@ -518,6 +518,23 @@ test("pictures: a radius of calc(infinity * 1px), a full round, cuts them too", 
   ]);
 });
 
+test("boxes: a radius the engine keeps as calc() (mixed units) makes the box a patch, not a square one", async ({
+  page,
+}) => {
+  // Mixed % and px stay a calc() in the computed value, which parseFloat reads
+  // as 0 (calc(infinity * 1px) above resolves to a plain length, so it is read).
+  // Horizontal 10px / vertical calc(): a first number alone would pass a check.
+  const scene = await sceneOf(
+    page,
+    '<main id="cap" style="width:300px"><div id="r" style="width:120px;height:40px;background:rgb(0,0,200);border-radius:10px / calc(50% - 2px)"></div></main>',
+  );
+  const computed = await page.evaluate(
+    () => getComputedStyle(document.getElementById("r") as Element).borderTopLeftRadius,
+  );
+  expect(computed, "the premise: the engine keeps the calc()").toContain("(");
+  expect(scene.unsupported).toEqual({ border: 1 });
+});
+
 test("pictures: an ancestor's rounded clip leaves an opaque one opaque: it hides the text under it, and JPEG applies", async ({
   page,
 }) => {

@@ -551,6 +551,9 @@ class Builder {
       return "text-effect";
     // Where a decoration was added, or below a box out of reach that added one.
     if (this.#decorationOf(b) === undefined) return "text-effect";
+    // A radius of mixed units stays calc()/min()/max()/clamp() in the computed
+    // value, which parseFloat reads as 0: the box would come out square.
+    if (CORNERS.some((c) => cs.getPropertyValue(`border-${c}-radius`).includes("("))) return "border";
     if (!this.#bordersDrawable(b)) return "border";
     if (!this.#coloursParse(b, text)) return "color";
     if (
