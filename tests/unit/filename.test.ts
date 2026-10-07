@@ -56,10 +56,18 @@ test('makeFilename: no / \\ : * ? " < > | or control characters, whitespace coll
   assert.equal(makeFilename(page({ title: "a/b" })), "snapii a b 2026-10-01 14-03-04.svg");
 });
 
-test("makeFilename: at most 120 characters including the extension, surrogate pairs kept whole", () => {
-  for (const title of ["x".repeat(500), "😀".repeat(200), `${"y".repeat(88)}😀tail`, "word ".repeat(100)]) {
+test("makeFilename: at most 120 UTF-8 bytes including the extension, surrogate pairs kept whole", () => {
+  for (const title of [
+    "x".repeat(500),
+    "😀".repeat(200),
+    `${"y".repeat(88)}😀tail`,
+    "word ".repeat(100),
+    "日本語".repeat(60),
+    "ä".repeat(300),
+  ]) {
     const name = makeFilename(page({ title }));
     assert.ok(name.length <= MAX_FILENAME_LENGTH, `${name.length}: ${name}`);
+    assert.ok(Buffer.byteLength(name) <= MAX_FILENAME_LENGTH, `${Buffer.byteLength(name)} bytes: ${name}`);
     assert.equal(MAX_FILENAME_LENGTH, 120);
     assert.ok(name.endsWith(" 2026-10-01 14-03-04.svg"), name);
     assert.doesNotMatch(name, /[\ud800-\udbff](?![\udc00-\udfff])/u, "lone high surrogate");

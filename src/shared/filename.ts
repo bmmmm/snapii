@@ -36,16 +36,22 @@ function stamp(iso: string): string {
   return `${date} ${two(d.getHours())}-${two(d.getMinutes())}-${two(d.getSeconds())}`;
 }
 
-/** Cuts to `max` UTF-16 units without splitting a surrogate pair. */
+/** UTF-8 bytes of one code point. */
+const utf8Bytes = (cp: number): number => (cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4);
+
+/** Cuts to `max` UTF-8 bytes (file systems count those) at a code point boundary. */
 function cut(text: string, max: number): string {
-  if (text.length <= max) return text;
-  let out = text.slice(0, max);
-  const last = out.charCodeAt(out.length - 1);
-  if (last >= 0xd800 && last <= 0xdbff) out = out.slice(0, -1);
-  return out.trimEnd();
+  let out = "";
+  let bytes = 0;
+  for (const ch of text) {
+    bytes += utf8Bytes(ch.codePointAt(0) ?? 0);
+    if (bytes > max) return out.trimEnd();
+    out += ch;
+  }
+  return out;
 }
 
-/** Never empty, at most MAX_FILENAME_LENGTH characters including `.svg`. */
+/** Never empty, at most MAX_FILENAME_LENGTH UTF-8 bytes including `.svg`. */
 export function makeFilename(page: PageMeta): string {
   const time = stamp(page.capturedAt);
   const fixed = PREFIX.length + EXTENSION.length + 1 + (time ? time.length + 1 : 0);
