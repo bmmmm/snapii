@@ -61,6 +61,8 @@ const mutations: Array<[string, (m: Loose) => void]> = [
   ["run fontStyle unknown", (m) => (m.runs[0].fontStyle = "bold")],
   ["run dir unknown", (m) => (m.runs[0].dir = "ttb")],
   ["run href number", (m) => (m.runs[0].href = 1)],
+  ["run href javascript:", (m) => (m.runs[0].href = "javascript:alert(1)")],
+  ["link href relative", (m) => (m.links[0].href = "/relative")],
   ["run is null", (m) => (m.runs[0] = null)],
   ["link alt missing", (m) => delete m.links[0].alt],
   ["page url missing", (m) => delete m.page.url],

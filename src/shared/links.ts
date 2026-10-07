@@ -20,6 +20,15 @@ export interface LinkCandidate {
 // when opened from disk: no script, no page-local blobs, no local files.
 const KEPT_SCHEMES = new Set(["http:", "https:", "mailto:"]);
 
+/** True for what linkFor emits: an absolute URL with a kept scheme. The background's check on a message's href. */
+export function isKeptHref(href: string): boolean {
+  try {
+    return KEPT_SCHEMES.has(new URL(href).protocol);
+  } catch {
+    return false;
+  }
+}
+
 function samePage(a: URL, b: URL): boolean {
   return a.origin === b.origin && a.pathname === b.pathname && a.search === b.search;
 }

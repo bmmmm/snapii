@@ -3,6 +3,7 @@
 // runs inside an arbitrary page, so a message is checked field by field
 // against the types before any of it reaches capture, rendering or metadata.
 
+import { isKeptHref } from "./links.ts";
 import type { FromPopup, SaveResponse, ToBackground, ToContent, UnsupportedReason } from "./types.ts";
 
 type Rec = Record<string, unknown>;
@@ -11,6 +12,8 @@ const isRec = (x: unknown): x is Rec => typeof x === "object" && x !== null && !
 const isNum = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x);
 const isStr = (x: unknown): x is string => typeof x === "string";
 const isStrOrNull = (x: unknown): boolean => x === null || isStr(x);
+// The content script decides links with linkFor; the file's <a href> trusts nothing else.
+const isHref = (x: unknown): boolean => x === null || (isStr(x) && isKeptHref(x));
 const isOneOf =
   <T extends string>(...values: T[]) =>
   (x: unknown): x is T =>
@@ -42,10 +45,10 @@ const isTextRun = (x: unknown): boolean =>
   isStr(x.color) &&
   isStrOrNull(x.lang) &&
   isDir(x.dir) &&
-  isStrOrNull(x.href);
+  isHref(x.href);
 
 const isLinkArea = (x: unknown): boolean =>
-  isRec(x) && nums(x, "x", "y", "width", "height") && isStr(x.alt) && isStrOrNull(x.href);
+  isRec(x) && nums(x, "x", "y", "width", "height") && isStr(x.alt) && isHref(x.href);
 
 const isPageMeta = (x: unknown): boolean =>
   isRec(x) &&

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { type LinkCandidate, linkFor } from "../../src/shared/links.ts";
+import { isKeptHref, type LinkCandidate, linkFor } from "../../src/shared/links.ts";
 
 const PAGE = "https://p/a";
 const a = (href: string | null, extra: Partial<LinkCandidate> = {}): LinkCandidate => ({
@@ -44,3 +44,19 @@ for (const [name, candidate, expected] of rows) {
     assert.equal(linkFor(candidate), expected);
   });
 }
+
+test("isKeptHref: only an absolute URL with a kept scheme, as linkFor emits them", () => {
+  for (const href of ["https://x/", "http://x/p?q#f", "mailto:a@b"])
+    assert.equal(isKeptHref(href), true, href);
+  for (const href of [
+    "javascript:alert(1)",
+    "JAVASCRIPT:x",
+    "blob:https://x/1",
+    "file:///etc",
+    "data:text/html,x",
+    "/relative",
+    "nonsense",
+    "",
+  ])
+    assert.equal(isKeptHref(href), false, href);
+});
