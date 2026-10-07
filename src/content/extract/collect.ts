@@ -105,6 +105,9 @@ interface RawRun extends TextRun {
 /**
  * Keeps the characters of [start, end) whose glyphs lie inside clip
  * horizontally; a capture edge through a word keeps only whole glyphs.
+ * `monotonic`: the line is one bidi fragment, so once a kept glyph is
+ * followed by one outside the clip no later glyph can be inside — reading on
+ * to the end of a million-character line took minutes.
  */
 function trimToClip(
   node: Text,
@@ -113,19 +116,26 @@ function trimToClip(
   end: number,
   clip: DocRect,
   toDoc: (r: DocRect) => DocRect,
+  monotonic: boolean,
 ): { start: number; end: number; box: DocRect } | null {
   let first = -1;
   let last = -1;
   let box: DocRect | null = null;
   for (let i = start; i < end; i++) {
+    let glyph = false;
+    let inside = false;
     for (const r of sliceRects(node, range, i, i + 1)) {
+      glyph = true;
       const d = toDoc(r);
       if (d.x >= clip.x - EPS && right(d) <= right(clip) + EPS) {
+        inside = true;
         if (first < 0) first = i;
         last = i;
         box = box ? union(box, d) : d;
       }
     }
+    // A collapsed space has no glyph and says nothing about where the line is.
+    if (monotonic && first >= 0 && glyph && !inside) break;
   }
   if (!box) return null;
   // Keep surrogate pairs whole at both ends.
@@ -242,7 +252,7 @@ export async function collectTextRunsDetailed(
       let { start, end } = line;
       let box = rect;
       if (rect.x < clip.x - EPS || right(rect) > right(clip) + EPS) {
-        const kept = trimToClip(node, range, start, end, clip, toDoc);
+        const kept = trimToClip(node, range, start, end, clip, toDoc, line.parts.length === 1);
         if (!kept) continue;
         ({ start, end, box } = kept);
       }
