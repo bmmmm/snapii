@@ -365,6 +365,26 @@ test("vector: a decoration is the run's text-decoration; one of another colour p
   assert.deepEqual(elements(plain), []);
 });
 
+test("parseSvg (the glue suites' and pnpm drive's reader) finds runs whose glyphs sit in a <tspan>", async () => {
+  // A non-literal specifier: the tools are plain JavaScript without types.
+  const tools = new URL("../../tools/marionette/svg.mjs", import.meta.url).href;
+  const { parseSvg } = await import(tools);
+  const black = { r: 0, g: 0, b: 0, a: 1 };
+  const runs = [makeRun({ text: "plain", line: 0 }), makeRun({ text: "red line", x: 120, line: 0 })];
+  const scene: Scene = {
+    ...makeScene(),
+    text: [
+      { fill: black },
+      {
+        fill: black,
+        decoration: { lines: ["underline"], paint: { r: 255, g: 0, b: 0, a: 1 }, style: "solid" },
+      },
+    ],
+  };
+  const svg = render({ runs, scene });
+  assert.ok(svg.includes("<tspan "));
+  assert.deepEqual(parseSvg(svg).tspans, ["plain", "red line"]);
+});
 test("vector: a border side's line is a dashed stroke; dots get round caps, dashes none", () => {
   const black = { r: 0, g: 0, b: 0, a: 1 };
   const scene: Scene = {

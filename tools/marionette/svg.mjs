@@ -62,10 +62,11 @@ export function parseSvg(text) {
     };
   });
   // One <text> per run (the renderer's font attributes tell runs from the
-  // line separators); the key keeps its old name for the callers.
-  const tspans = [...text.matchAll(/<text [^>]*font-size[^>]*>([^<]*)<\/text>/g)].map((m) =>
-    unescapeXml(m[1]),
-  );
+  // line separators), its glyphs in a <tspan> where a decoration of another
+  // colour paints the <text>; the key keeps its old name for the callers.
+  const tspans = [
+    ...text.matchAll(/<text [^>]*font-size[^>]*>(?:<tspan [^>]*>)?([^<]*)(?:<\/tspan>)?<\/text>/g),
+  ].map((m) => unescapeXml(m[1]));
   const hrefs = [...text.matchAll(/<a href="([^"]*)"/g)].map((m) => unescapeXml(m[1]));
   return { dc, capture: json ? JSON.parse(unescapeXml(json[1])) : null, images, tspans, hrefs };
 }

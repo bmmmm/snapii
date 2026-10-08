@@ -233,7 +233,9 @@ function summarizeSvg(path, text) {
     };
   });
   // The whole text layer in document order, line separators included.
-  const layer = [...text.matchAll(/<text [^>]*>([^<]*)<\/text>/g)].map((m) => m[1]).join("");
+  const layer = [...text.matchAll(/<text [^>]*>(?:<tspan [^>]*>)?([^<]*)(?:<\/tspan>)?<\/text>/g)]
+    .map((m) => m[1])
+    .join("");
   const plain = layer
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
