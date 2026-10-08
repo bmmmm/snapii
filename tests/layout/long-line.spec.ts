@@ -50,7 +50,9 @@ test("a capture edge a million px into a 1 MB line finds its words within a seco
     return { ms: stats.ms, texts: runs.map((r) => r.text), x: runs.map((r) => r.x - cap.x) };
   });
   expect(got.texts.length).toBe(1);
-  expect(got.texts[0]).toMatch(/^(word ?|ord ?|rd ?|d ?| )+$/);
+  // Cut at both edges to whole glyphs: only letters of "word" and spaces.
+  expect(got.texts[0]).toMatch(/^[ dorw]+$/);
+  expect(got.texts[0]).toContain("word word");
   // Whole glyphs inside the clip only: the run starts at or after the edge.
   expect(got.x[0]).toBeGreaterThanOrEqual(1_000_000 - 0.5);
   expect(got.x[0]).toBeLessThan(1_000_000 + 20);
