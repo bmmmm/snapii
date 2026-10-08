@@ -43,6 +43,11 @@ const HINT_TEXT = "Click an element or drag an area · ↑ ↓ parent/child · Q
 const MOUSE_EVENTS = ["mousedown", "mousemove", "mouseup", "click", "dblclick", "auxclick", "contextmenu"];
 const STOP_ONLY_EVENTS = ["pointerdown", "pointermove", "pointerup", "keypress"];
 const PREVENT_EVENTS = ["selectstart", "dragstart"];
+// The second click of a double-click on a button that closed the overlay
+// comes within this (Windows' default double-click time is 500 ms).
+const DOUBLE_CLICK_MS = 500;
+/** Ends a closed overlay's swallowClicks; a new overlay takes the events over at once. */
+let endSwallow: (() => void) | null = null;
 
 export function startOverlay(opts: {
   onAction(action: ToolbarAction, selection: Selection): void | Promise<void>;
@@ -50,6 +55,7 @@ export function startOverlay(opts: {
   /** Why this selection cannot be saved right now, or null; asked again after every scroll and resize. */
   saveBlocked?(selection: Selection): string | null;
 }): OverlayHandle {
+  endSwallow?.();
   const host = createHtml("snapii-overlay");
   styleHost(host, { inset: "0" });
   const root = host.attachShadow({ mode: "closed" });
@@ -83,6 +89,8 @@ export function startOverlay(opts: {
   let blocked: string | null = null;
   /** Lower-cased key of a handled keydown whose keyup has not arrived yet. */
   let held: string | null = null;
+  /** performance.now() of the last click on a toolbar button. */
+  let buttonClickAt = -Infinity;
 
   const page = (): { x: number; y: number } => ({ x: pointer.x + scrollX, y: pointer.y + scrollY });
 
@@ -211,6 +219,22 @@ export function startOverlay(opts: {
     setTimeout(off, 1000);
   }
 
+  /** Keeps the rest of a double-click whose first click closed the overlay from the page. */
+  function swallowClicks(ms: number): void {
+    const types = [...MOUSE_EVENTS, ...STOP_ONLY_EVENTS.filter((t) => t !== "keypress")];
+    const eat = (e: Event): void => {
+      if (STOP_ONLY_EVENTS.includes(e.type)) onStop(e);
+      else swallow(e);
+    };
+    const off = (): void => {
+      for (const t of types) window.removeEventListener(t, eat, true);
+      if (endSwallow === off) endSwallow = null;
+    };
+    for (const t of types) window.addEventListener(t, eat, true);
+    endSwallow = off;
+    setTimeout(off, ms);
+  }
+
   function cancel(): void {
     destroy();
     opts.onCancel();
@@ -301,7 +325,10 @@ export function startOverlay(opts: {
         const button = toolbar.buttonAt(m.clientX, m.clientY);
         const pressed = toolbarPress;
         toolbarPress = null;
-        if (button && button === pressed) onButton(button);
+        if (button && button === pressed) {
+          buttonClickAt = performance.now();
+          onButton(button);
+        }
         break;
       }
     }
@@ -413,6 +440,8 @@ export function startOverlay(opts: {
     for (const [t, type, fn, o] of listeners) t.removeEventListener(type, fn, o);
     // Closed by a key still down (Escape, F, or a copied link's E or R).
     if (held !== null) swallowKeyup(held);
+    const left = buttonClickAt + DOUBLE_CLICK_MS - performance.now();
+    if (left > 0) swallowClicks(left);
     host.remove();
   }
 

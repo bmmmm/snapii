@@ -419,6 +419,43 @@ test("Cancel button removes the host; setBusy blocks actions", async ({ page }) 
   expect(await page.evaluate(() => (window as unknown as TestWindow).__cancelled)).toBe(1);
 });
 
+test("a double-click on a button that closes the overlay never reaches the page; later clicks and clicks after a key close do", async ({
+  page,
+}) => {
+  await load(page, "/fixtures/overlay.html");
+  await page.evaluate(() => {
+    const w = window as unknown as TestWindow;
+    w.__pageEvents = 0;
+    for (const t of ["mousedown", "mouseup", "click", "dblclick", "pointerdown"]) {
+      document.addEventListener(t, () => w.__pageEvents++, true);
+    }
+  });
+  const events = () => page.evaluate(() => (window as unknown as TestWindow).__pageEvents);
+  await begin(page);
+  await clickAt(page, 200, 250);
+  const cancel = await page.evaluate(() => {
+    const root = (window as unknown as TestWindow).__roots["snapii-overlay"] as ShadowRoot;
+    const r = (root.querySelector('[data-action="cancel"]') as HTMLElement).getBoundingClientRect();
+    return { x: r.x + 5, y: r.y + 5 };
+  });
+  await page.mouse.dblclick(cancel.x, cancel.y);
+  expect(await page.evaluate(() => document.querySelector("snapii-overlay"))).toBeNull();
+  expect(await events()).toBe(0);
+  // The window ends: a click a moment later is the page's again.
+  await page.waitForTimeout(600);
+  await clickAt(page, cancel.x, cancel.y);
+  expect(await events()).toBeGreaterThan(0);
+
+  // Closed by a key, nothing is held back.
+  await begin(page);
+  await page.evaluate(() => {
+    (window as unknown as TestWindow).__pageEvents = 0;
+  });
+  await page.keyboard.press("Escape");
+  await clickAt(page, cancel.x, cancel.y);
+  expect(await events()).toBeGreaterThan(0);
+});
+
 test("the page sees no mouse or key events and no default actions", async ({ page }) => {
   await load(page, "/fixtures/overlay.html");
   await page.evaluate(() => {
