@@ -123,6 +123,10 @@ Limits:
   Chromium also draws a thickness of 0 unlike the page.
 - The viewer needs the page's fonts. Web fonts are not embedded, so a viewer
   without them shows a fallback font; each run keeps its place and width.
+  An icon font is recognised by its Private Use Area code points only: one
+  that draws its icons as ligatures of plain letters (Material Icons writes
+  `home`) is ordinary text, so a viewer without the font shows the word in
+  place of the icon.
 - Text is drawn above the shapes; text under a half-transparent box or
   shadow is not dimmed as on the page.
 - Dashed and dotted borders follow each browser's own layout, as far as it
