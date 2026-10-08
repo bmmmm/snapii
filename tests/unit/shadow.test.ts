@@ -17,6 +17,19 @@ test("outerShadows: each shadow as numbers, top one first, colours in any form p
   assert.equal(ok?.[0]?.spread, 3);
 });
 
+test("outerShadows: fully transparent shadows paint nothing and are left out", () => {
+  // Tailwind's ring and shadow utilities stack transparent placeholders.
+  assert.deepEqual(
+    outerShadows(
+      "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px",
+    ),
+    [{ paint: { r: 0, g: 0, b: 0, a: 0.1 }, x: 0, y: 1, blur: 3, spread: 0 }],
+  );
+  assert.deepEqual(outerShadows("rgba(0, 0, 0, 0) 0px 0px 0px 0px"), []);
+  // Still only an outer shadow this reads: an inset one keeps the whole value null.
+  assert.equal(outerShadows("rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(0, 0, 0) 0px 1px 0px 0px inset"), null);
+});
+
 test("outerShadows: an inset shadow, or any form this does not read, is null", () => {
   for (const value of [
     "rgb(208, 215, 222) 0px -1px 0px 0px inset",

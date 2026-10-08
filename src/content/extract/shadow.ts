@@ -36,7 +36,11 @@ function parts(value: string): string[] {
   return out;
 }
 
-/** The shadows of a computed box-shadow, the one painted on top first; null if one is not an outer shadow this reads. */
+/**
+ * The shadows of a computed box-shadow, the one painted on top first, without
+ * the fully transparent ones (Tailwind sets `0 0 #0000` on every ring);
+ * null if one is not an outer shadow this reads.
+ */
 export function outerShadows(value: string): Shadow[] | null {
   const out: Shadow[] = [];
   for (const part of parts(value)) {
@@ -44,6 +48,7 @@ export function outerShadows(value: string): Shadow[] | null {
     if (!m) return null;
     const paint = parseColor(m[1] as string);
     if (!paint) return null;
+    if (paint.a === 0) continue;
     out.push({ paint, x: Number(m[2]), y: Number(m[3]), blur: Number(m[4]), spread: Number(m[5]) });
   }
   return out;
