@@ -286,7 +286,7 @@ export async function collectTextRunsDetailed(
     const metrics = fontMetrics(ctx.doc, info.fontKey);
     const toDoc = (r: DocRect) => layout.toDoc(r, ctx);
 
-    for (const line of splitIntoLines(node, range)) {
+    for (const line of splitIntoLines(node, range, (r) => intersect(toDoc(r), clip) !== null)) {
       const rect = toDoc(line.rect);
       const shown = intersect(rect, clip);
       // Less than half the line visible: the raster shows a sliver, not text.

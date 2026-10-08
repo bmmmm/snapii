@@ -51,9 +51,11 @@ export function sliceRects(node: Text, range: Range, start: number, end: number)
 /**
  * Splits node into lines. range is scratch space owned by the caller (one
  * per document). Characters without a glyph rect (collapsed spaces) belong to
- * the line of the previous visible character.
+ * the line of the previous visible character. With keep, only the lines whose
+ * rect it accepts are returned, and only their starts are searched for: a
+ * 5000-line <pre> under a small capture needs a dozen searches, not 5000.
  */
-export function splitIntoLines(node: Text, range: Range): LineSlice[] {
+export function splitIntoLines(node: Text, range: Range, keep?: (rect: DocRect) => boolean): LineSlice[] {
   range.selectNodeContents(node);
   const groups = groupIntoLines(glyphRects(range));
   const data = node.data;
@@ -67,10 +69,15 @@ export function splitIntoLines(node: Text, range: Range): LineSlice[] {
     }
     return 0;
   };
-  const starts = [0];
-  for (let k = 1; k < groups.length; k++) {
+  const starts = new Map<number, number>([[0, 0]]);
+  // Start of the latest line found; lines are searched in order.
+  let floor = 0;
+  const startOf = (k: number): number => {
+    if (k >= groups.length) return len;
+    const known = starts.get(k);
+    if (known !== undefined) return known;
     // Smallest offset whose line is k or later; lines only advance with content order.
-    let lo = (starts[k - 1] as number) + 1;
+    let lo = floor + 1;
     let hi = len;
     while (lo < hi) {
       const mid = (lo + hi) >>> 1;
@@ -79,12 +86,21 @@ export function splitIntoLines(node: Text, range: Range): LineSlice[] {
     }
     // Firefox gives a pair's high half a zero-width rect and its low half the
     // glyph, so the search stops on the low half; the pair starts this line.
-    starts.push(codePointStart(data, lo));
-  }
-  return groups.map((g, k) => ({
-    start: Math.min(starts[k] as number, len),
-    end: Math.min(starts[k + 1] ?? len, len),
-    rect: g.rect,
-    parts: g.parts,
-  }));
+    const start = codePointStart(data, lo);
+    starts.set(k, start);
+    floor = start;
+    return start;
+  };
+  const out: LineSlice[] = [];
+  groups.forEach((g, k) => {
+    if (keep && !keep(g.rect)) return;
+    const start = startOf(k);
+    out.push({
+      start: Math.min(start, len),
+      end: Math.min(startOf(k + 1), len),
+      rect: g.rect,
+      parts: g.parts,
+    });
+  });
+  return out;
 }

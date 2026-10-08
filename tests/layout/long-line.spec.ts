@@ -84,6 +84,34 @@ test("a right-to-left 250 KB line with the edge a million px from its start is s
   expect(got.ms).toBeLessThan(3000);
 });
 
+test("a 1 MB pre of 5000 lines under a 2000×200 capture gives its visible lines within a second", async ({
+  page,
+}) => {
+  // Finding where each of 5000 lines starts cost one binary search per line
+  // of the whole node (8.5 s on Chromium); only the lines the clip meets need one.
+  await page.goto("/fixtures/smoke.html");
+  await page.evaluate(() => {
+    const lines = Array.from(
+      { length: 5000 },
+      (_, i) => `${String(i).padStart(4, "0")} ${"abcdefghi ".repeat(20)}`,
+    );
+    // Scrolled: the lines are kept by their document position, not the client one.
+    document.body.innerHTML = `<div style="height:3000px"></div><main id="cap" style="width:2000px;height:200px;overflow:hidden"><pre style="margin:0">${lines.join("\n")}</pre></main>`;
+    scrollTo(0, 2900);
+  });
+  await page.addScriptTag({ path: "dist-test/harness.js" });
+  const got = await page.evaluate(async () => {
+    const h = window.__snapii;
+    const { runs, stats } = await h.debug.collectTextRunsDetailed(document, h.debug.captureRect("#cap"), {});
+    return { ms: stats.ms, texts: runs.map((r) => r.text) };
+  });
+  expect(got.texts.length).toBeGreaterThanOrEqual(10);
+  got.texts.forEach((t, i) => {
+    expect(t.trimEnd()).toBe(`${String(i).padStart(4, "0")} ${"abcdefghi ".repeat(20)}`.trimEnd());
+  });
+  expect(got.ms).toBeLessThan(1000);
+});
+
 test("collapsed spaces inside the clip do not end the line early", async ({ page }) => {
   // Of three spaces two collapse to nothing and have no glyph rect: only a
   // glyph outside the clip says the line has left it.
