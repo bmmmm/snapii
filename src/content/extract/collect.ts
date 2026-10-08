@@ -107,7 +107,8 @@ interface RawRun extends TextRun {
  * horizontally; a capture edge through a word keeps only whole glyphs.
  * `monotonic`: the line is one bidi fragment, so once a kept glyph is
  * followed by one outside the clip no later glyph can be inside — reading on
- * to the end of a million-character line took minutes.
+ * to the end of a million-character line took minutes. It also lets a binary
+ * search skip the glyphs before the clip (14 s for an edge 1 M px in).
  */
 function trimToClip(
   node: Text,
@@ -121,6 +122,7 @@ function trimToClip(
   let first = -1;
   let last = -1;
   let box: DocRect | null = null;
+  if (monotonic) start = firstAtClip(node, range, start, end, clip, toDoc);
   for (let i = start; i < end; i++) {
     let glyph = false;
     let inside = false;
@@ -140,6 +142,46 @@ function trimToClip(
   if (!box) return null;
   // Keep surrogate pairs whole at both ends.
   return { start: codePointStart(node.data, first), end: codePointBoundary(node.data, last + 1), box };
+}
+
+/**
+ * On a one-fragment line: the first offset in [start, end) whose glyph is not
+ * before clip's leading edge (left for LTR, right for RTL), or a smaller one.
+ * Offsets without a glyph (collapsed spaces) take the next glyph's side.
+ */
+function firstAtClip(
+  node: Text,
+  range: Range,
+  start: number,
+  end: number,
+  clip: DocRect,
+  toDoc: (r: DocRect) => DocRect,
+): number {
+  const glyph = (i: number): { at: number; rect: DocRect } | null => {
+    for (let j = i; j < end; j++) {
+      const [r] = sliceRects(node, range, j, j + 1);
+      if (r) return { at: j, rect: toDoc(r) };
+    }
+    return null;
+  };
+  const head = glyph(start);
+  if (!head) return start;
+  let tail: DocRect | null = null;
+  for (let j = end - 1; j > head.at && !tail; j--) {
+    const [r] = sliceRects(node, range, j, j + 1);
+    if (r) tail = toDoc(r);
+  }
+  const rtl = tail !== null && tail.x < head.rect.x;
+  const reached = (d: DocRect) => (rtl ? right(d) <= right(clip) + EPS : d.x >= clip.x - EPS);
+  let lo = start;
+  let hi = end;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    const g = glyph(mid);
+    if (!g || reached(g.rect)) hi = mid;
+    else lo = g.at + 1;
+  }
+  return lo;
 }
 
 export async function collectTextRuns(

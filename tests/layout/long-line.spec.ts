@@ -31,6 +31,59 @@ test("a 1 MB single-line pre cut at the right edge gives its first words within 
   expect(got.ms).toBeLessThan(3000);
 });
 
+test("a capture edge a million px into a 1 MB line finds its words within a second", async ({ page }) => {
+  // The clip starts deep inside the line: reading one rect per character up
+  // to the clip took ~14 s; a binary search finds the first glyph inside it.
+  await page.goto("/fixtures/smoke.html");
+  await page.evaluate((words) => {
+    document.body.innerHTML = `<pre id="p" style="margin:0;white-space:pre">${"word ".repeat(words)}</pre>`;
+  }, WORDS);
+  await page.addScriptTag({ path: "dist-test/harness.js" });
+  const got = await page.evaluate(async () => {
+    const h = window.__snapii;
+    const cap = h.debug.captureRect("#p");
+    const { runs, stats } = await h.debug.collectTextRunsDetailed(
+      document,
+      { ...cap, x: cap.x + 1_000_000, width: 400 },
+      {},
+    );
+    return { ms: stats.ms, texts: runs.map((r) => r.text), x: runs.map((r) => r.x - cap.x) };
+  });
+  expect(got.texts.length).toBe(1);
+  expect(got.texts[0]).toMatch(/^(word ?|ord ?|rd ?|d ?| )+$/);
+  // Whole glyphs inside the clip only: the run starts at or after the edge.
+  expect(got.x[0]).toBeGreaterThanOrEqual(1_000_000 - 0.5);
+  expect(got.x[0]).toBeLessThan(1_000_000 + 20);
+  expect(got.ms).toBeLessThan(3000);
+});
+
+test("a right-to-left 250 KB line with the edge a million px from its start is searched as fast", async ({
+  page,
+}) => {
+  // The line starts at its right end: the search walks right to left.
+  await page.goto("/fixtures/smoke.html");
+  await page.evaluate((words) => {
+    document.body.innerHTML = `<pre id="p" dir="rtl" style="margin:0;white-space:pre;width:max-content">${"שלום ".repeat(words)}</pre>`;
+  }, WORDS / 4);
+  await page.addScriptTag({ path: "dist-test/harness.js" });
+  const got = await page.evaluate(async () => {
+    const h = window.__snapii;
+    const cap = h.debug.captureRect("#p");
+    const edge = cap.x + cap.width - 1_000_000;
+    const { runs, stats } = await h.debug.collectTextRunsDetailed(
+      document,
+      { ...cap, x: edge - 400, width: 400 },
+      {},
+    );
+    return { ms: stats.ms, texts: runs.map((r) => r.text), right: runs.map((r) => edge - (r.x + r.width)) };
+  });
+  expect(got.texts.length).toBe(1);
+  expect(got.texts[0]).toMatch(/[א-ת]{2}/);
+  expect(got.right[0]).toBeGreaterThanOrEqual(-0.5);
+  expect(got.right[0]).toBeLessThan(30);
+  expect(got.ms).toBeLessThan(3000);
+});
+
 test("collapsed spaces inside the clip do not end the line early", async ({ page }) => {
   // Of three spaces two collapse to nothing and have no glyph rect: only a
   // glyph outside the clip says the line has left it.
@@ -46,6 +99,28 @@ test("collapsed spaces inside the clip do not end the line early", async ({ page
   });
   expect(texts.length).toBe(1);
   expect(texts[0]).toMatch(/^word word word word /);
+});
+
+test("a line that ends in a long run of collapsed spaces is still searched to the clip", async ({ page }) => {
+  // The search's first probe lands among the spaces: no glyph from there to
+  // the end of the line.
+  await page.goto("/fixtures/smoke.html");
+  await page.evaluate(() => {
+    document.body.innerHTML = `<p id="p" style="margin:0;white-space:nowrap;width:max-content">${"word ".repeat(2000)}${" ".repeat(20_000)}</p>`;
+  });
+  await page.addScriptTag({ path: "dist-test/harness.js" });
+  const texts = await page.evaluate(async () => {
+    const h = window.__snapii;
+    const cap = h.debug.captureRect("#p");
+    const { runs } = await h.debug.collectTextRunsDetailed(
+      document,
+      { ...cap, x: cap.x + 2000, width: 400 },
+      {},
+    );
+    return runs.map((r) => r.text);
+  });
+  expect(texts.length).toBe(1);
+  expect(texts[0]).toMatch(/word word /);
 });
 
 test("a bidi line is scanned to its end: the right-to-left part re-enters the clip after the left-to-right part left it", async ({
