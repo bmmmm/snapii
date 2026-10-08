@@ -572,6 +572,41 @@ test("pictures longer than a canvas side may be are patches, not a failed scene 
   expect(scene.unsupported).toEqual({ budget: 3 });
 });
 
+test("a picture the canvas cannot draw, read or encode is a patch, not a failed scene", async ({ page }) => {
+  // Each picture's canvas is as wide as it (device px at DPR 1); a canvas
+  // over the browser's size limits fails at one of these steps.
+  await page.addInitScript(() => {
+    window.prepare = () => {
+      const getContext = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, ...args: unknown[]) {
+        if (this.width === 41) return null;
+        return (getContext as (...a: unknown[]) => RenderingContext | null).apply(this, args);
+      } as typeof getContext;
+      const drawImage = CanvasRenderingContext2D.prototype.drawImage;
+      CanvasRenderingContext2D.prototype.drawImage = function (
+        this: CanvasRenderingContext2D,
+        ...args: unknown[]
+      ) {
+        if (this.canvas.width === 42) throw new DOMException("too big", "InvalidStateError");
+        return (drawImage as (...a: unknown[]) => void).apply(this, args);
+      } as typeof drawImage;
+      const toDataURL = HTMLCanvasElement.prototype.toDataURL;
+      HTMLCanvasElement.prototype.toDataURL = function (this: HTMLCanvasElement, ...args: unknown[]) {
+        if (this.width === 43) throw new DOMException("too big", "InvalidStateError");
+        if (this.width === 44) return "data:,";
+        return (toDataURL as (...a: unknown[]) => string).apply(this, args);
+      };
+    };
+  });
+  const img = (w: number) => `<img src="/fixtures/images/quadrants.png" width="${w}" height="40">`;
+  const scene = await sceneOf(
+    page,
+    `<main id="cap" style="width:400px">${[41, 42, 43, 44, 45].map(img).join("")}</main>`,
+  );
+  expect(scene.unsupported).toEqual({ image: 4 });
+  expect(pictureOps(scene.ops).map((op) => op.width)).toEqual([45]);
+});
+
 test("pictures over the pixel budget are patches, counted before anything is drawn", async ({ page }) => {
   // Three blank canvases of 6 Mpx: the first two are drawn (and read back
   // empty), the third would take the pictures past 16 Mi px.

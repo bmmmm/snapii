@@ -616,8 +616,10 @@ class Builder {
     const canvas = createHtml("canvas");
     canvas.width = w;
     canvas.height = h;
-    // A new canvas always has one.
-    const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
+    // Null, or a context whose calls throw, for a canvas over the browser's
+    // size limits (a lowered gfx.canvas.max-size): the picture is a patch.
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return reason;
     const kx = w / visible.width;
     const ky = h / visible.height;
     // What lies outside a rounded corner stays out of the file, not just out
@@ -640,18 +642,18 @@ class Builder {
       ctx.clip();
     }
     ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(
-      el,
-      (dest.x - visible.x) * kx,
-      (dest.y - visible.y) * ky,
-      dest.width * kx,
-      dest.height * ky,
-    );
     let data: Uint8ClampedArray;
     try {
+      ctx.drawImage(
+        el,
+        (dest.x - visible.x) * kx,
+        (dest.y - visible.y) * ky,
+        dest.width * kx,
+        dest.height * ky,
+      );
+      // Cross-origin pixels taint the canvas: the page may show them, a script may not read them.
       data = ctx.getImageData(0, 0, w, h).data;
     } catch {
-      // Cross-origin pixels taint the canvas: the page may show them, a script may not read them.
       return reason;
     }
     let opaque = true;
@@ -676,9 +678,16 @@ class Builder {
       ctx.fill();
     }
     const jpeg = opaque && this.opts.encoding?.format === "jpeg";
-    const dataURL = jpeg
-      ? canvas.toDataURL("image/jpeg", this.opts.encoding?.jpegQuality)
-      : canvas.toDataURL("image/png");
+    let dataURL: string;
+    try {
+      dataURL = jpeg
+        ? canvas.toDataURL("image/jpeg", this.opts.encoding?.jpegQuality)
+        : canvas.toDataURL("image/png");
+    } catch {
+      return reason;
+    }
+    // "data:," is a canvas that could not be encoded.
+    if (!dataURL.startsWith("data:image/")) return reason;
     if (this.#pictureChars + dataURL.length > MAX_PICTURE_CHARS) return "budget";
     this.#pictureChars += dataURL.length;
     this.#pictures.set(b, { op: { op: "image", ...visible, dataURL }, opaque });
