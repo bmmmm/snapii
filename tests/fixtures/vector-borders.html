@@ -13,7 +13,9 @@
       with the box's corners).
       Patches ("border"): a dashed box with rounded corners (dashes follow
       the curve), a groove border, and a dashed cell of a collapsed table
-      (cells share their edges).
+      (cells share their edges). A dashed box inside a collapsed table's
+      cell inherits border-collapse but shares no edge, as does the table's
+      caption, and a dashed cell of a separated table: shapes.
       Chromium's own layout comes within 0.16 % of the page, Firefox's
       layout drawn in Chromium 0.73 %; Firefox 0.47 % (macOS, 2026-10-06).
     -->
@@ -28,13 +30,13 @@
     <script type="application/json" id="expect">
       {
         "capture": "#cap",
-        "lines": ["Borders drawn as shapes.", "Card", "An abbr here.", "Broken", "box", "Cell", "After the borders."],
+        "lines": ["Borders drawn as shapes.", "Card", "An abbr here.", "Broken", "box", "Cell", "Caption", "Inside", "Apart", "After the borders."],
         "vector": {
           "unsupported": { "border": 3 },
           "maxPatchArea": 0.1,
-          "visible": ["Borders drawn as shapes.", "Card", "abbr", "Broken", "box", "After the borders."],
+          "visible": ["Borders drawn as shapes.", "Card", "abbr", "Broken", "box", "Caption", "Inside", "Apart", "After the borders."],
           "hidden": ["Cell"],
-          "dashLines": 34,
+          "dashLines": 46,
           "rings": 1,
           "snappedLines": true,
           "tolerance": 0.01
@@ -64,6 +66,8 @@
         <div style="border-left: 4px solid rgb(0, 0, 0); border-radius: 12px; background: rgb(230, 230, 230)"></div>
       </div>
       <table style="border-collapse: collapse; margin: 0 0 12px"><tr><td style="border: 2px dashed rgb(0, 0, 0); padding: 2px 6px">Cell</td></tr></table>
+      <table style="border-collapse: collapse; margin: 0 0 12px"><caption style="border: 1px dashed rgb(0, 0, 0); text-align: left">Caption</caption><tr><td style="padding: 0"><div style="border: 1px dashed rgb(0, 0, 0); padding: 2px 6px">Inside</div></td></tr></table>
+      <table style="margin: 0 0 12px"><tr><td style="border: 1px dashed rgb(0, 0, 0); padding: 2px 6px">Apart</td></tr></table>
       <hr />
       <div class="row">
         <div style="border: 2px dashed rgb(0, 0, 0); border-radius: 8px"></div>

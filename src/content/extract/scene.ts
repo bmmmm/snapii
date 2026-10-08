@@ -61,6 +61,8 @@ export interface SceneOptions {
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const MATHML_NS = "http://www.w3.org/1998/Math/MathML";
+// The boxes whose borders take part in the collapsing border model (CSS 2 § 17.6.2).
+const TABLE_PARTS = /^(inline-)?table(-(cell|row|row-group|header-group|footer-group|column|column-group))?$/;
 const FORM = new Set(["input", "select", "textarea", "meter", "progress"]);
 const MEDIA = new Set(["video", "audio", "embed", "object"]);
 // Replaced elements drawn as shapes or pictures: atomic inlines that no
@@ -737,8 +739,10 @@ class Builder {
     if (visible.length === 0) return true;
     const square = CORNERS.every((c) => px(cs.getPropertyValue(`border-${c}-radius`)) === 0);
     // Dashes, dots and double lines are laid out along straight sides only,
-    // and per box: collapsed table cells share their edges.
-    if (visible.some((s) => s.style !== "solid")) return square && cs.borderCollapse !== "collapse";
+    // and per box: collapsed table cells share their edges. border-collapse
+    // is inherited, so a box inside a cell carries it without collapsing.
+    const collapsed = cs.borderCollapse === "collapse" && TABLE_PARTS.test(cs.display);
+    if (visible.some((s) => s.style !== "solid")) return square && !collapsed;
     // Sides of their own colours are drawn as straight bars: with rounded corners only one colour is.
     return square || visible.every((s) => s.color === visible[0]?.color);
   }
