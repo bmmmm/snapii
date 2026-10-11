@@ -73,6 +73,17 @@ const cases: [name: string, input: string, want: string][] = [
     "https://example.com/#/inbox?utm_source=x",
   ],
   ["http", "http://example.com/?gclid=1", "http://example.com/"],
+  // `;` as a separator: the pair may carry a real parameter after the tracker.
+  [
+    "a tracker followed by `;` and another parameter stays",
+    "https://example.com/a?utm_source=x;id=5",
+    "https://example.com/a?utm_source=x;id=5",
+  ],
+  [
+    "a tracker pair with `;` among `&` pairs stays",
+    "https://example.com/a?fbclid=1;p=2&gclid=3",
+    "https://example.com/a?fbclid=1;p=2",
+  ],
 ];
 for (const [name, input, want] of cases) {
   test(`cleanPageUrl: ${name}`, () => assert.equal(cleanPageUrl(input), want));

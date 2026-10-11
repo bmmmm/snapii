@@ -33,6 +33,9 @@ const TRACKING_PARAMS = new Set([
 const TRACKING_PREFIXES = ["utm_", "mtm_", "pk_", "hsa_", "oly_"];
 
 function isTracking(pair: string): boolean {
+  // Some sites still separate parameters with `;` (CGI, ASP): such a pair
+  // may hold another parameter after the tracker, so it is kept whole.
+  if (pair.includes(";")) return false;
   const raw = pair.split("=", 1)[0] ?? "";
   let name: string;
   try {
