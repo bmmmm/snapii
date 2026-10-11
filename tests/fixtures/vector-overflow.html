@@ -30,12 +30,12 @@
     <script type="application/json" id="expect">
       {
         "capture": "#cap",
-        "lines": ["Before the hero.", "Card text", "Tall text goes on", "below", "Clipped card", "Framed card", "Under the menu.", "After the hero."],
+        "lines": ["Before the hero.", "Card text", "Tall text", "goes on below", "Clipped card", "Framed card", "Under the menu.", "After the hero."],
         "vector": {
           "tolerance": 0.005,
           "maxPatchArea": 0.7,
           "unsupported": { "gradient": 5 },
-          "hidden": ["Card text", "Tall text goes on", "below", "Clipped card", "Framed card"],
+          "hidden": ["Card text", "Tall text", "goes on below", "Clipped card", "Framed card"],
           "visible": ["Before the hero.", "Under the menu.", "After the hero."]
         }
       }
@@ -46,7 +46,7 @@
       <p>Before the hero.</p>
       <div class="hero"><div class="card">Card text</div></div>
       <div style="height: 48px"></div>
-      <div class="hero short"><div style="width: 120px">Tall text goes on below</div></div>
+      <div class="hero short"><div>Tall text<br />goes on below</div></div>
       <div style="height: 40px"></div>
       <div class="hero clipped"><div class="card">Clipped card</div></div>
       <div class="hero"><div class="card framed">Framed card</div></div>
