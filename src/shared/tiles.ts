@@ -157,8 +157,8 @@ export function planTiles(rect: DocRect, scale: number, limits: TileLimits): Pla
     fitLength(limits.maxSide, scale, step, min),
     fitLength(area / Math.max(1, colPx), scale, step, min),
   );
-  // Limits under one device px per piece: nothing both fits and shows.
-  if (bandHeight <= 0 || devicePx(bandHeight, scale) < 1 || devicePx(colWidth, scale) < 1)
+  // A band under one device px (limits of a few px): nothing both fits and shows.
+  if (bandHeight <= 0 || devicePx(bandHeight, scale) < 1)
     throw new RangeError(`scale ${scale} too large for the capture limits`);
 
   const tiles: PlannedTile[] = [];

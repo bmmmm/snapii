@@ -260,6 +260,7 @@ test("planTiles: tiny limits at scales below 1 — a merged rest band or column 
   // 0.33 / 9 / 40 / 300×333: the band fitted against the first column's width gave the
   // merged last column 9×5 = 45 px; 0.33 / 16 / 97 / 41×333: without fitLength's reserve
   // the merged last band gave 13×8 = 104 px.
+  let planned = 0;
   for (const scale of [0.3, 0.33, 0.45, Math.SQRT1_2, 0.9]) {
     for (const maxSide of [7, 9, 16, 64]) {
       for (const area of [40, 97, 500, 3491]) {
@@ -279,6 +280,7 @@ test("planTiles: tiny limits at scales below 1 — a merged rest band or column 
             assert.ok(e instanceof RangeError, String(e));
             continue;
           }
+          planned++;
           const what = `scale ${scale} side ${maxSide} area ${area} ${w}x${h}`;
           assertPartition(region, tiles);
           for (const t of tiles) {
@@ -293,4 +295,6 @@ test("planTiles: tiny limits at scales below 1 — a merged rest band or column 
       }
     }
   }
+  // Most of the grid plans (only the smallest limits throw): the checks above ran on something.
+  assert.ok(planned >= 300, `${planned} planned`);
 });
