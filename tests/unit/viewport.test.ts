@@ -24,6 +24,37 @@ test("fitsViewport: a region reaching past any edge does not fit", () => {
   assert.equal(fitsViewport({ x: -5, y: 1100, width: 300, height: 200 }, visible), false);
 });
 
+test("fitsViewport: a region reaching up to a pixel past the whole-pixel viewport size fits, further not", () => {
+  // Chromium at a device scale of 1.5: clientHeight 713, a 100vh box ends at 713.33 (measured).
+  const visible = { x: 0, y: 1000, width: 1001, height: 713 };
+  assert.equal(fitsViewport({ x: 0, y: 1000, width: 1001.3333, height: 713.3333 }, visible), true);
+  assert.equal(fitsViewport({ x: 0, y: 1000, width: 1001, height: 714 }, visible), true);
+  assert.equal(fitsViewport({ x: 0, y: 1000, width: 1001, height: 714.01 }, visible), false);
+  assert.equal(fitsViewport({ x: 0, y: 1000, width: 1002.01, height: 713 }, visible), false);
+  // The start is exact: nothing before the viewport fits.
+  assert.equal(fitsViewport({ x: -0.5, y: 1000, width: 300, height: 200 }, visible), false);
+  assert.equal(fitsViewport({ x: 0, y: 999.5, width: 300, height: 200 }, visible), false);
+});
+
+test("planViewportCrop: a region a fraction past the whole-pixel viewport size is cut to the picture", () => {
+  // DPR 1.5, viewport 1001×713 reported, picture 1502×1070: the 100vh box's pixels are all there.
+  const crop = planViewportCrop(
+    { x: 0, y: 0, width: 1001.3333, height: 713.3333 },
+    { viewport: { width: 1001, height: 713 }, scroll: { x: 0, y: 0 }, devicePixelRatio: 1.5 },
+    { width: 1502, height: 1070 },
+    1e8,
+  );
+  assert.deepEqual(crop.source, { x: 0, y: 0, width: 1502, height: 1070 });
+  // A picture that ends at the reported size gives what it has.
+  const cut = planViewportCrop(
+    { x: 0, y: 0, width: 1001.3333, height: 713.3333 },
+    { viewport: { width: 1001, height: 713 }, scroll: { x: 0, y: 0 }, devicePixelRatio: 1.5 },
+    { width: 1501, height: 1069 },
+    1e8,
+  );
+  assert.deepEqual(cut.source, { x: 0, y: 0, width: 1501, height: 1069 });
+});
+
 test("planViewportCrop: whole CSS px at DPR 2, scrolled", () => {
   const crop = planViewportCrop(
     { x: 10, y: 1100, width: 300, height: 200 },

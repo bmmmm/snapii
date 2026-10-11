@@ -7,14 +7,22 @@ import type { DocRect, PageMeta } from "./types.ts";
 
 /** Binary noise of css × devicePixelRatio products, far below one device pixel. */
 const EPS = 1e-6;
+/**
+ * The viewport's size comes as whole CSS px (clientWidth/Height), its real
+ * edge up to a pixel beyond: at a device scale of 1.5 a 100vh box ends at
+ * 713.33 px against a clientHeight of 713 (measured on Chromium), and the
+ * capture has those pixels. A region may reach that far past the reported
+ * size; its start is exact, the scroll position being fractional.
+ */
+const EDGE = 1;
 
 /** Is `region` (document CSS px) wholly inside `visible` (the viewport in document CSS px)? */
 export function fitsViewport(region: DocRect, visible: DocRect): boolean {
   return (
     region.x >= visible.x - EPS &&
     region.y >= visible.y - EPS &&
-    region.x + region.width <= visible.x + visible.width + EPS &&
-    region.y + region.height <= visible.y + visible.height + EPS
+    region.x + region.width <= visible.x + visible.width + EDGE &&
+    region.y + region.height <= visible.y + visible.height + EDGE
   );
 }
 
