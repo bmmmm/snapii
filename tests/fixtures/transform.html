@@ -6,6 +6,18 @@
     <style>
       body { margin: 0; padding: 20px; font: 16px/1.5 serif; }
     </style>
+    <script>
+      // A word running through a shadow tree: light-DOM text slotted into a span.
+      customElements.define(
+        "x-slot",
+        class extends HTMLElement {
+          constructor() {
+            super();
+            this.attachShadow({ mode: "open" }).innerHTML = "<span><slot></slot></span>";
+          }
+        },
+      );
+    </script>
     <script type="application/json" id="expect">
       {
         "capture": "#cap",
@@ -17,7 +29,8 @@
           "Foobar And One",
           "Foo",
           "Bar HomeAbout XYes Cd",
-          "Foobar FooBar Foobar Foobar"
+          "Foobar FooBar Foobar Foobar",
+          "Foobar Foobar Foobar Foobar"
         ],
         "absent": ["Straße", "istanbul", "MIXED", "ONe", "Homeabout", "Xyes", "cd", "Foobar FooBar FooBar"]
       }
@@ -35,6 +48,8 @@
       <p style="text-transform: capitalize">foo<br />bar <span style="display: inline-block">home</span><span style="display: inline-block">about</span> x<span style="display: inline-block; width: 10px"></span>yes <span style="display: none">ab</span><b>cd</b></p>
       <!-- One word inside an inline-block; a word broken by the edge of one; hidden text and a padded inline inside a word (both browsers; after an inline-block the engines differ, so that case is not here). -->
       <p style="text-transform: capitalize"><span style="display: inline-block">foo<b>bar</b></span> foo<span style="display: inline-block">bar</span> foo<span style="display: none">x</span>bar foo<b style="padding: 0 3px">bar</b></p>
+      <!-- Text slotted through a shadow tree, an empty inline, hidden whitespace and a hidden <br> inside a word: both browsers run the word on. -->
+      <p style="text-transform: capitalize">foo<x-slot>bar</x-slot> foo<span></span>bar foo<span style="display: none">x y</span>bar foo<br style="display: none" />bar</p>
     </main>
   </body>
 </html>

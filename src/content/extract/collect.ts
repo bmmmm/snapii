@@ -78,6 +78,24 @@ function isBlockLevel(display: string): boolean {
   return !display.startsWith("inline") && !display.startsWith("ruby") && display !== "contents";
 }
 
+/** Elements that break a word for `capitalize` when they stand between two text nodes (with inline-* boxes). */
+const ATOMIC = new Set([
+  "br",
+  "hr",
+  "img",
+  "svg",
+  "canvas",
+  "video",
+  "audio",
+  "iframe",
+  "object",
+  "embed",
+  "input",
+  "select",
+  "textarea",
+  "button",
+]);
+
 // Everything a run takes from its parent element, read once per element.
 interface ParentInfo {
   visible: boolean;
@@ -203,22 +221,20 @@ export async function collectTextRunsDetailed(
 ): Promise<{ runs: TextRun[]; stats: CollectStats; sources: RunSource[] }> {
   const t0 = performance.now();
   const stats: CollectStats = { textNodes: 0, skippedFrames: 0, skippedVertical: 0, ms: 0 };
-  /** `between`: the elements entered since the text node before, for `capitalize`. */
-  const texts: { node: Text; ctx: FrameContext; between: Element[] }[] = [];
+  /** `at`: how many of `elements` (every element in walk order) came before the text node, for `capitalize`. */
+  const texts: { node: Text; ctx: FrameContext; at: number }[] = [];
+  const elements: Element[] = [];
   const opaque: { frame: Element; ctx: FrameContext }[] = [];
   const docs = new Set<Document>();
   const walk = walkFlatTree(root, {
     skip: opts.skip,
     onOpaqueFrame: (frame, ctx) => opaque.push({ frame, ctx }),
   });
-  let between: Element[] = [];
   for (const { node, ctx } of walk) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      texts.push({ node: node as Text, ctx, between });
-      between = [];
-    } else {
+    if (node.nodeType === Node.TEXT_NODE) texts.push({ node: node as Text, ctx, at: elements.length });
+    else {
       docs.add(ctx.doc);
-      between.push(node as Element);
+      elements.push(node as Element);
     }
   }
   stats.textNodes = texts.length;
@@ -305,11 +321,12 @@ export async function collectTextRunsDetailed(
     /**
      * What is rendered before a slice, for `capitalize`: the node's own text
      * before it, else the last run's node's where the page runs the word on
-     * across the two (foo<b>bar</b>, foo<span hidden>x</span>bar): on the
-     * same line, under the same block or inline-block, with nothing between
-     * them that has a box or breaks the line — a picture, an empty
-     * inline-block, a <br>, a collapsed space start a word (both browsers
-     * capitalise after each; measured). Hidden text between does not.
+     * across the two (foo<b>bar</b>, foo<span hidden>x</span>bar, text
+     * slotted through a shadow tree): on the same line, under the same block
+     * or inline-block, with no rendered atomic element or line break between
+     * the two text nodes — a picture, an inline-block, a <br>, a collapsed
+     * space start a word (both browsers capitalise after each; measured).
+     * Hidden text or an empty inline between does not.
      */
     const before = (start: number, box: DocRect): string => {
       if (!info.transform.includes("capitalize")) return "";
@@ -320,16 +337,19 @@ export async function collectTextRunsDetailed(
       const prevInfo = parent && infoOf(parent, ctx);
       if (!prevInfo || prevInfo.root !== info.root) return "";
       if (!(prev.top < box.y + box.height && box.y < prev.top + prev.height)) return "";
-      for (let j = lastRun + 1; j <= i; j++) {
+      // The flat-tree ancestors of this text: an element between that holds it is no boundary.
+      const ancestors = new Set<Element>();
+      for (let a = flatParent(node); a; a = flatParent(a)) ancestors.add(a);
+      const last = texts[lastRun] as (typeof texts)[number];
+      for (let j = lastRun + 1; j < i; j++) {
+        // A text node that made no run: a rendered one holding a space is a boundary, hidden text is not.
         const t = texts[j] as (typeof texts)[number];
-        // A text node that made no run: a collapsed space is a boundary, hidden text is not.
-        if (j < i && /\s/.test(t.node.data)) return "";
-        for (const e of t.between) {
-          if (e.localName === "br" || e.localName === "hr") return "";
-          if (e.contains(node)) continue;
-          const r = e.getBoundingClientRect();
-          if (r.width > 0 || r.height > 0) return "";
-        }
+        const p = flatParent(t.node);
+        if (p && /\s/.test(t.node.data) && layout.isRendered(p)) return "";
+      }
+      for (const e of elements.slice(last.at, (texts[i] as (typeof texts)[number]).at)) {
+        if (ancestors.has(e) || !layout.isRendered(e)) continue;
+        if (ATOMIC.has(e.localName) || layout.style(e).display.startsWith("inline-")) return "";
       }
       return prev.source.node.data.slice(-2);
     };
