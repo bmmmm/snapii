@@ -17,8 +17,8 @@
       and a see-through one over another (which stays painted).
       Patches ("gradient"): a radial and a repeating gradient, two layers, a
       colour hint, a background size, a content-box origin inside padding
-      (CSS repeats where SVG would pad), one under a see-through border, a
-      background position, a fixed one, a blended one, one across an inline
+      (CSS repeats where SVG would pad), one under a see-through border, one
+      under a dashed border (its gaps show the repeat), a background position, a fixed one, a blended one, one across an inline
       box's two lines, a gradient clipped to text, and a frame's body and
       root gradient (they paint the frame's whole canvas, not their box).
     -->
@@ -45,7 +45,7 @@
         "vector": {
           "tolerance": 0.005,
           "maxPatchArea": 0.25,
-          "unsupported": { "gradient": 14 },
+          "unsupported": { "gradient": 15 },
           "hidden": ["Hidden under a gradient", "Inline gradient", "on two lines", "Clipped to text"],
           "visible": [
             "Gradients drawn as shapes.",
@@ -89,6 +89,7 @@
         <div style="background: linear-gradient(rgb(255, 0, 0), rgb(0, 0, 255)); background-size: 50% 100%"></div>
         <div style="box-sizing: border-box; padding: 8px; background: linear-gradient(rgb(255, 0, 0), rgb(0, 0, 255)) content-box border-box"></div>
         <div style="box-sizing: border-box; border: 6px solid rgba(0, 0, 0, 0.3); background: linear-gradient(rgb(255, 0, 0), rgb(0, 0, 255))"></div>
+        <div style="box-sizing: border-box; border: 4px dashed rgb(0, 0, 0); background: linear-gradient(rgb(255, 255, 255), rgb(0, 0, 0))"></div>
         <div style="background: linear-gradient(rgb(255, 0, 0), rgb(0, 0, 255)) 10px 0"></div>
         <div style="background: linear-gradient(rgb(255, 0, 0), rgb(0, 0, 255)) fixed"></div>
         <div style="background: rgb(255, 255, 0) linear-gradient(rgb(255, 0, 0), rgb(0, 0, 255)); background-blend-mode: multiply"></div>

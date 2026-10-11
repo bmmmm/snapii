@@ -722,8 +722,11 @@ class Builder {
     const origin = this.#backgroundArea(cs, frag, border, cs.backgroundOrigin);
     const area = this.#backgroundArea(cs, frag, border);
     // Beyond its origin box CSS repeats the gradient and SVG pads it: alike
-    // only under borders that hide it.
-    const opaqueBorders = sides(cs).every((s) => !shown(s) || parseColor(s.color)?.a === 1);
+    // only under borders that hide it, which a dashed, dotted or double one
+    // does not whatever its colour.
+    const opaqueBorders = sides(cs).every(
+      (s) => !shown(s) || (s.style === "solid" && parseColor(s.color)?.a === 1),
+    );
     if (!within(area, origin) && !(same(origin, inset(frag, ...border)) && opaqueBorders)) return null;
     const g = linearGradient(cs.backgroundImage, origin.width, origin.height);
     if (g) this.#gradients.set(b, g);
@@ -746,6 +749,14 @@ class Builder {
     if (outline && cs.outlineStyle !== "solid") return false;
     if ((cs.getPropertyValue("border-image-source") || "none") !== "none") return false;
     if (visible.length === 0) return true;
+    // Sides of several colours meet diagonally at the corners, which the
+    // bars below paint square: on a box with no padding box (the CSS
+    // triangle, Bootstrap's .caret) the whole shape is such corners.
+    if (new Set(visible.map((s) => s.color)).size > 1) {
+      const [t, r, bt, l] = sides(cs).map((s) => (shown(s) ? s.width : 0)) as Quad;
+      const frag = this.#fragments(b)[0] as DocRect;
+      if (frag.width - l - r <= 0 || frag.height - t - bt <= 0) return false;
+    }
     const square = CORNERS.every((c) => px(cs.getPropertyValue(`border-${c}-radius`)) === 0);
     // Dashes, dots and double lines are laid out along straight sides only,
     // and per box: collapsed table cells share their edges. border-collapse

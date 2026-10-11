@@ -12,8 +12,10 @@
       A rounded box with a left border only keeps the solid path (a ring
       with the box's corners).
       Patches ("border"): a dashed box with rounded corners (dashes follow
-      the curve), a groove border, and a dashed cell of a collapsed table
-      (cells share their edges). A dashed box inside a collapsed table's
+      the curve), a groove border, a dashed cell of a collapsed table
+      (cells share their edges), and two boxes without a padding box whose
+      sides differ in colour, the CSS triangle and Bootstrap's .caret: there
+      the sides meet diagonally and the whole shape is corners. A dashed box inside a collapsed table's
       cell inherits border-collapse but shares no edge, as does the table's
       caption, and a dashed cell of a separated table: shapes.
       Chromium's own layout comes within 0.16 % of the page, Firefox's
@@ -32,7 +34,7 @@
         "capture": "#cap",
         "lines": ["Borders drawn as shapes.", "Card", "An abbr here.", "Broken", "box", "Cell", "Caption", "Inside", "Apart", "After the borders."],
         "vector": {
-          "unsupported": { "border": 3 },
+          "unsupported": { "border": 5 },
           "maxPatchArea": 0.1,
           "visible": ["Borders drawn as shapes.", "Card", "abbr", "Broken", "box", "Caption", "Inside", "Apart", "After the borders."],
           "hidden": ["Cell"],
@@ -72,6 +74,8 @@
       <div class="row">
         <div style="border: 2px dashed rgb(0, 0, 0); border-radius: 8px"></div>
         <div style="border: 4px groove rgb(160, 160, 160)"></div>
+        <div style="width: 0; height: 0; background: none; border-left: 50px solid transparent; border-right: 50px solid transparent; border-bottom: 44px solid rgb(204, 0, 0)"></div>
+        <div style="width: 0; height: 0; background: none; border-top: 4px dashed rgb(51, 51, 51); border-right: 4px solid transparent; border-left: 4px solid transparent"></div>
       </div>
       <p>After the borders.</p>
     </main>
