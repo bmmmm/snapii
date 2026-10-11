@@ -95,8 +95,8 @@ interface ParentInfo {
   dir: TextRun["dir"];
   href: string | null;
   block: Element;
-  /** An inline-block, inline-flex, … between the text and its block: a word boundary at its edges. */
-  atomic: boolean;
+  /** The nearest block-level or inline-block (inline-flex, …) ancestor: a word never crosses its edge. */
+  root: Element;
 }
 
 interface RawRun extends TextRun {
@@ -203,16 +203,23 @@ export async function collectTextRunsDetailed(
 ): Promise<{ runs: TextRun[]; stats: CollectStats; sources: RunSource[] }> {
   const t0 = performance.now();
   const stats: CollectStats = { textNodes: 0, skippedFrames: 0, skippedVertical: 0, ms: 0 };
-  const texts: { node: Text; ctx: FrameContext }[] = [];
+  /** `between`: the elements entered since the text node before, for `capitalize`. */
+  const texts: { node: Text; ctx: FrameContext; between: Element[] }[] = [];
   const opaque: { frame: Element; ctx: FrameContext }[] = [];
   const docs = new Set<Document>();
   const walk = walkFlatTree(root, {
     skip: opts.skip,
     onOpaqueFrame: (frame, ctx) => opaque.push({ frame, ctx }),
   });
+  let between: Element[] = [];
   for (const { node, ctx } of walk) {
-    if (node.nodeType === Node.TEXT_NODE) texts.push({ node: node as Text, ctx });
-    else docs.add(ctx.doc);
+    if (node.nodeType === Node.TEXT_NODE) {
+      texts.push({ node: node as Text, ctx, between });
+      between = [];
+    } else {
+      docs.add(ctx.doc);
+      between.push(node as Element);
+    }
   }
   stats.textNodes = texts.length;
   // Every measurement below has to see the layout with its final fonts.
@@ -257,14 +264,19 @@ export async function collectTextRunsDetailed(
       dir: cs.direction === "rtl" ? "rtl" : "ltr",
       href: hrefOf(el, pageURL),
       block,
-      atomic:
-        closestComposed(el, (e) => e === block || layout.style(e).display.startsWith("inline-")) !== block,
+      root:
+        closestComposed(el, (e) => {
+          const d = layout.style(e).display;
+          return isBlockLevel(d) || d.startsWith("inline-");
+        }) ?? el,
     };
     parents.set(el, info);
     return info;
   };
 
   const raw: RawRun[] = [];
+  /** Index in `texts` of the node the last raw run came from. */
+  let lastRun = -1;
   for (const [i, { node, ctx }] of texts.entries()) {
     if (!node.data) continue;
     if (!layout.frame(ctx).clip) continue;
@@ -292,25 +304,34 @@ export async function collectTextRunsDetailed(
     const toDoc = (r: DocRect) => layout.toDoc(r, ctx);
     /**
      * What is rendered before a slice, for `capitalize`: the node's own text
-     * before it, else the previous text node's where the page runs the word
-     * on across the two (foo<b>bar</b>): that node is the one right before
-     * this one, its run ends where this one starts on the same line, the
-     * same block holds both and neither sits in an atomic inline. A <br>, a
-     * picture, an inline-block or hidden text between them is a word
-     * boundary — the browsers capitalise after each (measured).
+     * before it, else the last run's node's where the page runs the word on
+     * across the two (foo<b>bar</b>, foo<span hidden>x</span>bar): on the
+     * same line, under the same block or inline-block, with nothing between
+     * them that has a box or breaks the line — a picture, an empty
+     * inline-block, a <br>, a collapsed space start a word (both browsers
+     * capitalise after each; measured). Hidden text between does not.
      */
     const before = (start: number, box: DocRect): string => {
       if (!info.transform.includes("capitalize")) return "";
       if (start > 0) return node.data.slice(Math.max(0, start - 2), start);
       const prev = raw[raw.length - 1];
-      const prevNode = texts[i - 1];
-      if (!prev || !prevNode || prev.source.node !== prevNode.node || prevNode.ctx.doc !== ctx.doc) return "";
-      const parent = flatParent(prevNode.node);
-      const prevInfo = parent && infoOf(parent, prevNode.ctx);
-      if (!prevInfo || prevInfo.block !== info.block || prevInfo.atomic || info.atomic) return "";
-      const adjoins = Math.abs(prev.x + prev.width - box.x) <= 1;
-      const sameLine = prev.top < box.y + box.height && box.y < prev.top + prev.height;
-      return adjoins && sameLine ? prevNode.node.data.slice(-2) : "";
+      if (!prev || lastRun < 0 || prev.source.node.ownerDocument !== ctx.doc) return "";
+      const parent = flatParent(prev.source.node);
+      const prevInfo = parent && infoOf(parent, ctx);
+      if (!prevInfo || prevInfo.root !== info.root) return "";
+      if (!(prev.top < box.y + box.height && box.y < prev.top + prev.height)) return "";
+      for (let j = lastRun + 1; j <= i; j++) {
+        const t = texts[j] as (typeof texts)[number];
+        // A text node that made no run: a collapsed space is a boundary, hidden text is not.
+        if (j < i && /\s/.test(t.node.data)) return "";
+        for (const e of t.between) {
+          if (e.localName === "br" || e.localName === "hr") return "";
+          if (e.contains(node)) continue;
+          const r = e.getBoundingClientRect();
+          if (r.width > 0 || r.height > 0) return "";
+        }
+      }
+      return prev.source.node.data.slice(-2);
     };
 
     for (const line of splitIntoLines(node, range, (r) => intersect(toDoc(r), clip) !== null)) {
@@ -360,6 +381,7 @@ export async function collectTextRunsDetailed(
         preserved: isPreserved(info.whiteSpace),
         source: { node, start, end, clip },
       });
+      lastRun = i;
     }
   }
 

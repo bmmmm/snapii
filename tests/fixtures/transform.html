@@ -16,9 +16,10 @@
           "The Quick (Brown) Fox's Tail",
           "Foobar And One",
           "Foo",
-          "Bar HomeAbout XYes Cd"
+          "Bar HomeAbout XYes Cd",
+          "Foobar FooBar Foobar Foobar"
         ],
-        "absent": ["Straße", "istanbul", "MIXED", "FooBar", "ONe", "Homeabout", "Xyes", "cd"]
+        "absent": ["Straße", "istanbul", "MIXED", "ONe", "Homeabout", "Xyes", "cd", "Foobar FooBar FooBar"]
       }
     </script>
   </head>
@@ -32,6 +33,8 @@
       <p style="text-transform: capitalize">foo<b>bar</b> and <i>o</i>ne</p>
       <!-- A <br>, an inline-block, an atomic inline and hidden text are word boundaries: both browsers capitalise after each. -->
       <p style="text-transform: capitalize">foo<br />bar <span style="display: inline-block">home</span><span style="display: inline-block">about</span> x<span style="display: inline-block; width: 10px"></span>yes <span style="display: none">ab</span><b>cd</b></p>
+      <!-- One word inside an inline-block; a word broken by the edge of one; hidden text and a padded inline inside a word (both browsers; after an inline-block the engines differ, so that case is not here). -->
+      <p style="text-transform: capitalize"><span style="display: inline-block">foo<b>bar</b></span> foo<span style="display: inline-block">bar</span> foo<span style="display: none">x</span>bar foo<b style="padding: 0 3px">bar</b></p>
     </main>
   </body>
 </html>
