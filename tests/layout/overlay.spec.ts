@@ -660,3 +660,53 @@ test("showToast shows the message and removes itself", async ({ page }) => {
   expect(await page.evaluate(() => document.querySelectorAll("snapii-toast").length)).toBe(1);
   await expect.poll(() => page.evaluate(() => document.querySelector("snapii-toast"))).toBeNull();
 });
+
+test("focus inside a frame: the overlay's keys still work, the frame gets none, and focus goes back after", async ({
+  page,
+}) => {
+  await load(page, "/fixtures/overlay.html");
+  await page.evaluate(async () => {
+    const frame = document.createElement("iframe");
+    frame.id = "editor";
+    frame.style.cssText = "position:absolute;left:100px;top:600px;width:300px;height:120px";
+    frame.srcdoc = "<textarea id='t' rows='3' cols='30'></textarea>";
+    const loaded = new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
+    document.body.append(frame);
+    await loaded;
+    frame.contentDocument?.querySelector("textarea")?.focus();
+  });
+  const inFrame = () =>
+    page.evaluate(() => {
+      const frame = document.querySelector("#editor") as HTMLIFrameElement;
+      return {
+        topActive: document.activeElement?.id ?? document.activeElement?.localName ?? null,
+        value: frame.contentDocument?.querySelector("textarea")?.value ?? null,
+      };
+    });
+  expect(await inFrame()).toEqual({ topActive: "editor", value: "" });
+  await begin(page);
+  // Nothing hovered: the key does nothing in the overlay, and nothing in the frame.
+  await page.keyboard.press("q");
+  await page.keyboard.press("Escape");
+  expect(await page.evaluate(() => (window as unknown as TestWindow).__cancelled)).toBe(1);
+  expect(await page.evaluate(() => document.querySelector("snapii-overlay"))).toBeNull();
+  expect(await inFrame()).toEqual({ topActive: "editor", value: "" });
+});
+
+test("Enter and Space on a toolbar button reached by Tab press that button, not Save", async ({ page }) => {
+  await start(page);
+  await clickAt(page, 200, 250); // select #para
+  await expect.poll(() => box(page)).toEqual(PARA);
+  const focus = (action: string) =>
+    page.evaluate((a) => {
+      const root = (window as unknown as TestWindow).__roots["snapii-overlay"] as ShadowRoot;
+      (root.querySelector(`button[data-action="${a}"]`) as HTMLButtonElement).focus();
+    }, action);
+  await focus("copy-text");
+  await page.keyboard.press(" ");
+  expect(await actions(page)).toEqual([{ action: "copy-text", mode: "element", rect: PARA, id: "para" }]);
+  await focus("cancel");
+  await page.keyboard.press("Enter");
+  expect(await actions(page)).toHaveLength(1);
+  expect(await page.evaluate(() => (window as unknown as TestWindow).__cancelled)).toBe(1);
+});

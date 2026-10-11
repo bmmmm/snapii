@@ -46,6 +46,8 @@ const PREVENT_EVENTS = ["selectstart", "dragstart"];
 // The second click of a double-click on a button that closed the overlay
 // comes within this (Windows' default double-click time is 500 ms).
 const DOUBLE_CLICK_MS = 500;
+/** Elements whose focus sends keys to another document. */
+const FRAME_TAGS = new Set(["iframe", "frame", "object", "embed"]);
 /** Ends a closed overlay's swallowClicks; a new overlay takes the events over at once. */
 let endSwallow: (() => void) | null = null;
 
@@ -348,6 +350,15 @@ export function startOverlay(opts: {
         cancel();
         break;
       case "Enter":
+      case " ": {
+        // A toolbar button reached by Tab: Enter and Space press that one.
+        const focused = toolbar.focused();
+        if (focused) {
+          e.preventDefault();
+          onButton(focused);
+          break;
+        }
+        if (e.key === " ") break;
         e.preventDefault();
         if (busy) break;
         if (state === "selected") runAction("save");
@@ -356,6 +367,7 @@ export function startOverlay(opts: {
           if (hovered) selectElement(hovered);
         }
         break;
+      }
       case "ArrowUp":
       case "ArrowDown":
         e.preventDefault();
@@ -433,11 +445,21 @@ export function startOverlay(opts: {
   ];
   for (const [t, type, fn, o] of listeners) t.addEventListener(type, fn, o);
 
+  // Keys go to the focused document. With a frame focused (an editor in an
+  // iframe, an embedded player) none reached the listeners above, and the
+  // hint's keys typed into the frame (measured on Firefox 157: "q" landed
+  // in its textarea, Escape did nothing). Focus leaves the frame while the
+  // overlay is up and goes back to it when the overlay is gone.
+  const framed = document.activeElement;
+  const unfocused = framed instanceof HTMLElement && FRAME_TAGS.has(framed.localName) ? framed : null;
+  unfocused?.blur();
+
   function destroy(): void {
     if (destroyed) return;
     destroyed = true;
     if (frame) cancelAnimationFrame(frame);
     for (const [t, type, fn, o] of listeners) t.removeEventListener(type, fn, o);
+    if (unfocused?.isConnected) unfocused.focus({ preventScroll: true });
     // Closed by a key still down (Escape, F, or a copied link's E or R).
     if (held !== null) swallowKeyup(held);
     const left = buttonClickAt + DOUBLE_CLICK_MS - performance.now();

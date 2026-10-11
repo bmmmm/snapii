@@ -34,6 +34,8 @@ export interface Toolbar {
    * geometry instead of by DOM listeners on the buttons.
    */
   buttonAt(x: number, y: number): ToolbarButton | null;
+  /** The button that has keyboard focus (reached by Tab), or null. */
+  focused(): ToolbarButton | null;
   setBusy(busy: boolean): void;
   /** Marks Save as unavailable for the current selection (`reason` is its tooltip), or available again. */
   setSaveBlocked(reason: string | null): void;
@@ -68,6 +70,11 @@ export function createToolbar(): Toolbar {
         if (x >= r.left && x < r.right && y >= r.top && y < r.bottom) return action;
       }
       return null;
+    },
+    focused() {
+      const root = el.getRootNode();
+      const active = root instanceof ShadowRoot ? root.activeElement : null;
+      return buttons.find(({ b }) => b === active)?.action ?? null;
     },
     setBusy(busy) {
       el.setAttribute("aria-busy", String(busy));
