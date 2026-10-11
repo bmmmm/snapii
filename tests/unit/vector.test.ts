@@ -508,6 +508,36 @@ test("vector: a border is painted inside the box: the stroke runs half its width
   assert.equal(attr(rounded[0] as XEl, "rx"), "6");
 });
 
+test("vector: a border wider than twice its corner radius is a ring with the outer corner still round", () => {
+  // border: 20px solid; border-radius: 4px — a stroke's centreline would be square there.
+  const shapes = shapesOf([
+    {
+      op: "rect",
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 60,
+      radii: [
+        [4, 4],
+        [4, 4],
+        [4, 4],
+        [4, 4],
+      ],
+      stroke: { width: 20, paint: { r: 0, g: 0, b: 0, a: 1 } },
+    },
+  ]);
+  assert.equal(named(shapes, "rect").length, 0);
+  const [ring] = named(shapes, "path");
+  assert.ok(ring);
+  assert.equal(attr(ring, "fill"), "rgb(0,0,0)");
+  assert.equal(attr(ring, "fill-rule"), "evenodd");
+  // Outer path with 4 px arcs, then the square inner box 20 px in.
+  assert.equal(
+    attr(ring, "d"),
+    "M4 0H96A4 4 0 0 1 100 4V56A4 4 0 0 1 96 60H4A4 4 0 0 1 0 56V4A4 4 0 0 1 4 0ZM20 20H80V40H20V20Z",
+  );
+});
+
 /** The shapes layer of a scene made of just these ops. */
 const shapesOf = (ops: SceneOp[]): XEl =>
   byId(parseXml(render({ scene: { ...makeScene(), ops } })), "shapes");

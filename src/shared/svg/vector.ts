@@ -249,10 +249,16 @@ function rectLines(op: Extract<SceneOp, { op: "rect" }>, defs: Defs): string[] {
       out.push(shape(op, op.radii, paintAttrs(stroke.paint, "fill")));
     } else {
       const outer = op.radii ? fitRadii(op.width, op.height, op.radii) : NO_RADII;
+      // A corner rounded by less than half the width has no round centreline
+      // to stroke: the stroke's outer edge would be square where CSS rounds
+      // it, so that border is the ring between the two boxes instead.
+      const tight = outer.some(([x, y]) => (x > 0 && x < w / 2) || (y > 0 && y < w / 2));
       const inner = outer.map(([x, y]) => [Math.max(0, x - w / 2), Math.max(0, y - w / 2)]) as Radii;
       const box = { x: op.x + w / 2, y: op.y + w / 2, width: op.width - w, height: op.height - w };
       out.push(
-        shape(box, inner, `fill="none" ${paintAttrs(stroke.paint, "stroke")} stroke-width="${fmt(w)}"`),
+        tight
+          ? ringLine(op, [w, w, w, w], stroke.paint)
+          : shape(box, inner, `fill="none" ${paintAttrs(stroke.paint, "stroke")} stroke-width="${fmt(w)}"`),
       );
     }
   }
