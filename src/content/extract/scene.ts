@@ -749,11 +749,16 @@ class Builder {
     if (outline && cs.outlineStyle !== "solid") return false;
     if ((cs.getPropertyValue("border-image-source") || "none") !== "none") return false;
     if (visible.length === 0) return true;
-    // Sides of several colours meet diagonally at the corners, which the
-    // bars below paint square: on a box with no padding box (the CSS
-    // triangle, Bootstrap's .caret) the whole shape is such corners.
-    if (new Set(visible.map((s) => s.color)).size > 1) {
-      const [t, r, bt, l] = sides(cs).map((s) => (shown(s) ? s.width : 0)) as Quad;
+    // Two adjacent sides of different colours meet diagonally at their
+    // corner, which the bars below paint square: on a box with no padding
+    // box (the CSS triangle, Bootstrap's .caret) the whole shape is corners.
+    const all = sides(cs);
+    const meet = all.some((s, i) => {
+      const next = all[(i + 1) % 4] as (typeof all)[number];
+      return shown(s) && shown(next) && s.color !== next.color;
+    });
+    if (meet) {
+      const [t, r, bt, l] = all.map((s) => (shown(s) ? s.width : 0)) as Quad;
       const frag = this.#fragments(b)[0] as DocRect;
       if (frag.width - l - r <= 0 || frag.height - t - bt <= 0) return false;
     }
@@ -983,11 +988,13 @@ class Builder {
     let n = 0;
     for (const d of el.querySelectorAll("*")) {
       if (++n > 2_000) break;
-      if (!this.#boxes.has(d) || !this.#layout.isRendered(d)) continue;
+      if (!this.#boxes.has(d)) continue;
       const r = this.#layout.toDoc(d.getBoundingClientRect(), ctx);
-      if (!(r.width > 0 && r.height > 0) || within(r, inside)) continue;
-      // Only what shows: a clipping ancestor between the two cuts it.
-      const clip = this.#layout.clip(d, ctx);
+      if (!(r.width > 0 && r.height > 0) || within(r, inside) || !this.#layout.isRendered(d)) continue;
+      // Only what shows: a clipping ancestor between the two cuts it. The
+      // box's own clip (boxClip, not clip) — its overflow clips its content,
+      // not its border.
+      const clip = this.#layout.boxClip(d, ctx);
       const shown = clip && intersect(r, clip);
       if (shown) out.push(shown);
     }

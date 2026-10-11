@@ -11,7 +11,9 @@
       background and the overflowing text are pixels; neither is drawn as
       shapes, and their runs are hidden, not painted white onto the canvas.
       A patched box that clips its overflow keeps its own size, and the card
-      inside it is cut off as on the page.
+      inside it is cut off as on the page. A leaving card that clips its own
+      overflow still brings its border with it: its box is cut by the clip
+      of what contains it, not by its own.
     -->
     <style>
       body { margin: 0; padding: 20px; font: 16px/1.5 serif; background: rgb(255, 255, 255); }
@@ -21,16 +23,17 @@
       .card { position: relative; top: 40px; margin: 0 20px; padding: 8px 12px; background: rgb(17, 34, 51); color: rgb(255, 255, 255); }
       .short { height: 20px; }
       .clipped { overflow: hidden; }
+      .framed { overflow: hidden; border: 6px solid rgb(204, 0, 0); }
     </style>
     <script type="application/json" id="expect">
       {
         "capture": "#cap",
-        "lines": ["Before the hero.", "Card text", "Tall text goes on", "below", "Clipped card", "After the hero."],
+        "lines": ["Before the hero.", "Card text", "Tall text goes on", "below", "Clipped card", "Framed card", "After the hero."],
         "vector": {
           "tolerance": 0.005,
-          "maxPatchArea": 0.6,
-          "unsupported": { "gradient": 3 },
-          "hidden": ["Card text", "Tall text goes on", "below", "Clipped card"],
+          "maxPatchArea": 0.7,
+          "unsupported": { "gradient": 4 },
+          "hidden": ["Card text", "Tall text goes on", "below", "Clipped card", "Framed card"],
           "visible": ["Before the hero.", "After the hero."]
         }
       }
@@ -44,6 +47,8 @@
       <div class="hero short"><div style="width: 120px">Tall text goes on below</div></div>
       <div style="height: 40px"></div>
       <div class="hero clipped"><div class="card">Clipped card</div></div>
+      <div class="hero"><div class="card framed">Framed card</div></div>
+      <div style="height: 60px"></div>
       <p>After the hero.</p>
     </main>
   </body>
