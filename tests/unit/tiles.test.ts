@@ -218,3 +218,39 @@ test("planPatches: each patch is captured at its place in the document and place
   );
   assert.deepEqual(planPatches(region, [], 2, DEFAULT_LIMITS), []);
 });
+
+test("planTiles/planPatches: no tile thinner than one device px when scale × zoom < 1", () => {
+  // A capture of 0 device px rejects (NS_ERROR_LOSS_OF_SIGNIFICANT_DATA, Firefox 157).
+  const region = { x: 0, y: 0, width: 800, height: 600 };
+  const thin = [
+    { x: 10, y: 10, width: 200, height: 1 },
+    { x: 0, y: 0, width: 0.5, height: 0.5 },
+    { x: 5, y: 5, width: 1, height: 100 },
+  ];
+  for (const scale of [0.5, 0.9, 0.6, 0.3]) {
+    const plan = planPatches(region, thin, scale, DEFAULT_LIMITS);
+    assert.equal(plan.length, 3);
+    for (const t of plan) {
+      assert.ok(
+        t.pixelWidth >= 1 && t.pixelHeight >= 1,
+        `scale ${scale}: ${t.pixelWidth}x${t.pixelHeight} px`,
+      );
+      assert.equal(t.pixelWidth, device(t.doc.width, scale));
+      assert.equal(t.pixelHeight, device(t.doc.height, scale));
+    }
+    // Widened past the far edge only, to the shortest length with one device px.
+    const need = Math.ceil(1 / scale);
+    assert.deepEqual(plan[0]?.doc, { x: 10, y: 10, width: 200, height: need });
+    assert.deepEqual(plan[0]?.rel, { x: 10, y: 10, width: 200, height: need });
+    assert.deepEqual(plan[1]?.doc, { x: 0, y: 0, width: need, height: need });
+    assert.deepEqual(plan[2]?.doc, { x: 5, y: 5, width: need, height: 100 });
+  }
+  // Raster: a capped scale whose last band would be a 1 CSS px rest joins the band before it.
+  const tall = { x: 0, y: 0, width: 1000, height: 171_773 };
+  const scale = captureScale(tall, 1, 1, 100_000_000);
+  assert.ok(scale < 1);
+  const tiles = planTiles(tall, scale, DEFAULT_LIMITS);
+  assertPartition(tall, tiles);
+  assertLimits(tiles, scale, DEFAULT_LIMITS);
+  for (const t of tiles) assert.ok(t.pixelHeight >= 1, `band ${JSON.stringify(t.doc)} has no device row`);
+});

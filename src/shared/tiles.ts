@@ -78,17 +78,37 @@ export function deviceStep(scale: number): number {
 
 const devicePx = (css: number, scale: number): number => Math.floor(css * scale + EPS);
 
-/** Largest multiple of `step` (CSS px) whose device length fits `limitPx`. */
-function fitLength(limitPx: number, scale: number, step: number): number {
+/**
+ * The shortest CSS length with at least one device px: a capture of 0 device
+ * px in either dimension rejects (NS_ERROR_LOSS_OF_SIGNIFICANT_DATA, measured
+ * on Firefox 157), so no planned tile may be thinner. 1 unless scale < 1.
+ */
+const minLength = (scale: number): number => Math.max(1, Math.ceil(1 / scale - EPS));
+
+/**
+ * Largest multiple of `step` (CSS px) whose device length fits `limitPx`,
+ * with room for a rest of up to `min - 1` CSS px that `cuts` may add.
+ */
+function fitLength(limitPx: number, scale: number, step: number, min: number): number {
   let len = Math.floor(limitPx / scale / step) * step;
-  while (len > 0 && devicePx(len, scale) > limitPx) len -= step;
+  while (len > 0 && devicePx(len + min - 1, scale) > limitPx) len -= step;
   return len;
 }
 
-/** Cuts [0, total) into pieces of `size` (the last one takes the rest). */
-function cuts(total: number, size: number): Array<[number, number]> {
+/**
+ * Cuts [0, total) into pieces of `size`; the last one takes the rest, and a
+ * rest thinner than `min` joins the piece before it instead of being one.
+ */
+function cuts(total: number, size: number, min: number): Array<[number, number]> {
   const out: Array<[number, number]> = [];
-  for (let at = 0; at < total; at += size) out.push([at, Math.min(size, total - at)]);
+  for (let at = 0; at < total; at += size) {
+    const rest = total - at;
+    if (rest - size < min) {
+      out.push([at, rest]);
+      break;
+    }
+    out.push([at, size]);
+  }
   return out;
 }
 
@@ -100,12 +120,17 @@ function cuts(total: number, size: number): Array<[number, number]> {
  * deviceStep(scale), so every tile but the last band/column has whole device
  * pixels. `rel` of the first tile can start slightly before 0 when the region
  * starts between CSS pixels: that is where the captured pixels really are.
+ * Every tile has at least one device px per side: a rect thinner than that
+ * (a 1 px patch at a scale below 1) is widened past its far edge.
  * Throws RangeError when not even one CSS px fits the limits.
  */
 export function planTiles(rect: DocRect, scale: number, limits: TileLimits): PlannedTile[] {
   if (!(scale > 0) || !Number.isFinite(scale)) throw new RangeError(`invalid scale ${scale}`);
   const snapped = snapRect(rect);
   if (snapped.width <= 0 || snapped.height <= 0) return [];
+  const min = minLength(scale);
+  snapped.width = Math.max(snapped.width, min);
+  snapped.height = Math.max(snapped.height, min);
   const area = Math.min(limits.maxArea, limits.maxTilePixels);
 
   let step = deviceStep(scale);
@@ -120,22 +145,22 @@ export function planTiles(rect: DocRect, scale: number, limits: TileLimits): Pla
     devicePx(colWidth, scale) * devicePx(minBand, scale) > area
   ) {
     colWidth = Math.min(
-      fitLength(limits.maxSide, scale, step),
-      fitLength(area / Math.max(1, devicePx(minBand, scale)), scale, step),
+      fitLength(limits.maxSide, scale, step, min),
+      fitLength(area / Math.max(1, devicePx(minBand, scale)), scale, step, min),
     );
   }
   if (colWidth <= 0) throw new RangeError(`scale ${scale} too large for the capture limits`);
 
   const colPx = devicePx(Math.min(colWidth, snapped.width), scale);
   const bandHeight = Math.min(
-    fitLength(limits.maxSide, scale, step),
-    fitLength(area / Math.max(1, colPx), scale, step),
+    fitLength(limits.maxSide, scale, step, min),
+    fitLength(area / Math.max(1, colPx), scale, step, min),
   );
   if (bandHeight <= 0) throw new RangeError(`scale ${scale} too large for the capture limits`);
 
   const tiles: PlannedTile[] = [];
-  for (const [dy, h] of cuts(snapped.height, bandHeight)) {
-    for (const [dx, w] of cuts(snapped.width, colWidth)) {
+  for (const [dy, h] of cuts(snapped.height, bandHeight, min)) {
+    for (const [dx, w] of cuts(snapped.width, colWidth, min)) {
       const x = snapped.x + dx;
       const y = snapped.y + dy;
       tiles.push({
