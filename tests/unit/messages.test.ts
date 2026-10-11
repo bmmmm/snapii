@@ -48,6 +48,15 @@ const model = (): CaptureModel => ({
 // biome-ignore lint/suspicious/noExplicitAny: deliberately ill-typed test input
 type Loose = Record<string, any>;
 
+/** `items` with a hole at `at` (the slot deleted, not undefined): what `every` skips. */
+function holed(items: unknown[], at: number): unknown[] {
+  const out = new Array(items.length);
+  items.forEach((v, i) => {
+    if (i !== at) out[i] = v;
+  });
+  return out;
+}
+
 // Each mutation breaks exactly one field of an otherwise valid save message.
 const mutations: Array<[string, (m: Loose) => void]> = [
   ["runs not an array", (m) => (m.runs = { 0: m.runs[0] })],
@@ -78,6 +87,19 @@ const mutations: Array<[string, (m: Loose) => void]> = [
     "imageArea width NaN",
     (m) => (m.imageAreas = [{ x: 0, y: 0, width: Number.NaN, height: 30, kind: "img" }]),
   ],
+  // `every` skips a hole and Firefox's structured clone keeps one.
+  ["runs with a hole", (m) => (m.runs = holed([m.runs[0], m.runs[0], m.runs[0]], 1))],
+  ["links with a hole", (m) => (m.links = holed([m.links[0], m.links[0]], 0))],
+  [
+    "imageAreas with a hole",
+    (m) => (m.imageAreas = holed([{ x: 0, y: 0, width: 30, height: 30, kind: "img" }, null], 1)),
+  ],
+  ["run width negative", (m) => (m.runs[0].width = -40)],
+  ["run height negative", (m) => (m.runs[0].height = -1)],
+  ["run fontSize negative", (m) => (m.runs[0].fontSize = -16)],
+  ["link width negative", (m) => (m.links[0].width = -10)],
+  // The save spreads the model into the render input: an extra key would reach the renderer.
+  ["model with a foreign key", (m) => (m.ocr = { runs: [], info: { engine: "<forged>", status: "pwned" } })],
 ];
 
 test("isToBackground: accepts a well-formed save", () => {
@@ -223,6 +245,23 @@ const sceneMutations: Array<[string, (s: Loose) => void]> = [
   ["canvas alpha negative", (s) => (s.canvas.a = -0.1)],
   ["canvas channel negative", (s) => (s.canvas.b = -1)],
   ["ops not an array", (s) => (s.ops = {})],
+  ["ops with a hole", (s) => (s.ops = holed([s.ops[0], s.ops[0]], 0))],
+  ["patches with a hole", (s) => (s.patches = holed([null, ...s.patches], 0))],
+  ["text with a hole", (s) => (s.text = holed([null], 0))],
+  ["group children with a hole", (s) => (s.ops[0].children = holed([null, ...s.ops[0].children], 0))],
+  [
+    "rect radii with a hole",
+    (s) =>
+      (s.ops[0].children[0].radii = holed(
+        [
+          [1, 1],
+          [1, 1],
+          [1, 1],
+          [1, 1],
+        ],
+        1,
+      )),
+  ],
   ["op unknown", (s) => (s.ops = [{ op: "path", d: "M0 0" }])],
   ["op null", (s) => (s.ops = [null])],
   ["rect x NaN", (s) => (s.ops[0].children[0].x = Number.NaN)],

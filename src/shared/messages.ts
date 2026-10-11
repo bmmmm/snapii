@@ -20,6 +20,17 @@ const isOneOf =
     values.includes(x as T);
 
 const nums = (o: Rec, ...keys: string[]): boolean => keys.every((k) => isNum(o[k]));
+const nonNeg = (o: Rec, ...keys: string[]): boolean =>
+  keys.every((k) => isNum(o[k]) && (o[k] as number) >= 0);
+
+// An array whose every slot holds a valid element. `every` skips holes, and
+// Firefox's structured clone keeps them, so a forged `[run, , run]` would pass
+// it and crash the renderer on the undefined; a hole is checked as one here.
+function all(x: unknown, ok: (v: unknown) => boolean): x is unknown[] {
+  if (!Array.isArray(x)) return false;
+  for (let i = 0; i < x.length; i++) if (!(i in x) || !ok(x[i])) return false;
+  return true;
+}
 
 const isFontStyle = isOneOf("normal", "italic", "oblique");
 const isDir = isOneOf("ltr", "rtl");
@@ -33,13 +44,14 @@ const isFragmentStatus = isOneOf(
   "DISABLED",
 );
 
-const isRect = (x: unknown): boolean =>
-  isRec(x) && nums(x, "x", "y", "width", "height") && (x.width as number) >= 0 && (x.height as number) >= 0;
+const isRect = (x: unknown): boolean => isRec(x) && nums(x, "x", "y") && nonNeg(x, "width", "height");
 
 const isTextRun = (x: unknown): boolean =>
   isRec(x) &&
+  isRect(x) &&
   isStr(x.text) &&
-  nums(x, "x", "y", "top", "width", "height", "fontSize", "fontWeight", "line", "block") &&
+  nums(x, "top", "fontWeight", "line", "block") &&
+  nonNeg(x, "fontSize") &&
   isStr(x.fontFamily) &&
   isFontStyle(x.fontStyle) &&
   isStr(x.color) &&
@@ -47,8 +59,7 @@ const isTextRun = (x: unknown): boolean =>
   isDir(x.dir) &&
   isHref(x.href);
 
-const isLinkArea = (x: unknown): boolean =>
-  isRec(x) && nums(x, "x", "y", "width", "height") && isStr(x.alt) && isHref(x.href);
+const isLinkArea = (x: unknown): boolean => isRec(x) && isRect(x) && isStr(x.alt) && isHref(x.href);
 
 const isPageMeta = (x: unknown): boolean =>
   isRec(x) &&
@@ -110,9 +121,7 @@ const isPaint = (x: unknown): boolean =>
   isRec(x) && inRange(x.r, 0, 255) && inRange(x.g, 0, 255) && inRange(x.b, 0, 255) && inRange(x.a, 0, 1);
 
 const isRadii = (x: unknown): boolean =>
-  Array.isArray(x) &&
-  x.length === 4 &&
-  x.every((c) => Array.isArray(c) && c.length === 2 && c.every((v) => isNum(v) && v >= 0));
+  all(x, (c) => all(c, (v) => isNum(v) && v >= 0) && c.length === 2) && x.length === 4;
 
 const isClip = (x: unknown): boolean =>
   isRect(x) && ((x as Rec).radii === undefined || isRadii((x as Rec).radii));
@@ -121,15 +130,14 @@ const isClip = (x: unknown): boolean =>
 // for each change of alpha, and patches a gradient that would need more
 // (content/extract/gradient.ts).
 export const MAX_GRADIENT_STOPS = 2_048;
-const isPoint = (x: unknown): boolean => Array.isArray(x) && x.length === 2 && x.every(isNum);
+const isPoint = (x: unknown): boolean => all(x, isNum) && x.length === 2;
 const isGradient = (x: unknown): boolean =>
   isRec(x) &&
   isPoint(x.from) &&
   isPoint(x.to) &&
-  Array.isArray(x.stops) &&
+  all(x.stops, (s) => isRec(s) && inRange(s.offset, 0, 1) && isPaint(s.paint)) &&
   x.stops.length >= 1 &&
-  x.stops.length <= MAX_GRADIENT_STOPS &&
-  x.stops.every((s) => isRec(s) && inRange(s.offset, 0, 1) && isPaint(s.paint));
+  x.stops.length <= MAX_GRADIENT_STOPS;
 
 function isOp(x: unknown, depth: number, budget: { left: number }): boolean {
   if (!isRec(x) || --budget.left < 0) return false;
@@ -144,9 +152,8 @@ function isOp(x: unknown, depth: number, budget: { left: number }): boolean {
         (isRec(stroke) && isNum(stroke.width) && stroke.width >= 0 && isPaint(stroke.paint))) &&
       (border === undefined ||
         (isRec(border) &&
-          Array.isArray(border.widths) &&
+          all(border.widths, (w) => isNum(w) && w >= 0) &&
           border.widths.length === 4 &&
-          border.widths.every((w) => isNum(w) && w >= 0) &&
           isPaint(border.paint)))
     );
   }
@@ -168,9 +175,8 @@ function isOp(x: unknown, depth: number, budget: { left: number }): boolean {
       isNum(x.width) &&
       x.width >= 0 &&
       isPaint(x.paint) &&
-      Array.isArray(dash) &&
+      all(dash, (v) => isNum(v) && v >= 0) &&
       dash.length === 2 &&
-      dash.every((v) => isNum(v) && v >= 0) &&
       (dash[0] as number) + (dash[1] as number) > 0 &&
       (x.round === undefined || typeof x.round === "boolean")
     );
@@ -180,8 +186,7 @@ function isOp(x: unknown, depth: number, budget: { left: number }): boolean {
       depth < MAX_SCENE_DEPTH &&
       (x.clip === undefined || isClip(x.clip)) &&
       (x.opacity === undefined || inRange(x.opacity, 0, 1)) &&
-      Array.isArray(x.children) &&
-      x.children.every((c) => isOp(c, depth + 1, budget))
+      all(x.children, (c) => isOp(c, depth + 1, budget))
     );
   }
   return false;
@@ -193,10 +198,9 @@ const DECORATION_LINES = new Set<unknown>(["underline", "overline", "line-throug
 const DECORATION_STYLES = new Set<unknown>(["solid", "double", "dotted", "dashed", "wavy"]);
 const isDecoration = (x: unknown): boolean =>
   isRec(x) &&
-  Array.isArray(x.lines) &&
+  all(x.lines, (l) => DECORATION_LINES.has(l)) &&
   x.lines.length >= 1 &&
   x.lines.length <= 3 &&
-  x.lines.every((l) => DECORATION_LINES.has(l)) &&
   isPaint(x.paint) &&
   DECORATION_STYLES.has(x.style) &&
   (x.thickness === undefined || (isNum(x.thickness) && x.thickness >= 0));
@@ -215,27 +219,27 @@ const isScene = (x: unknown, runs: number): boolean => {
   const budget = { left: MAX_SCENE_OPS };
   return (
     isPaint(x.canvas) &&
-    Array.isArray(x.ops) &&
-    x.ops.every((op) => isOp(op, 0, budget)) &&
-    Array.isArray(x.patches) &&
+    all(x.ops, (op) => isOp(op, 0, budget)) &&
+    all(x.patches, isPatch) &&
     x.patches.length <= MAX_SCENE_PATCHES &&
-    x.patches.every(isPatch) &&
-    Array.isArray(x.text) &&
+    all(x.text, isTextPaint) &&
     x.text.length === runs &&
-    x.text.every(isTextPaint) &&
     isRec(x.unsupported) &&
     Object.entries(x.unsupported).every(([k, n]) => isReason(k) && Number.isInteger(n) && (n as number) >= 0)
   );
 };
 
+// The save spreads the model into the render input, so a key beyond these
+// (say a forged `ocr`) would reach the renderer and the metadata unchecked.
+const MODEL_KEYS = new Set(["region", "runs", "links", "page", "imageAreas", "scene"]);
+
 const isCaptureModel = (x: unknown): boolean =>
   isRec(x) &&
+  Object.keys(x).every((k) => MODEL_KEYS.has(k)) &&
   isRect(x.region) &&
-  (x.imageAreas === undefined || (Array.isArray(x.imageAreas) && x.imageAreas.every(isImageArea))) &&
-  Array.isArray(x.runs) &&
-  x.runs.every(isTextRun) &&
-  Array.isArray(x.links) &&
-  x.links.every(isLinkArea) &&
+  (x.imageAreas === undefined || all(x.imageAreas, isImageArea)) &&
+  all(x.runs, isTextRun) &&
+  all(x.links, isLinkArea) &&
   isPageMeta(x.page) &&
   (x.scene === undefined || isScene(x.scene, x.runs.length));
 
