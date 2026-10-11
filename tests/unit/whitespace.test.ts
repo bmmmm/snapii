@@ -74,3 +74,16 @@ test("normalizeLines: preserved runs keep their spaces", () => {
     ["  indented  ", " tail"],
   );
 });
+
+test("applyTextTransform: capitalize keeps a run that starts inside a word lower-case", () => {
+  // foo<b>bar</b>, a slice cut at the capture edge, a wrapped word: the page shows one word.
+  assert.equal(applyTextTransform("bar", "capitalize", "en", "oo"), "bar");
+  assert.equal(applyTextTransform("pture", "capitalize", "en", "ca"), "pture");
+  assert.equal(applyTextTransform("t", "capitalize", "en", "n'"), "t");
+  // After a space, a block start or an opening bracket a word begins.
+  assert.equal(applyTextTransform("bar", "capitalize", "en", "o "), "Bar");
+  assert.equal(applyTextTransform("bar", "capitalize", "en", ""), "Bar");
+  assert.equal(applyTextTransform("bar", "capitalize", "en", " ("), "Bar");
+  // The prefix is dropped whole, also when its own letter changes length.
+  assert.equal(applyTextTransform("traße", "capitalize", "de", " ß"), "traße");
+});

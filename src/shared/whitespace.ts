@@ -39,19 +39,30 @@ function lower(s: string, lang: string | null): string {
   }
 }
 
+const capitalize = (text: string, lang: string | null): string =>
+  text.replace(/(^|\s)([^\s\p{L}\p{N}]*)(\p{L})/gu, (_, sp, lead, ch) => sp + lead + upper(ch, lang));
+
 /**
  * Applies the computed text-transform. uppercase may change the length
  * (ß -> SS); the renderer's textLength absorbs that. capitalize upper-cases
  * the first letter of every whitespace-separated word, so "don't" keeps its t.
+ * `before` is what is rendered right before `text` (its last two characters
+ * are enough): a word goes on across a run's start — a slice cut at the
+ * capture edge, a line wrap, an inline boundary like foo<b>bar</b> — and a
+ * run starting inside one keeps its case, as on the page.
  */
-export function applyTextTransform(text: string, transform: string, lang: string | null): string {
+export function applyTextTransform(
+  text: string,
+  transform: string,
+  lang: string | null,
+  before = "",
+): string {
   if (transform.includes("uppercase")) return upper(text, lang);
   if (transform.includes("lowercase")) return lower(text, lang);
   if (transform.includes("capitalize")) {
-    return text.replace(
-      /(^|\s)([^\s\p{L}\p{N}]*)(\p{L})/gu,
-      (_, sp, lead, ch) => sp + lead + upper(ch, lang),
-    );
+    // Each letter's case depends on what precedes it only, so the prefix
+    // comes out the same alone as in front of the text.
+    return capitalize(before + text, lang).slice(capitalize(before, lang).length);
   }
   return text;
 }

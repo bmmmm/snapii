@@ -13,9 +13,10 @@
           "STRASSE UND FLUSS",
           "İSTANBUL İĞDIR",
           "mixed case text",
-          "The Quick (Brown) Fox's Tail"
+          "The Quick (Brown) Fox's Tail",
+          "Foobar And One"
         ],
-        "absent": ["Straße", "istanbul", "MIXED"]
+        "absent": ["Straße", "istanbul", "MIXED", "FooBar", "ONe"]
       }
     </script>
   </head>
@@ -25,6 +26,8 @@
       <p lang="tr" style="text-transform: uppercase">istanbul iğdır</p>
       <p style="text-transform: lowercase">MIXED Case TEXT</p>
       <p style="text-transform: capitalize">the quick (brown) fox's tail</p>
+      <!-- A word goes on across an inline boundary: foo<b>bar</b> is one word on the page. -->
+      <p style="text-transform: capitalize">foo<b>bar</b> and <i>o</i>ne</p>
     </main>
   </body>
 </html>

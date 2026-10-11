@@ -260,7 +260,7 @@ export async function collectTextRunsDetailed(
   };
 
   const raw: RawRun[] = [];
-  for (const { node, ctx } of texts) {
+  for (const [i, { node, ctx }] of texts.entries()) {
     if (!node.data) continue;
     if (!layout.frame(ctx).clip) continue;
     let range = ranges.get(ctx.doc);
@@ -285,6 +285,19 @@ export async function collectTextRunsDetailed(
     if (!clip) continue;
     const metrics = fontMetrics(ctx.doc, info.fontKey);
     const toDoc = (r: DocRect) => layout.toDoc(r, ctx);
+    /**
+     * What is rendered before a slice, for `capitalize`: the node's own text
+     * before it, else the previous text node's when the same block holds
+     * both (an inline boundary goes on with the word; a block starts one).
+     */
+    const before = (start: number): string => {
+      if (!info.transform.includes("capitalize")) return "";
+      if (start > 0) return node.data.slice(Math.max(0, start - 2), start);
+      const prev = texts[i - 1];
+      if (!prev || prev.ctx.doc !== ctx.doc) return "";
+      const parent = flatParent(prev.node);
+      return parent && infoOf(parent, prev.ctx).block === info.block ? prev.node.data.slice(-2) : "";
+    };
 
     for (const line of splitIntoLines(node, range, (r) => intersect(toDoc(r), clip) !== null)) {
       const rect = toDoc(line.rect);
@@ -303,6 +316,7 @@ export async function collectTextRunsDetailed(
         collapse(node.data.slice(start, end), info.whiteSpace),
         info.transform,
         info.lang,
+        before(start),
       );
       if (!text || isIconText(text)) continue;
       let block = blocks.get(info.block);
