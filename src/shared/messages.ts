@@ -135,9 +135,10 @@ const isGradient = (x: unknown): boolean =>
   isRec(x) &&
   isPoint(x.from) &&
   isPoint(x.to) &&
-  all(x.stops, (s) => isRec(s) && inRange(s.offset, 0, 1) && isPaint(s.paint)) &&
+  Array.isArray(x.stops) &&
   x.stops.length >= 1 &&
-  x.stops.length <= MAX_GRADIENT_STOPS;
+  x.stops.length <= MAX_GRADIENT_STOPS &&
+  all(x.stops, (s) => isRec(s) && inRange(s.offset, 0, 1) && isPaint(s.paint));
 
 function isOp(x: unknown, depth: number, budget: { left: number }): boolean {
   if (!isRec(x) || --budget.left < 0) return false;
@@ -198,9 +199,10 @@ const DECORATION_LINES = new Set<unknown>(["underline", "overline", "line-throug
 const DECORATION_STYLES = new Set<unknown>(["solid", "double", "dotted", "dashed", "wavy"]);
 const isDecoration = (x: unknown): boolean =>
   isRec(x) &&
-  all(x.lines, (l) => DECORATION_LINES.has(l)) &&
+  Array.isArray(x.lines) &&
   x.lines.length >= 1 &&
   x.lines.length <= 3 &&
+  all(x.lines, (l) => DECORATION_LINES.has(l)) &&
   isPaint(x.paint) &&
   DECORATION_STYLES.has(x.style) &&
   (x.thickness === undefined || (isNum(x.thickness) && x.thickness >= 0));
@@ -220,10 +222,12 @@ const isScene = (x: unknown, runs: number): boolean => {
   return (
     isPaint(x.canvas) &&
     all(x.ops, (op) => isOp(op, 0, budget)) &&
-    all(x.patches, isPatch) &&
+    Array.isArray(x.patches) &&
     x.patches.length <= MAX_SCENE_PATCHES &&
-    all(x.text, isTextPaint) &&
+    all(x.patches, isPatch) &&
+    Array.isArray(x.text) &&
     x.text.length === runs &&
+    all(x.text, isTextPaint) &&
     isRec(x.unsupported) &&
     Object.entries(x.unsupported).every(([k, n]) => isReason(k) && Number.isInteger(n) && (n as number) >= 0)
   );
