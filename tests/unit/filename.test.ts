@@ -75,3 +75,13 @@ test("makeFilename: at most 120 UTF-8 bytes including the extension, surrogate p
   }
   assert.equal(makeFilename(page({ title: "x".repeat(500) })).length, 120);
 });
+
+test("makeFilename: noncharacters and lone surrogates from the title are removed", () => {
+  // With U+FFFE or U+FDD0 in the name the file cannot be created and
+  // downloads.download() never settles; a lone surrogate is refused
+  // (measured on macOS, Firefox 157).
+  const name = makeFilename(page({ title: "Report￾﷐ Q\uD83D3\uDE00 end" }));
+  assert.equal(name, "snapii Report Q 3 end 2026-10-01 14-03-04.svg");
+  assert.doesNotMatch(name, /[\p{Cn}\p{Cs}]/u);
+  assert.doesNotMatch(name, /[\ud800-\udfff]/u, "lone surrogate");
+});
