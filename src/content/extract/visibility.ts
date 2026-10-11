@@ -18,6 +18,10 @@ export interface FrameGeometry {
 
 const px = (v: string): number => Number.parseFloat(v) || 0;
 
+/** content-visibility: auto or hidden applies paint and layout containment (the computed `contain` does not say so). */
+const skipsContent = (cs: CSSStyleDeclaration): boolean =>
+  /^(auto|hidden)$/.test(cs.getPropertyValue("content-visibility"));
+
 function clientToRect(r: DOMRectReadOnly): DocRect {
   return { x: r.left, y: r.top, width: r.width, height: r.height };
 }
@@ -158,12 +162,19 @@ export class Layout {
     if (!parent || (position !== "absolute" && position !== "fixed")) return parent;
     return closestComposed(parent, (a) => {
       const s = this.style(a);
+      // The individual transform properties (Tailwind v4 emits them) and
+      // content-visibility's layout containment count like transform and contain.
       const fixedCB =
         s.transform !== "none" ||
+        s.translate !== "none" ||
+        s.rotate !== "none" ||
+        s.scale !== "none" ||
         s.perspective !== "none" ||
         s.filter !== "none" ||
+        s.getPropertyValue("backdrop-filter") !== "none" ||
         /paint|layout|strict|content/.test(s.contain) ||
-        /transform|perspective|filter/.test(s.willChange);
+        skipsContent(s) ||
+        /transform|translate|rotate|scale|perspective|filter/.test(s.willChange);
       return fixedCB || (position === "absolute" && s.position !== "static");
     });
   }
@@ -173,7 +184,7 @@ export class Layout {
     // overflow does not apply to inline boxes; clip-path and clip still do.
     const doc = el.ownerDocument;
     const boxClips = el !== doc.documentElement && el !== doc.body && cs.display !== "inline";
-    const paint = /paint|strict|content/.test(cs.contain);
+    const paint = /paint|strict|content/.test(cs.contain) || skipsContent(cs);
     const clipX = boxClips && (cs.overflowX !== "visible" || paint);
     const clipY = boxClips && (cs.overflowY !== "visible" || paint);
     const needsBox = clipX || clipY || cs.clipPath.startsWith("inset(") || cs.clip.startsWith("rect(");

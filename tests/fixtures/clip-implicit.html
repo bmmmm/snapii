@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>clip-implicit</title>
+    <!--
+      Clips that no overflow or contain property spells out: a box with
+      content-visibility: auto (paint containment, so its overflow is cut),
+      and fixed boxes inside an ancestor that is their containing block only
+      through an individual transform property (translate) or a
+      backdrop-filter, and which clips its overflow. The text that leaves
+      those boxes is not on the page and must not be a run.
+    -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; }
+      #cap { width: 400px; }
+      #cap > div { margin: 0 0 12px; }
+      .auto { content-visibility: auto; height: 48px; width: 300px; }
+      .cb { overflow: hidden; width: 100px; height: 24px; }
+      .cb > span { position: fixed; left: 0; top: 0; white-space: nowrap; }
+      .cb i { margin-left: 200px; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["First line kept", "second line kept", "Shown", "Shown too"],
+        "absent": ["third line cut", "fourth line cut", "Clipped away", "Clipped as well"]
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <div class="auto">First line kept<br />second line kept<br />third line cut<br />fourth line cut</div>
+      <div class="cb" style="translate: 0 0"><span><b>Shown</b><i>Clipped away</i></span></div>
+      <div class="cb" style="backdrop-filter: blur(1px)"><span><b>Shown too</b><i>Clipped as well</i></span></div>
+    </main>
+  </body>
+</html>
