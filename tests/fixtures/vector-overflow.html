@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>vector overflow</title>
+    <!--
+      Content that leaves a patched element: a section with a radial
+      gradient (a patch) holding a card pulled below it by a relative `top`,
+      and a fixed-height box with the same gradient whose text runs past it.
+      The patch grows over what leaves the box (V-D3), so the card's
+      background and the overflowing text are pixels; neither is drawn as
+      shapes, and their runs are hidden, not painted white onto the canvas.
+      A patched box that clips its overflow keeps its own size, and the card
+      inside it is cut off as on the page.
+    -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; background: rgb(255, 255, 255); }
+      #cap { width: 400px; }
+      p { margin: 0 0 8px; }
+      .hero { height: 60px; background-image: radial-gradient(rgb(200, 200, 200), rgb(120, 120, 120)); }
+      .card { position: relative; top: 40px; margin: 0 20px; padding: 8px 12px; background: rgb(17, 34, 51); color: rgb(255, 255, 255); }
+      .short { height: 20px; }
+      .clipped { overflow: hidden; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Before the hero.", "Card text", "Tall text goes on", "below", "Clipped card", "After the hero."],
+        "vector": {
+          "tolerance": 0.005,
+          "maxPatchArea": 0.6,
+          "unsupported": { "gradient": 3 },
+          "hidden": ["Card text", "Tall text goes on", "below", "Clipped card"],
+          "visible": ["Before the hero.", "After the hero."]
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>Before the hero.</p>
+      <div class="hero"><div class="card">Card text</div></div>
+      <div style="height: 48px"></div>
+      <div class="hero short"><div style="width: 120px">Tall text goes on below</div></div>
+      <div style="height: 40px"></div>
+      <div class="hero clipped"><div class="card">Clipped card</div></div>
+      <p>After the hero.</p>
+    </main>
+  </body>
+</html>

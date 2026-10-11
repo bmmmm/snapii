@@ -959,9 +959,10 @@ class Builder {
 
   /**
    * What a patch of b must cover: its box, grown by what shadows and filters
-   * paint beyond it, plus the boxes of positioned descendants that leave it
-   * (a dropdown). Only shown ones: a hidden popover still has a box, and a
-   * union over every descendant took in boxes broken across columns.
+   * paint beyond it, plus the shown part of every descendant that leaves it
+   * (a dropdown, overflowing content). Only shown ones: a hidden popover
+   * still has a box; and only those leaving it: a union over every
+   * descendant took in boxes broken across columns.
    */
   #extent(b: Box): DocRect[] {
     const { cs, el, ctx } = b;
@@ -973,14 +974,22 @@ class Builder {
       height: r.height + 2 * m,
     }));
     if (cs.overflowX !== "visible" && cs.overflowY !== "visible") return out;
+    // Every shown descendant that leaves the box, whatever moved it there: a
+    // dropdown, a card pulled down by a relative `top` or a negative margin,
+    // content taller than a fixed height. Its children are never visited, so
+    // what is not under the patch would be neither shapes nor pixels, and
+    // its text, painted, would sit on the canvas (white on white, measured).
+    const inside = this.#fragments(b).reduce(union);
     let n = 0;
     for (const d of el.querySelectorAll("*")) {
       if (++n > 2_000) break;
-      const box = this.#boxes.get(d);
-      if (!box || (box.cs.position !== "absolute" && box.cs.position !== "fixed")) continue;
-      if (!this.#layout.isRendered(d)) continue;
-      const r = d.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) out.push(this.#layout.toDoc(r, ctx));
+      if (!this.#boxes.has(d) || !this.#layout.isRendered(d)) continue;
+      const r = this.#layout.toDoc(d.getBoundingClientRect(), ctx);
+      if (!(r.width > 0 && r.height > 0) || within(r, inside)) continue;
+      // Only what shows: a clipping ancestor between the two cuts it.
+      const clip = this.#layout.clip(d, ctx);
+      const shown = clip && intersect(r, clip);
+      if (shown) out.push(shown);
     }
     return out;
   }
