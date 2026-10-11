@@ -72,7 +72,6 @@ export function createToolbar(): Toolbar {
       return null;
     },
     focused() {
-      if (el.hidden) return null;
       const root = el.getRootNode();
       const active = root instanceof ShadowRoot ? root.activeElement : null;
       return buttons.find(({ b }) => b === active)?.action ?? null;

@@ -13,10 +13,10 @@ const EXTENSION = ".svg";
 // invisible format characters (bidi overrides could disguise the extension),
 // line/paragraph separators, unassigned code points (the noncharacters among
 // them) and lone surrogates. A title can hold the last two (`&#xFFFE;`, a
-// cut emoji): with a noncharacter the file
-// cannot be created and downloads.download() never settles, so the save
-// ends without a word; a lone surrogate is refused as "download failed"
-// (both measured on macOS, Firefox 157).
+// cut emoji): with a noncharacter the file cannot be created and
+// downloads.download() never settles, so the save ends without a word; a
+// lone surrogate is refused as "download failed" (both measured on macOS,
+// Firefox 157).
 const UNSAFE = /[/\\:*?"<>|\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cn}\p{Cs}]/gu;
 
 function clean(text: string): string {

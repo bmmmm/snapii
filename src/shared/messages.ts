@@ -121,7 +121,7 @@ const isPaint = (x: unknown): boolean =>
   isRec(x) && inRange(x.r, 0, 255) && inRange(x.g, 0, 255) && inRange(x.b, 0, 255) && inRange(x.a, 0, 1);
 
 const isRadii = (x: unknown): boolean =>
-  all(x, (c) => all(c, (v) => isNum(v) && v >= 0) && c.length === 2) && x.length === 4;
+  Array.isArray(x) && x.length === 4 && all(x, (c) => isPoint(c) && c.every((v) => v >= 0));
 
 const isClip = (x: unknown): boolean =>
   isRect(x) && ((x as Rec).radii === undefined || isRadii((x as Rec).radii));
@@ -130,7 +130,7 @@ const isClip = (x: unknown): boolean =>
 // for each change of alpha, and patches a gradient that would need more
 // (content/extract/gradient.ts).
 export const MAX_GRADIENT_STOPS = 2_048;
-const isPoint = (x: unknown): boolean => all(x, isNum) && x.length === 2;
+const isPoint = (x: unknown): x is number[] => Array.isArray(x) && x.length === 2 && all(x, isNum);
 const isGradient = (x: unknown): boolean =>
   isRec(x) &&
   isPoint(x.from) &&
@@ -153,8 +153,9 @@ function isOp(x: unknown, depth: number, budget: { left: number }): boolean {
         (isRec(stroke) && isNum(stroke.width) && stroke.width >= 0 && isPaint(stroke.paint))) &&
       (border === undefined ||
         (isRec(border) &&
-          all(border.widths, (w) => isNum(w) && w >= 0) &&
+          Array.isArray(border.widths) &&
           border.widths.length === 4 &&
+          all(border.widths, (w) => isNum(w) && w >= 0) &&
           isPaint(border.paint)))
     );
   }
@@ -176,8 +177,9 @@ function isOp(x: unknown, depth: number, budget: { left: number }): boolean {
       isNum(x.width) &&
       x.width >= 0 &&
       isPaint(x.paint) &&
-      all(dash, (v) => isNum(v) && v >= 0) &&
+      Array.isArray(dash) &&
       dash.length === 2 &&
+      all(dash, (v) => isNum(v) && v >= 0) &&
       (dash[0] as number) + (dash[1] as number) > 0 &&
       (x.round === undefined || typeof x.round === "boolean")
     );
