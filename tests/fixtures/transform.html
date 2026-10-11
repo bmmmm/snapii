@@ -14,9 +14,11 @@
           "İSTANBUL İĞDIR",
           "mixed case text",
           "The Quick (Brown) Fox's Tail",
-          "Foobar And One"
+          "Foobar And One",
+          "Foo",
+          "Bar HomeAbout XYes Cd"
         ],
-        "absent": ["Straße", "istanbul", "MIXED", "FooBar", "ONe"]
+        "absent": ["Straße", "istanbul", "MIXED", "FooBar", "ONe", "Homeabout", "Xyes", "cd"]
       }
     </script>
   </head>
@@ -28,6 +30,8 @@
       <p style="text-transform: capitalize">the quick (brown) fox's tail</p>
       <!-- A word goes on across an inline boundary: foo<b>bar</b> is one word on the page. -->
       <p style="text-transform: capitalize">foo<b>bar</b> and <i>o</i>ne</p>
+      <!-- A <br>, an inline-block, an atomic inline and hidden text are word boundaries: both browsers capitalise after each. -->
+      <p style="text-transform: capitalize">foo<br />bar <span style="display: inline-block">home</span><span style="display: inline-block">about</span> x<span style="display: inline-block; width: 10px"></span>yes <span style="display: none">ab</span><b>cd</b></p>
     </main>
   </body>
 </html>

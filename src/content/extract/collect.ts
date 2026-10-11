@@ -95,6 +95,8 @@ interface ParentInfo {
   dir: TextRun["dir"];
   href: string | null;
   block: Element;
+  /** An inline-block, inline-flex, … between the text and its block: a word boundary at its edges. */
+  atomic: boolean;
 }
 
 interface RawRun extends TextRun {
@@ -238,6 +240,7 @@ export async function collectTextRunsDetailed(
         : "normal";
     const fontSize = Number.parseFloat(cs.fontSize) || 0;
     const fontWeight = Number.parseFloat(cs.fontWeight) || 400;
+    const block = closestComposed(el, (e) => isBlockLevel(layout.style(e).display)) ?? el;
     info = {
       visible: layout.isRendered(el),
       vertical: !cs.writingMode.startsWith("horizontal"),
@@ -253,7 +256,9 @@ export async function collectTextRunsDetailed(
       lang: langOf(el),
       dir: cs.direction === "rtl" ? "rtl" : "ltr",
       href: hrefOf(el, pageURL),
-      block: closestComposed(el, (e) => isBlockLevel(layout.style(e).display)) ?? el,
+      block,
+      atomic:
+        closestComposed(el, (e) => e === block || layout.style(e).display.startsWith("inline-")) !== block,
     };
     parents.set(el, info);
     return info;
@@ -287,16 +292,25 @@ export async function collectTextRunsDetailed(
     const toDoc = (r: DocRect) => layout.toDoc(r, ctx);
     /**
      * What is rendered before a slice, for `capitalize`: the node's own text
-     * before it, else the previous text node's when the same block holds
-     * both (an inline boundary goes on with the word; a block starts one).
+     * before it, else the previous text node's where the page runs the word
+     * on across the two (foo<b>bar</b>): that node is the one right before
+     * this one, its run ends where this one starts on the same line, the
+     * same block holds both and neither sits in an atomic inline. A <br>, a
+     * picture, an inline-block or hidden text between them is a word
+     * boundary — the browsers capitalise after each (measured).
      */
-    const before = (start: number): string => {
+    const before = (start: number, box: DocRect): string => {
       if (!info.transform.includes("capitalize")) return "";
       if (start > 0) return node.data.slice(Math.max(0, start - 2), start);
-      const prev = texts[i - 1];
-      if (!prev || prev.ctx.doc !== ctx.doc) return "";
-      const parent = flatParent(prev.node);
-      return parent && infoOf(parent, prev.ctx).block === info.block ? prev.node.data.slice(-2) : "";
+      const prev = raw[raw.length - 1];
+      const prevNode = texts[i - 1];
+      if (!prev || !prevNode || prev.source.node !== prevNode.node || prevNode.ctx.doc !== ctx.doc) return "";
+      const parent = flatParent(prevNode.node);
+      const prevInfo = parent && infoOf(parent, prevNode.ctx);
+      if (!prevInfo || prevInfo.block !== info.block || prevInfo.atomic || info.atomic) return "";
+      const adjoins = Math.abs(prev.x + prev.width - box.x) <= 1;
+      const sameLine = prev.top < box.y + box.height && box.y < prev.top + prev.height;
+      return adjoins && sameLine ? prevNode.node.data.slice(-2) : "";
     };
 
     for (const line of splitIntoLines(node, range, (r) => intersect(toDoc(r), clip) !== null)) {
@@ -316,7 +330,7 @@ export async function collectTextRunsDetailed(
         collapse(node.data.slice(start, end), info.whiteSpace),
         info.transform,
         info.lang,
-        before(start),
+        before(start, box),
       );
       if (!text || isIconText(text)) continue;
       let block = blocks.get(info.block);
