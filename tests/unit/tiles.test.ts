@@ -254,3 +254,43 @@ test("planTiles/planPatches: no tile thinner than one device px when scale × zo
   assertLimits(tiles, scale, DEFAULT_LIMITS);
   for (const t of tiles) assert.ok(t.pixelHeight >= 1, `band ${JSON.stringify(t.doc)} has no device row`);
 });
+
+test("planTiles: tiny limits at scales below 1 — a merged rest band or column never breaks a limit", () => {
+  // The last column may take a rest of up to min - 1 CSS px: the band is fitted against that width.
+  // 0.33 / 9 / 40 / 300×333: the band fitted against the first column's width gave the
+  // merged last column 9×5 = 45 px; 0.33 / 16 / 97 / 41×333: without fitLength's reserve
+  // the merged last band gave 13×8 = 104 px.
+  for (const scale of [0.3, 0.33, 0.45, Math.SQRT1_2, 0.9]) {
+    for (const maxSide of [7, 9, 16, 64]) {
+      for (const area of [40, 97, 500, 3491]) {
+        const limits = { maxSide, maxArea: area, maxTilePixels: area };
+        for (const [w, h] of [
+          [181, 333],
+          [41, 23],
+          [41, 333],
+          [300, 7],
+          [300, 333],
+        ] as [number, number][]) {
+          const region = { x: 0, y: 0, width: w, height: h };
+          let tiles: PlannedTile[];
+          try {
+            tiles = planTiles(region, scale, limits);
+          } catch (e) {
+            assert.ok(e instanceof RangeError, String(e));
+            continue;
+          }
+          const what = `scale ${scale} side ${maxSide} area ${area} ${w}x${h}`;
+          assertPartition(region, tiles);
+          for (const t of tiles) {
+            assert.ok(t.pixelWidth >= 1 && t.pixelHeight >= 1, `${what}: ${t.pixelWidth}x${t.pixelHeight}`);
+            assert.ok(t.pixelWidth <= maxSide && t.pixelHeight <= maxSide, `${what}: side`);
+            assert.ok(
+              t.pixelWidth * t.pixelHeight <= area,
+              `${what}: ${t.pixelWidth * t.pixelHeight} px > ${area}`,
+            );
+          }
+        }
+      }
+    }
+  }
+});

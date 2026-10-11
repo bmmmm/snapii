@@ -151,12 +151,15 @@ export function planTiles(rect: DocRect, scale: number, limits: TileLimits): Pla
   }
   if (colWidth <= 0) throw new RangeError(`scale ${scale} too large for the capture limits`);
 
-  const colPx = devicePx(Math.min(colWidth, snapped.width), scale);
+  // The widest column: the last one may take a rest of up to min - 1.
+  const colPx = devicePx(Math.min(colWidth + min - 1, snapped.width), scale);
   const bandHeight = Math.min(
     fitLength(limits.maxSide, scale, step, min),
     fitLength(area / Math.max(1, colPx), scale, step, min),
   );
-  if (bandHeight <= 0) throw new RangeError(`scale ${scale} too large for the capture limits`);
+  // Limits under one device px per piece: nothing both fits and shows.
+  if (bandHeight <= 0 || devicePx(bandHeight, scale) < 1 || devicePx(colWidth, scale) < 1)
+    throw new RangeError(`scale ${scale} too large for the capture limits`);
 
   const tiles: PlannedTile[] = [];
   for (const [dy, h] of cuts(snapped.height, bandHeight, min)) {
