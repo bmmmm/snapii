@@ -149,6 +149,13 @@ export class Layout {
     return container ? this.clip(container, ctx) : this.frame(ctx).clip;
   }
 
+  /** boxClip cut by el's own clip-path inset and legacy clip, which cut its border box too; its overflow does not. */
+  shapeClip(el: Element, ctx: FrameContext): DocRect | null {
+    const clip = this.boxClip(el, ctx);
+    const cs = this.style(el);
+    return clip && cs.display !== "contents" ? this.#ownClip(el, cs, clip, ctx, false) : clip;
+  }
+
   /** The element whose content area el's box lies in, following the containing-block chain. */
   container(el: Element): Element | null {
     return this.#containerOf(el, this.style(el).position);
@@ -179,11 +186,17 @@ export class Layout {
     });
   }
 
-  #ownClip(el: Element, cs: CSSStyleDeclaration, clip: DocRect, ctx: FrameContext): DocRect | null {
+  #ownClip(
+    el: Element,
+    cs: CSSStyleDeclaration,
+    clip: DocRect,
+    ctx: FrameContext,
+    overflow = true,
+  ): DocRect | null {
     // The root element's and body's overflow belongs to the viewport, and
     // overflow does not apply to inline boxes; clip-path and clip still do.
     const doc = el.ownerDocument;
-    const boxClips = el !== doc.documentElement && el !== doc.body && cs.display !== "inline";
+    const boxClips = overflow && el !== doc.documentElement && el !== doc.body && cs.display !== "inline";
     const paint = /paint|strict|content/.test(cs.contain) || skipsContent(cs);
     const clipX = boxClips && (cs.overflowX !== "visible" || paint);
     const clipY = boxClips && (cs.overflowY !== "visible" || paint);

@@ -991,10 +991,10 @@ class Builder {
       if (!this.#boxes.has(d)) continue;
       const r = this.#layout.toDoc(d.getBoundingClientRect(), ctx);
       if (!(r.width > 0 && r.height > 0) || within(r, inside) || !this.#layout.isRendered(d)) continue;
-      // Only what shows: a clipping ancestor between the two cuts it. The
-      // box's own clip (boxClip, not clip) — its overflow clips its content,
-      // not its border.
-      const clip = this.#layout.boxClip(d, ctx);
+      // Only what shows: a clipping ancestor between the two cuts it, and so
+      // do the box's own clip-path and clip (a closed dropdown wiped out by
+      // an inset); its overflow clips its content, not its border.
+      const clip = this.#layout.shapeClip(d, ctx);
       const shown = clip && intersect(r, clip);
       if (shown) out.push(shown);
     }
