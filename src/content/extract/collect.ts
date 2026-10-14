@@ -46,6 +46,7 @@ const EPS = 0.5;
 const XLINK = "http://www.w3.org/1999/xlink";
 const XML = "http://www.w3.org/XML/1998/namespace";
 const XHTML = "http://www.w3.org/1999/xhtml";
+const MATHML = "http://www.w3.org/1998/Math/MathML";
 
 function isLinkish(el: Element): boolean {
   const n = el.localName;
@@ -87,8 +88,25 @@ function newlines(data: string, from: number, to = data.length): number {
   return n;
 }
 
+/** Inline-level displays that do not say "inline": inline MathML (Chromium computes `math`), an old-flexbox inline box. */
+const INLINE_ATOMIC = new Set(["math", "-webkit-inline-box"]);
+
 function isBlockLevel(display: string): boolean {
-  return !display.startsWith("inline") && !display.startsWith("ruby") && display !== "contents";
+  return (
+    !display.startsWith("inline") &&
+    !display.startsWith("ruby") &&
+    display !== "contents" &&
+    !INLINE_ATOMIC.has(display)
+  );
+}
+
+/**
+ * e starts a block of its own. Inside a formula the formula lays out its
+ * parts, whatever their display says (Chromium computes `block math` for
+ * <mi>): only the <math> element itself is a block or not.
+ */
+function startsBlock(e: Element, display: string): boolean {
+  return isBlockLevel(display) && (e.namespaceURI !== MATHML || e.localName === "math");
 }
 
 /** Elements that break a word for `capitalize` when they stand between two text nodes (with inline-* boxes). */
@@ -275,8 +293,10 @@ export async function collectTextRunsDetailed(
         ? "italic"
         : "normal";
     const fontSize = Number.parseFloat(cs.fontSize) || 0;
+    // The computed size is before CSS zoom, the text is painted zoomed (measured, both browsers).
+    const zoom = (el as Element & { currentCSSZoom?: number }).currentCSSZoom ?? 1;
     const fontWeight = Number.parseFloat(cs.fontWeight) || 400;
-    const block = closestComposed(el, (e) => isBlockLevel(layout.style(e).display)) ?? el;
+    const block = closestComposed(el, (e) => startsBlock(e, layout.style(e).display)) ?? el;
     info = {
       visible: layout.isRendered(el),
       vertical: !cs.writingMode.startsWith("horizontal"),
@@ -285,7 +305,7 @@ export async function collectTextRunsDetailed(
       transform: cs.textTransform,
       fontKey: `${fontStyle} ${fontWeight} ${fontSize}px ${cs.fontFamily}`,
       fontFamily: cs.fontFamily,
-      fontSize,
+      fontSize: fontSize * zoom,
       fontWeight,
       fontStyle,
       color: cs.color,
@@ -296,7 +316,7 @@ export async function collectTextRunsDetailed(
       root:
         closestComposed(el, (e) => {
           const d = layout.style(e).display;
-          return isBlockLevel(d) || d.startsWith("inline-");
+          return startsBlock(e, d) || d.startsWith("inline-") || INLINE_ATOMIC.has(d);
         }) ?? el,
     };
     parents.set(el, info);
@@ -366,10 +386,11 @@ export async function collectTextRunsDetailed(
      * before it, else the last run's node's where the page runs the word on
      * across the two (foo<b>bar</b>, foo<span hidden>x</span>bar, text
      * slotted through a shadow tree): on the same line, under the same block
-     * or inline-block, with no rendered atomic element or line break between
+     * or inline-block, with no atomic element or line break laid out between
      * the two text nodes — a picture, an inline-block, a <br>, a collapsed
-     * space start a word (both browsers capitalise after each; measured).
-     * Hidden text or an empty inline between does not.
+     * space start a word, painted or not (visibility: hidden, opacity: 0;
+     * both browsers capitalise after each; measured). Text with no box
+     * (display: none) or an empty inline between does not.
      */
     const before = (start: number, box: DocRect): string => {
       if (!info.transform.includes("capitalize")) return "";
@@ -385,13 +406,13 @@ export async function collectTextRunsDetailed(
       for (let a = flatParent(node); a; a = flatParent(a)) ancestors.add(a);
       const last = texts[lastRun] as (typeof texts)[number];
       for (let j = lastRun + 1; j < i; j++) {
-        // A text node that made no run: a rendered one holding a space is a boundary, hidden text is not.
+        // A text node that made no run: one laid out holding a space is a boundary, one without a box is not.
         const t = texts[j] as (typeof texts)[number];
         const p = flatParent(t.node);
-        if (p && /\s/.test(t.node.data) && layout.isRendered(p)) return "";
+        if (p && /\s/.test(t.node.data) && layout.hasBox(p)) return "";
       }
       for (const e of elements.slice(last.at, (texts[i] as (typeof texts)[number]).at)) {
-        if (ancestors.has(e) || !layout.isRendered(e)) continue;
+        if (ancestors.has(e) || !layout.hasBox(e)) continue;
         if (ATOMIC.has(e.localName) || layout.style(e).display.startsWith("inline-")) return "";
       }
       return prev.source.node.data.slice(-2);

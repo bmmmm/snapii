@@ -30,7 +30,8 @@
           "Foo",
           "Bar HomeAbout XYes Cd",
           "Foobar FooBar Foobar Foobar",
-          "Foobar Foobar Foobar Foobar"
+          "Foobar Foobar Foobar Foobar",
+          "FooBar FooBar Foobar"
         ],
         "absent": ["Straße", "istanbul", "MIXED", "ONe", "Homeabout", "Xyes", "cd", "Foobar FooBar FooBar"]
       }
@@ -50,6 +51,9 @@
       <p style="text-transform: capitalize"><span style="display: inline-block">foo<b>bar</b></span> foo<span style="display: inline-block">bar</span> foo<span style="display: none">x</span>bar foo<b style="padding: 0 3px">bar</b></p>
       <!-- Text slotted through a shadow tree, an empty inline, hidden whitespace and a hidden <br> inside a word: both browsers run the word on. -->
       <p style="text-transform: capitalize">foo<x-slot>bar</x-slot> foo<span></span>bar foo<span style="display: none">x y</span>bar foo<br style="display: none" />bar</p>
+      <!-- Laid out but not painted is still a boundary (a visibility:hidden space, a transparent picture); an empty
+           absolutely positioned box is none (both browsers; after an empty float they differ, so that case is not here). -->
+      <p style="text-transform: capitalize">foo<span style="visibility: hidden"> </span>bar foo<img style="opacity: 0; width: 10px; height: 10px" alt="" />bar foo<span style="position: absolute"></span>bar</p>
     </main>
   </body>
 </html>

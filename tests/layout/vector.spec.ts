@@ -842,6 +842,21 @@ test("patches: one that lies inside another is not captured again; the container
   expect(scene.patches).toEqual([{ x: 0, y: 0, width: 200, height: 60, reason: "gradient" }]);
 });
 
+test("text under CSS zoom: the run carries the size it is painted at", async ({ page }) => {
+  await page.goto("/fixtures/smoke.html");
+  await page.evaluate(() => {
+    document.body.innerHTML =
+      '<main id="cap" style="width:300px"><p style="zoom:2;font:16px serif;margin:0">Zoomed</p></main>';
+  });
+  await page.addScriptTag({ path: "dist-test/harness.js" });
+  const sizes = await page.evaluate(async () => {
+    const h = window.__snapii;
+    const { runs } = await h.debug.collectTextRunsDetailed(document, h.debug.captureRect("#cap"), {});
+    return runs.map((r) => r.fontSize);
+  });
+  expect(sizes).toEqual([32]);
+});
+
 /** Every op of the scene, groups flattened. */
 const flatOps = (ops: Scene["ops"]): Scene["ops"][number][] =>
   ops.flatMap((op) => (op.op === "group" ? flatOps(op.children) : [op]));

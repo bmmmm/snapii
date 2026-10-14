@@ -15,6 +15,8 @@
         .z             z-index:2 (7) over a later positioned z-index:auto box (6)
         .hide          "covered words" lie under a later positioned box: the
                        run stays selectable, but invisible
+        .cq            a size container is no stacking context (measured, both
+                       browsers): its z-index:-1 child paints under its background
         .grid          a grid item with z-index:1 (it applies to static items)
                        over a later item in the same cell, both behind a
                        display:contents wrapper
@@ -37,6 +39,8 @@
       .z { margin: 8px 0; }
       .zpos { position: relative; z-index: 2; width: 200px; height: 30px; background: rgb(255, 140, 0); }
       .zauto { position: relative; width: 300px; height: 30px; margin-top: -15px; background: rgb(0, 128, 128); }
+      .cq { container-type: inline-size; height: 40px; margin: 8px 0; background: rgb(220, 220, 220); }
+      .cqneg { position: relative; z-index: -1; width: 160px; height: 40px; background: rgb(150, 0, 150); }
       .grid { display: grid; margin: 8px 0; }
       .gz { grid-area: 1 / 1; z-index: 1; width: 200px; height: 30px; background: rgb(255, 140, 0); }
       .gb { grid-area: 1 / 1; width: 300px; height: 30px; background: rgb(0, 0, 200); }
@@ -65,6 +69,7 @@
       <div class="ctx"><div class="neg"></div><div class="blockchild"></div></div>
       <div class="hide"><p>covered words</p><div class="cover"></div></div>
       <div class="z"><div class="zpos"></div><div class="zauto"></div></div>
+      <div class="cq"><div class="cqneg"></div></div>
       <div class="grid"><div style="display: contents"><div class="gz">grid caption</div><div class="gb"></div></div></div>
     </main>
   </body>

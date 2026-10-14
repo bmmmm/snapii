@@ -97,6 +97,19 @@ test("copy text: newlines outside the line flow add no blank line; an indented p
   expect(plain).toBe("h\ni\nj\nk\n\nl\n\nm\n\nn\n   \no");
 });
 
+test("copy text: inline math and an old-flexbox inline box stay in their line", async ({ page }) => {
+  await page.goto("/fixtures/smoke.html");
+  await page.addScriptTag({ path: "dist-test/harness.js" });
+  const plain = await page.evaluate(async () => {
+    document.body.innerHTML =
+      '<p id="cap" style="width:400px">a <math><mi>x</mi><mo>+</mo><mn>1</mn></math> b <span style="display:-webkit-inline-box">c</span> d</p>';
+    const h = window.__snapii;
+    const { runs } = await h.debug.collectTextRunsDetailed(document, h.debug.captureRect("#cap"));
+    return h.runsToPlainText(runs);
+  });
+  expect(plain).toBe("a x+1 b c d");
+});
+
 test("writeClipboard: content clipboard first, background as fallback, rejects only if both fail", async ({
   page,
 }) => {

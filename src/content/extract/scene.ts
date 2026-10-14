@@ -879,8 +879,9 @@ class Builder {
       cs.position === "sticky" ||
       Number.parseFloat(cs.opacity) < 1 ||
       cs.isolation === "isolate" ||
+      // container-type: size and inline-size apply size and style containment,
+      // neither a stacking context (measured, both browsers).
       /paint|layout|strict|content/.test(cs.contain) ||
-      /size/.test(cs.getPropertyValue("container-type")) ||
       /opacity|transform|filter|isolation/.test(cs.willChange)
     );
   }

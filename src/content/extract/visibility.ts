@@ -128,6 +128,16 @@ export class Layout {
   }
 
   /**
+   * Whether el takes part in layout, painted or not (visibility: hidden and
+   * opacity: 0 keep their box); display: contents asks its nearest boxed
+   * ancestor.
+   */
+  hasBox(el: Element): boolean {
+    const boxed = closestComposed(el, (e) => this.style(e).display !== "contents");
+    return (boxed?.getClientRects().length ?? 0) > 0;
+  }
+
+  /**
    * The area in which el's content can be seen, in document coordinates:
    * every overflow / contain:paint ancestor on its containing-block chain,
    * clip-path: inset(), clip: rect(), and the viewports of enclosing frames.
