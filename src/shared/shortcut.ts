@@ -203,7 +203,12 @@ const ARIA_KEYS: Record<string, string> = {
   Down: "ArrowDown",
   Left: "ArrowLeft",
   Right: "ArrowRight",
+  "↑": "ArrowUp",
+  "↓": "ArrowDown",
+  "←": "ArrowLeft",
+  "→": "ArrowRight",
 };
+const ARIA_GLYPHS: Record<string, string> = { "⌃": "Control", "⌥": "Alt", "⇧": "Shift", "⌘": "Meta" };
 
 /**
  * The aria-keyshortcuts value (KeyboardEvent.key names joined by "+"), so a
@@ -212,6 +217,12 @@ const ARIA_KEYS: Record<string, string> = {
  */
 export function ariaShortcut(shortcut: string, platform: Platform): string {
   if (shortcut === "") return "";
+  // Chromium on macOS reports its shortcuts in symbols ("⇧⌘E").
+  const glyphs = /^([⌃⌥⇧⌘]+)(.+)$/u.exec(shortcut);
+  if (glyphs) {
+    const [, mods = "", key = ""] = glyphs;
+    return [...[...mods].map((g) => ARIA_GLYPHS[g]), ARIA_KEYS[key] ?? key].join("+");
+  }
   const parts = shortcut.split("+").map((p) => p.trim());
   const key = parts.pop() ?? "";
   const modifier = (m: string): string => {

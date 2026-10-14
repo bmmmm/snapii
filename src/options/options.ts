@@ -121,6 +121,8 @@ async function save<K extends FormKey>(key: K, value: Settings[K]): Promise<void
     await browser.storage.sync.set({ [key]: value });
     say("Saved");
   } catch {
+    // The form shows what the next capture uses: the stored values.
+    render(await loadSettings());
     say("Could not save", 0);
   }
 }

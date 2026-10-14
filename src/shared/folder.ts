@@ -27,9 +27,10 @@ export type FolderCheck = { ok: true; folder: string } | { ok: false; reason: Fo
 // A path root: "/", "\", "~", "~/…", a drive letter.
 const ABSOLUTE = /^([/\\]|~([/\\]|$)|[A-Za-z]:)/;
 // The characters Windows reserves, "%", controls, invisible format characters,
-// line separators and every space but the plain one (no-break, em, thin, …): the set
-// filename.ts strips from titles, minus the path separators.
-const UNSAFE_SEGMENT = /[:*?"<>|%\p{Cc}\p{Cf}\p{Zl}\p{Zp}]|(?! )\p{Zs}/u;
+// line separators, unassigned code points (noncharacters among them), lone
+// surrogates and every space but the plain one (no-break, em, thin, …): the
+// set filename.ts strips from titles, minus the path separators.
+const UNSAFE_SEGMENT = /[:*?"<>|%\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cn}\p{Cs}]|(?! )\p{Zs}/u;
 
 // What Chromium's downloads.download answered "Invalid filename" to: a name
 // that starts or ends with "~", a Windows device name with or without
@@ -40,18 +41,19 @@ const CHROMIUM_RESERVED =
 
 export function checkFolder(input: string, target: BuildTarget = TARGET): FolderCheck {
   const text = input.trim();
-  if (ABSOLUTE.test(text)) return { ok: false, reason: "absolute" };
   const segments = text
     .split(/[/\\]/)
     .map((s) => s.trim())
     .filter((s) => s !== "" && s !== ".");
+  const folder = segments.join("/");
+  // A root behind "./" or a blank ("./~/x", "~ /x") is one once normalised.
+  if (ABSOLUTE.test(text) || ABSOLUTE.test(folder)) return { ok: false, reason: "absolute" };
   if (segments.includes("..")) return { ok: false, reason: "parent" };
   if (segments.some((s) => s.startsWith(".") || s.endsWith("."))) return { ok: false, reason: "dot" };
   if (segments.some((s) => UNSAFE_SEGMENT.test(s))) return { ok: false, reason: "unsafe" };
   if (target === "chromium" && segments.some((s) => CHROMIUM_RESERVED.test(s))) {
     return { ok: false, reason: "reserved" };
   }
-  const folder = segments.join("/");
   if (folder.length > MAX_FOLDER_LENGTH) return { ok: false, reason: "too-long" };
   return { ok: true, folder };
 }

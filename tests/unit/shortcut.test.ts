@@ -305,6 +305,12 @@ test("ariaShortcut: the aria-keyshortcuts value (Ctrl is Command on macOS, MacCt
   assert.equal(ariaShortcut("", "mac"), "");
 });
 
+test("ariaShortcut: Chromium's macOS symbols become key names", () => {
+  assert.equal(ariaShortcut("⇧⌘E", "mac"), "Shift+Meta+E");
+  assert.equal(ariaShortcut("⌃⌥↑", "mac"), "Control+Alt+ArrowUp");
+  assert.equal(ariaShortcut("⌘,", "mac"), "Meta+,");
+});
+
 test("suggestedKeyFor: the platform's own manifest key, else the default", () => {
   const key = { default: "Ctrl+Alt+S", mac: "MacCtrl+Alt+S" };
   assert.equal(suggestedKeyFor(key, "mac"), "MacCtrl+Alt+S");

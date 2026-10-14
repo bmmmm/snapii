@@ -299,6 +299,8 @@ export class Driver {
         shortcut: document.getElementById("capture-shortcut").textContent,
         about: document.getElementById("about")?.textContent ?? null,
         ocrDisabled: document.querySelector('input[name="ocr"]').disabled,
+        // Per picture: null while loading, else whether it has pixels.
+        images: [...document.images].map((i) => (i.complete ? i.naturalWidth > 0 : null)),
       })`),
     );
   }

@@ -28,6 +28,12 @@ test("popup on a web page: the capture button is ready, with the bound shortcut 
   assert.equal(state.status, "");
   assert.equal(state.shortcut, SHORTCUT);
   assert.match(state.about, /^snapii \d+\.\d+\.\d+ · .* · Chromium \d+$/);
+  // The logo is the same file in both builds.
+  const images = await g.until(async () => {
+    const s = await g.popupState();
+    return s.images.every((loaded) => loaded !== null) ? s.images : null;
+  }, "the popup's pictures to load");
+  assert.deepEqual(images, [true]);
 });
 
 test("popup with vector output: the OCR toggle is off (that mode has no OCR)", async () => {

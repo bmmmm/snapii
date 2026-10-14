@@ -107,7 +107,8 @@ async function buildExtension(target, info) {
     await copyFile(join(root, "src/offscreen/offscreen.html"), join(outdir, "offscreen.html"));
   }
   await mkdir(join(outdir, "icons"), { recursive: true });
-  for (const icon of new Set(Object.values(manifest.icons))) {
+  // The popup shows icon.svg in both builds; Chromium's manifest names PNGs only.
+  for (const icon of new Set(["icons/icon.svg", ...Object.values(manifest.icons)])) {
     await copyFile(join(root, "src", icon), join(outdir, icon));
   }
   for (const f of ["LICENSE", "NOTICE"]) await copyFile(join(root, f), join(outdir, f));

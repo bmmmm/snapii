@@ -381,6 +381,30 @@ test("a folder add-ons cannot use is not stored and says why; the field keeps wh
   assert.deepEqual(await stored(), { saveFolder: "kept" });
 });
 
+test("a setting that cannot be stored: the form shows the stored values again and says so", async () => {
+  await openWith({ saveFolder: "kept" });
+  await g.until(async () => (await folderState()).value === "kept", "the stored folder to show");
+  await g.system(
+    `const page = window.wrappedJSObject;
+    const sync = page.browser.storage.sync;
+    Components.utils.exportFunction(
+      () => new page.Promise((_, reject) => reject(new page.Error("stubbed failure"))),
+      sync,
+      { defineAs: "set" },
+    );
+    return true;`,
+  );
+  await clickOn("#folder");
+  await g.content(`document.getElementById("folder").select();`);
+  await type("other");
+  await g.key("Enter");
+  await g.until(async () => (await statusText()) === "Could not save", "the failure status");
+  assert.deepEqual(await folderState(), { value: "kept", invalid: false });
+  await clickOn('input[name="format"][value="jpeg"]');
+  await g.until(async () => (await checkedFormat()) === "png", "the stored format back");
+  assert.deepEqual(await stored(), { saveFolder: "kept" });
+});
+
 test("Reset to defaults clears the folder", async () => {
   await openWith({ saveFolder: "kept" });
   await g.until(async () => (await folderState()).value === "kept", "the stored folder to show");

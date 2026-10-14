@@ -52,6 +52,12 @@ test("checkFolder: an absolute path is refused, since add-ons cannot leave the d
     "C:\\Users",
     "c:/x",
     "  /x",
+    // A root behind "./" or a blank is one once normalised.
+    "./~/x",
+    "~ /x",
+    "./~",
+    " . / ~ ",
+    "./C:/x",
   ]) {
     assert.equal(folder(input), "absolute", JSON.stringify(input));
   }
@@ -94,9 +100,32 @@ test("checkFolder: one refused character in any segment refuses the folder", () 
     "\u200a",
     "\u202f",
     "\u3000",
+    // Noncharacters, an unassigned code point, a lone surrogate (filename.ts strips them all).
+    "\ufffe",
+    "\ufdd0",
+    "\u0378",
+    "\ud800",
   ]) {
     assert.equal(folder(`ok/ab${ch}c`), "unsafe", JSON.stringify(ch));
     assert.equal(folder(`ab${ch}c/ok`), "unsafe", JSON.stringify(ch));
+  }
+});
+
+test("checkFolder: what it accepts it accepts again unchanged (the background stores nothing else)", () => {
+  for (const input of [
+    "snapii",
+    "./a/./b",
+    " a / b ",
+    "a\\b",
+    "~notes",
+    "./~notes",
+    "x/ ~/y",
+    "Ünï/日本語",
+    "a  b",
+  ]) {
+    const once = checkFolder(input);
+    assert.ok(once.ok, JSON.stringify(input));
+    assert.deepEqual(checkFolder(once.folder), once, JSON.stringify(input));
   }
 });
 
