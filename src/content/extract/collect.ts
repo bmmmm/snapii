@@ -446,10 +446,19 @@ export async function collectTextRunsDetailed(
       for (let j = lastRun + 1; j < i; j++) {
         // A text node that made no run: one laid out in this line's flow holding a
         // space is a boundary; one without a box or out of the flow (an absolutely
-        // positioned or floated box) is not.
+        // positioned or floated box) is not. Under display: contents (a slot) the
+        // nearest boxed ancestor lays it out.
         const t = texts[j] as (typeof texts)[number];
         const p = flatParent(t.node);
-        if (p && /\s/.test(t.node.data) && layout.hasBox(p) && infoOf(p, ctx).root === info.root) return "";
+        const boxed = p && closestComposed(p, (e) => layout.style(e).display !== "contents");
+        if (
+          p &&
+          boxed &&
+          /\s/.test(t.node.data) &&
+          layout.hasBox(boxed) &&
+          infoOf(p, t.ctx).root === info.root
+        )
+          return "";
       }
       for (const e of elements.slice(last.at, (texts[i] as (typeof texts)[number]).at)) {
         if (ancestors.has(e) || !layout.hasBox(e)) continue;

@@ -970,6 +970,12 @@ test("patches: a fieldset's rendered legend is its first legend in flow, a float
     '<main id="cap" style="width:300px"><fieldset style="border:2px solid rgb(0,0,0)"><legend style="float:left">a</legend>text</fieldset></main>',
   );
   expect(floated.unsupported).toEqual({});
+  // A legend with no box of its own is none either.
+  const contents = await sceneOf(
+    page,
+    '<main id="cap" style="width:300px"><fieldset style="border:2px solid rgb(0,0,0)"><legend style="display:contents">a</legend>text</fieldset></main>',
+  );
+  expect(contents.unsupported).toEqual({});
   // Nor is one without a box: the next legend is the rendered one.
   const hidden = await sceneOf(
     page,

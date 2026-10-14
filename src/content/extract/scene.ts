@@ -605,7 +605,7 @@ class Builder {
       (k): k is Box =>
         isBox(k) &&
         k.el.localName === "legend" &&
-        k.cs.display !== "none" &&
+        this.#layout.hasBox(k.el) &&
         k.cs.float === "none" &&
         !/absolute|fixed/.test(k.cs.position),
     );
