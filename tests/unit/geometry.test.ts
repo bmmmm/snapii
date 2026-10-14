@@ -181,6 +181,14 @@ test("assignLines: a run three times taller on the same baseline stays on the li
     assignLines([cap, rest]).map((r) => r.line),
     [0, 0],
   );
+  // A small raised currency sign before a big number: the number's baseline
+  // lies lower by more than the sign is tall, but it goes on from the sign.
+  const sign = { ...run(0, 17, 0), x: 0, width: 9, y: 14 };
+  const number = { ...run(4, 69, 0), x: 9, width: 66, y: 59 };
+  assert.deepEqual(
+    assignLines([sign, number]).map((r) => r.line),
+    [0, 0],
+  );
   // A superscript and the text after it share the line.
   const base = { ...run(100, 18, 0), y: 114 };
   const sup = { ...run(95, 14, 0), y: 106 };

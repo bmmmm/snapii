@@ -25,12 +25,17 @@
           "e",
           "f",
           "g",
+          "p",
+          "q",
           "h",
           "i",
           "j",
           "k",
           "l",
-          "m"
+          "m",
+          "n",
+          "   ",
+          "o"
         ]
       }
     </script>
@@ -46,7 +51,8 @@ spaces</p>
         Normal   text
         folds    everything.
       </p>
-      <!-- copy.spec: blank lines in one node, two in a row, one in a node of its own between spans; pre-line keeps them too. -->
+      <!-- copy.spec: blank lines in one node, two in a row, one in a node of its own between spans; pre-line
+           keeps them too, and so does a code element made an inline-block. -->
       <div id="blanks"><pre>a
 
 b
@@ -56,9 +62,12 @@ c<span>d</span>
 
 <span>e</span></pre><p class="pre-line">f
 
-g</p></div>
+g</p><pre><code style="display: inline-block"><span>p</span>
+
+<span>q</span></code></pre></div>
       <!-- copy.spec: newlines outside the pre's own line flow make no blank line (SVG markup, an
-           out-of-flow screen-reader span, a textarea's value); an indented pre-line keeps its blank line. -->
+           out-of-flow screen-reader span, a textarea's value); an indented pre-line keeps its blank line;
+           a line of spaces in a pre is that line, not one more. -->
       <div id="notblank"><pre>h<svg width="12" height="12">
   <circle cx="6" cy="6" r="5"></circle>
 </svg>
@@ -69,7 +78,9 @@ j<textarea rows="1" cols="3">t
 u</textarea>
 k</pre><p class="pre-line">    l
 
-    m</p></div>
+    m</p><pre>n
+   
+o</pre></div>
     </main>
   </body>
 </html>

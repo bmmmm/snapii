@@ -305,15 +305,18 @@ export async function collectTextRunsDetailed(
 
   /**
    * The newlines of tail.node after tail.from, where they break lines of
-   * `block`'s own inline flow: rendered HTML text whose parent keeps
-   * breaks, laid out in the block itself — not in an inline-block, a form
-   * control, an out-of-flow box (its own block) or SVG markup.
+   * the last run's inline flow: rendered HTML text whose parent keeps
+   * breaks, laid out in the last run's block itself or in the inline-block
+   * the last run is in (a code element made one) — not in another
+   * inline-block, a form control, an out-of-flow box (its own block) or SVG
+   * markup.
    */
-  const tailBreaks = (tail: { node: Text; ctx: FrameContext; from: number }, block: Element): number => {
+  const tailBreaks = (tail: { node: Text; ctx: FrameContext; from: number }, last: ParentInfo): number => {
     const p = flatParent(tail.node);
-    if (!p || p.namespaceURI !== XHTML || !closestComposed(p, (e) => e === block)) return 0;
+    if (!p || p.namespaceURI !== XHTML || !closestComposed(p, (e) => e === last.block)) return 0;
     const info = infoOf(p, tail.ctx);
-    if (info.root !== block || !info.visible || !keepsBreaks(info.whiteSpace)) return 0;
+    if (info.root !== last.block && info.root !== last.root) return 0;
+    if (!info.visible || !keepsBreaks(info.whiteSpace)) return 0;
     return newlines(tail.node.data, tail.from);
   };
 
@@ -327,12 +330,12 @@ export async function collectTextRunsDetailed(
    * between two spans has no glyph and no rect).
    */
   let breaks = 0;
-  /** The last run's block: only text inside it can stand between that run and the next one of its block. */
-  let lastBlock: Element | null = null;
+  /** The last run's parent: only text in its block can stand between that run and the next one of the block. */
+  let lastInfo: ParentInfo | null = null;
   /** The node in hand and the offset after its last run's text, for the breaks that follow it. */
   let tail: { node: Text; ctx: FrameContext; from: number } | null = null;
   for (const [i, { node, ctx }] of texts.entries()) {
-    if (tail && lastBlock && tail.node.data.includes("\n", tail.from)) breaks += tailBreaks(tail, lastBlock);
+    if (tail && lastInfo && tail.node.data.includes("\n", tail.from)) breaks += tailBreaks(tail, lastInfo);
     tail = { node, ctx, from: 0 };
     if (!node.data) continue;
     if (!layout.frame(ctx).clip) continue;
@@ -414,11 +417,15 @@ export async function collectTextRunsDetailed(
         before(start, box),
       );
       if (!text || isIconText(text)) continue;
-      // The newlines around a slice's text end the line before it or its own
-      // (collapsed spaces beside them have no glyph and stay in the slice).
+      // The newlines around a slice's text end the line before it or its own;
+      // where spaces collapse (pre-line) they have no glyph and stay in the
+      // slice beside them, where they are kept they are the text.
       const slice = keepsBreaks(info.whiteSpace) ? node.data.slice(start, end) : "";
-      const lead = slice.length - slice.replace(/^[ \t\n\r\f]+/, "").length;
-      const trail = slice.length - slice.replace(/[ \t\n\r\f]+$/, "").length;
+      const edge = isPreserved(info.whiteSpace) ? /^\n+/ : /^[ \t\n\r]+/;
+      const lead = slice.length - slice.replace(edge, "").length;
+      const rest = slice.slice(lead);
+      const trail =
+        rest.length - rest.replace(isPreserved(info.whiteSpace) ? /\n+$/ : /[ \t\n\r]+$/, "").length;
       const gap = breaks + (slice ? newlines(node.data, tail.from, start + lead) : 0);
       let block = blocks.get(info.block);
       if (block === undefined) {
@@ -450,7 +457,7 @@ export async function collectTextRunsDetailed(
       });
       lastRun = i;
       breaks = 0;
-      lastBlock = info.block;
+      lastInfo = info;
       tail.from = end - trail;
     }
   }
