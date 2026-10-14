@@ -15,6 +15,11 @@
       overflow still brings its border with it: its box is cut by the clip
       of what contains it, not by its own; a leaving menu wiped out by its
       own clip-path brings nothing, so the paragraph under it stays shapes.
+      What leaves the box also counts when the box clips its overflow but the
+      leaving box is absolutely positioned against an ancestor outside it
+      ("Escaping drop"), when a clip between the box and its container would
+      cut it but not the leaving box ("Escaping menu"), and when it lies in
+      the box's shadow tree ("Shadow card").
     -->
     <style>
       body { margin: 0; padding: 20px; font: 16px/1.5 serif; background: rgb(255, 255, 255); }
@@ -26,17 +31,32 @@
       .clipped { overflow: hidden; }
       .framed { overflow: hidden; border: 6px solid rgb(204, 0, 0); }
       .menu { position: relative; top: 70px; clip-path: inset(0 0 100% 0); background: rgb(0, 0, 0); color: rgb(255, 255, 255); }
+      .anchor { position: relative; }
+      .drop { position: absolute; left: 20px; top: 70px; padding: 8px 12px; background: rgb(17, 34, 51); color: rgb(255, 255, 255); }
     </style>
     <script type="application/json" id="expect">
       {
         "capture": "#cap",
-        "lines": ["Before the hero.", "Card text", "Tall text", "goes on below", "Clipped card", "Framed card", "Under the menu.", "After the hero."],
+        "lines": [
+          "Before the hero.",
+          "Card text",
+          "Tall text",
+          "goes on below",
+          "Clipped card",
+          "Framed card",
+          "Under the menu.",
+          "After the hero.",
+          "Escaping drop",
+          "Escaping menu",
+          "Shadow card",
+          "After the shadow hero."
+        ],
         "vector": {
           "tolerance": 0.005,
           "maxPatchArea": 0.7,
-          "unsupported": { "gradient": 5 },
-          "hidden": ["Card text", "Tall text", "goes on below", "Clipped card", "Framed card"],
-          "visible": ["Before the hero.", "Under the menu.", "After the hero."]
+          "unsupported": { "gradient": 8 },
+          "hidden": ["Card text", "Tall text", "goes on below", "Clipped card", "Framed card", "Escaping drop", "Escaping menu", "Shadow card"],
+          "visible": ["Before the hero.", "Under the menu.", "After the hero.", "After the shadow hero."]
         }
       }
     </script>
@@ -54,6 +74,18 @@
       <div class="hero short"><div class="menu">Hidden menu</div></div>
       <p style="margin-top: 8px">Under the menu.</p>
       <p>After the hero.</p>
+      <div class="anchor"><div class="hero clipped"><div class="drop">Escaping drop</div></div></div>
+      <div style="height: 70px"></div>
+      <div class="anchor"><div class="clipped" style="height: 60px"><div class="hero"><div class="drop">Escaping menu</div></div></div></div>
+      <div style="height: 70px"></div>
+      <div class="hero" id="shadow-hero"></div>
+      <div style="height: 50px"></div>
+      <p>After the shadow hero.</p>
     </main>
+    <script>
+      document.getElementById("shadow-hero").attachShadow({ mode: "open" }).innerHTML =
+        "<style>.card { position: relative; top: 40px; margin: 0 20px; padding: 8px 12px; background: rgb(17, 34, 51); color: rgb(255, 255, 255); }</style>" +
+        '<div class="card">Shadow card</div>';
+    </script>
   </body>
 </html>

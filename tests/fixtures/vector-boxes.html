@@ -15,6 +15,10 @@
       outer component forwards its slot into an inner one, as Lit and
       Shoelace components do): the flat tree has to yield the forwarding slot
       itself, or neither the green text nor the red box has a parent box.
+      Slotted text takes the slot's side's style: a text shadow there makes
+      it a patch, and so does an icon-font glyph slotted in. A fieldset with
+      a legend draws its top border at the legend's middle, cut out behind
+      it: a patch.
     -->
     <style>
       body { margin: 0; padding: 20px; font: 16px/1.5 serif; background: rgb(244, 241, 234); }
@@ -28,6 +32,7 @@
       .ring { width: 160px; height: 60px; margin: 8px 0; border: solid rgb(80, 80, 160); border-width: 2px 12px 2px 12px; border-radius: 30px; }
       .outlined { width: 120px; height: 16px; margin: 12px 4px; background: rgb(230, 230, 250); outline: 2px solid rgb(200, 0, 200); outline-offset: 2px; }
       .fwd { width: 160px; margin: 4px 0; padding: 4px 8px; background: rgb(200, 0, 0); color: rgb(255, 255, 255); }
+      .fs { margin: 8px 0; padding: 4px 8px; border: 2px solid rgb(0, 0, 0); }
     </style>
     <script type="application/json" id="expect">
       {
@@ -39,13 +44,17 @@
           "A padding-box background",
           "slotted text",
           "forwarded text",
-          "forwarded box"
+          "forwarded box",
+          "shadowed slot",
+          "Legend",
+          "Field text"
         ],
         "reason": "tolerance: the ring's corners and the outline are each about 0.3 % of the region and this page renders within 0.07 % (2026-10-04), so either missing has to show.",
         "vector": {
           "tolerance": 0.002,
-          "maxPatchArea": 0,
-          "unsupported": {},
+          "maxPatchArea": 0.15,
+          "unsupported": { "text-effect": 1, "icon-font": 1, "border": 1 },
+          "hidden": ["shadowed slot", "Legend", "Field text"],
           "fills": { "slotted text": "rgb(0,0,200)", "a pill badge": "rgb(0,51,102)", "forwarded text": "rgb(0,120,0)" }
         }
       }
@@ -67,6 +76,9 @@
         forwarded text
         <div class="fwd">forwarded box</div>
       </snap-outer>
+      <snap-shadow><template shadowrootmode="open"><div style="text-shadow: 1px 1px rgb(255, 0, 0)"><slot></slot></div></template>shadowed slot</snap-shadow>
+      <snap-icon><template shadowrootmode="open"><div><slot></slot></div></template>&#xE001;</snap-icon>
+      <fieldset class="fs"><legend>Legend</legend>Field text</fieldset>
     </main>
   </body>
 </html>

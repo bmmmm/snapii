@@ -842,6 +842,52 @@ test("patches: one that lies inside another is not captured again; the container
   expect(scene.patches).toEqual([{ x: 0, y: 0, width: 200, height: 60, reason: "gradient" }]);
 });
 
+/** Every op of the scene, groups flattened. */
+const flatOps = (ops: Scene["ops"]): Scene["ops"][number][] =>
+  ops.flatMap((op) => (op.op === "group" ? flatOps(op.children) : [op]));
+
+test("inline boxes: a wrapped one in RTL has its start edge (right) on its first line, its end edge (left) on its last", async ({
+  page,
+}) => {
+  const scene = await sceneOf(
+    page,
+    '<main id="cap" dir="rtl" style="width:300px;font:16px/30px monospace"><p style="margin:0">ab <span style="border:4px solid rgb(0,0,0)">cd<br>ef</span> gh</p></main>',
+  );
+  const rings = flatOps(scene.ops)
+    .flatMap((op) => (op.op === "rect" && op.border ? [op] : []))
+    .sort((a, b) => a.y - b.y);
+  // First and last fragment: the forced break may add one of its own between.
+  const widths = rings.map((op) => op.op === "rect" && op.border?.widths);
+  expect([widths[0], widths.at(-1)]).toEqual([
+    [4, 4, 4, 0],
+    [4, 0, 4, 4],
+  ]);
+});
+
+test("inline boxes: a wrapped one's content-box background leaves out the padding only where the box has its edges", async ({
+  page,
+}) => {
+  const scene = await sceneOf(
+    page,
+    '<main id="cap" style="width:300px;font:16px/30px monospace"><p style="margin:0">ab <span id="s" style="padding:0 8px;background:rgb(0,200,0);background-clip:content-box">cd<br>ef</span> gh</p></main>',
+  );
+  const frags = await page.evaluate(() => {
+    const cap = (document.getElementById("cap") as HTMLElement).getBoundingClientRect();
+    return [...(document.getElementById("s") as HTMLElement).getClientRects()].map((r) => ({
+      x: r.x - cap.x,
+      width: r.width,
+    }));
+  });
+  const fills = flatOps(scene.ops)
+    .flatMap((op) => (op.op === "rect" && op.fill ? [op] : []))
+    .sort((a, b) => a.y - b.y);
+  const near = (v: number) => Math.round(v * 10) / 10;
+  expect(fills.map((op) => [near(op.x), near(op.width)])).toEqual([
+    [near((frags[0]?.x ?? 0) + 8), near((frags[0]?.width ?? 0) - 8)],
+    [near(frags[1]?.x ?? 0), near((frags[1]?.width ?? 0) - 8)],
+  ]);
+});
+
 /** Each patch's pixels, cut from the region's screenshot on whole pixels (DPR 1, CSS scale). */
 async function cropTiles(page: Page, png: Buffer, patches: Patch[]): Promise<RasterTile[]> {
   return page.evaluate(

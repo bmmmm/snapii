@@ -162,6 +162,13 @@ interface Layer {
 
 const isBox = (x: Box | Layer | Text): x is Box => "kids" in x;
 
+/** Text painted in a way SVG text cannot be: a shadow, a stroke, a background clipped to it. */
+const textEffect = (cs: CSSStyleDeclaration): boolean =>
+  cs.textShadow !== "none" ||
+  px(cs.getPropertyValue("-webkit-text-stroke-width")) > 0 ||
+  /text/.test(cs.getPropertyValue("background-clip")) ||
+  /text/.test(cs.getPropertyValue("-webkit-background-clip"));
+
 /**
  * Whether the decorations b's parent carries reach b: CSS propagates them
  * to in-flow descendants, not into an inline-block, a replaced element, a
@@ -544,20 +551,14 @@ class Builder {
     }
     if (cs.boxShadow !== "none" && !this.#shadow(b)) return "box-shadow";
     const text = b.kids.some((k) => !isBox(k) && k.data.trim() !== "");
-    if (
-      text &&
-      (cs.textShadow !== "none" ||
-        px(cs.getPropertyValue("-webkit-text-stroke-width")) > 0 ||
-        /text/.test(cs.getPropertyValue("background-clip")) ||
-        /text/.test(cs.getPropertyValue("-webkit-background-clip")))
-    )
-      return "text-effect";
+    if (text && textEffect(cs)) return "text-effect";
     // Where a decoration was added, or below a box out of reach that added one.
     if (this.#decorationOf(b) === undefined) return "text-effect";
     // A radius of mixed units stays calc()/min()/max()/clamp() in the computed
     // value, which parseFloat reads as 0: the box would come out square.
     if (CORNERS.some((c) => cs.getPropertyValue(`border-${c}-radius`).includes("("))) return "border";
     if (!this.#bordersDrawable(b)) return "border";
+    if (name === "fieldset" && this.#legendShown(b)) return "border";
     if (!this.#coloursParse(b, text)) return "color";
     if (
       !NO_PSEUDO.has(name) &&
@@ -571,6 +572,48 @@ class Builder {
     if (b.kids.some((k) => !isBox(k) && isIconText(collapse(k.data, "normal")))) return "icon-font";
     if (name === "img" || name === "canvas") return this.#picture(b);
     return null;
+  }
+
+  /**
+   * A fieldset's rendered legend (its first legend child, in flow) moves the
+   * top border down to the legend's middle and cuts it out behind it: a box
+   * that paints a border or a background then is not one rect.
+   */
+  #legendShown(b: Box): boolean {
+    const { cs } = b;
+    const legend = b.kids.find((k): k is Box => isBox(k) && k.el.localName === "legend");
+    if (!legend || legend.cs.float !== "none" || /absolute|fixed/.test(legend.cs.position)) return false;
+    if (!this.#layout.isRendered(legend.el)) return false;
+    const bg = parseColor(cs.backgroundColor);
+    return sides(cs).some(shown) || (bg !== null && bg.a > 0) || cs.backgroundImage !== "none";
+  }
+
+  /**
+   * The checks #reasonOf runs on a box's own text, for the text of a
+   * display: contents element (slotted text among it): it takes its style
+   * from that element and is painted in its colour.
+   */
+  #textReason(b: Box): UnsupportedReason | null {
+    const { cs } = b;
+    const texts = b.kids.filter((k): k is Text => !isBox(k) && k.data.trim() !== "");
+    if (texts.length === 0) return null;
+    if (textEffect(cs) || this.#decorationOf(b) === undefined) return "text-effect";
+    if (parseColor(cs.color) === null || this.#textColour(b) === null) return "color";
+    if (!cs.writingMode.startsWith("horizontal")) return "vertical";
+    if (texts.some((t) => isIconText(collapse(t.data, "normal")))) return "icon-font";
+    return null;
+  }
+
+  /** Client rects of b's own text, document coordinates. */
+  #textRects(b: Box): DocRect[] {
+    const range = b.el.ownerDocument.createRange();
+    return b.kids.flatMap((k) => {
+      if (isBox(k)) return [];
+      range.selectNodeContents(k);
+      return [...range.getClientRects()]
+        .filter((r) => r.width > 0 && r.height > 0)
+        .map((r) => this.#layout.toDoc(r, b.ctx));
+    });
   }
 
   /**
@@ -720,8 +763,9 @@ class Builder {
     )
       return null;
     const border = sides(cs).map((s) => (shown(s) ? s.width : 0)) as Quad;
-    const origin = this.#backgroundArea(cs, frag, border, cs.backgroundOrigin);
-    const area = this.#backgroundArea(cs, frag, border);
+    const padding = [cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft].map(px) as Quad;
+    const origin = this.#backgroundArea(cs, frag, border, padding, cs.backgroundOrigin);
+    const area = this.#backgroundArea(cs, frag, border, padding);
     // Beyond its origin box CSS repeats the gradient and SVG pads it: alike
     // only under borders that hide it, which a dashed, dotted or double one
     // does not whatever its colour.
@@ -843,9 +887,12 @@ class Builder {
 
   // ------------------------------------------------------------ paint order
 
-  /** Sorts b's children into the layers of C (nearest context) and R (nearest real stacking context). */
-  #visit(b: Box, C: Layer, R: Layer): void {
-    const flex = /flex|grid/.test(b.cs.display);
+  /**
+   * Sorts b's children into the layers of C (nearest context) and R (nearest
+   * real stacking context). `flex`: b's children are flex or grid items, so
+   * also those of a display: contents child, which has no box of its own.
+   */
+  #visit(b: Box, C: Layer, R: Layer, flex = /flex|grid/.test(b.cs.display)): void {
     const order = (k: Box | Text) => (isBox(k) ? Number.parseInt(k.cs.order, 10) || 0 : 0);
     const kids = flex ? [...b.kids].sort((p, q) => order(p) - order(q)) : b.kids;
     for (const k of kids) {
@@ -857,7 +904,10 @@ class Builder {
       if (cs.display === "none") continue;
       if (performance.now() > this.#deadline) throw new OverBudget();
       if (cs.display === "contents") {
-        this.#visit(k, C, R);
+        // Its text (slotted text among it) takes its style: the checks a box runs on its own text.
+        const reason = this.#textReason(k);
+        if (reason) this.#patch(k, this.#textRects(k), reason);
+        this.#visit(k, C, R, flex);
         continue;
       }
       if (!this.#layout.isRendered(k.el)) {
@@ -874,16 +924,18 @@ class Builder {
         const own = cs.overflowX !== "visible" || cs.overflowY !== "visible";
         if (!own || r.width * r.height <= 1) continue;
       }
+      // Before a patch of the item: an outside marker lies beside its box, not in it.
+      this.#marker(k);
       const reason = this.#reasonOf(k);
       if (reason) {
         // body (or a frame's root) paints wherever its content runs, not only
         // inside its own box: it takes the region, as the root does in build().
         const doc = k.el.ownerDocument;
         const whole = k.el === doc.body || k.el === doc.documentElement;
-        this.#patch(k, whole ? [this.region] : this.#extent(k), reason);
+        if (whole) this.#patch(k, [this.region], reason);
+        else this.#patch(k, this.#extent(k), reason, this.#leaving(k));
         continue;
       }
-      this.#marker(k);
       const positioned = cs.position !== "static";
       // Flex and grid items: z-index applies, and they paint like inline-blocks.
       const item = flex && cs.position !== "absolute" && cs.position !== "fixed";
@@ -963,39 +1015,43 @@ class Builder {
     return [this.#rect(b)];
   }
 
-  /**
-   * What a patch of b must cover: its box, grown by what shadows and filters
-   * paint beyond it, plus the shown part of every descendant that leaves it
-   * (a dropdown, overflowing content). Only shown ones: a hidden popover
-   * still has a box; and only those leaving it: a union over every
-   * descendant took in boxes broken across columns.
-   */
+  /** What a patch of b must cover of b itself: its box, grown by what shadows and filters paint beyond it. */
   #extent(b: Box): DocRect[] {
-    const { cs, el, ctx } = b;
-    const m = inkMargin(cs);
-    const out = this.#fragments(b).map((r) => ({
+    const m = inkMargin(b.cs);
+    return this.#fragments(b).map((r) => ({
       x: r.x - m,
       y: r.y - m,
       width: r.width + 2 * m,
       height: r.height + 2 * m,
     }));
-    if (cs.overflowX !== "visible" && cs.overflowY !== "visible") return out;
-    // Every shown descendant that leaves the box, whatever moved it there: a
-    // dropdown, a card pulled down by a relative `top` or a negative margin,
-    // content taller than a fixed height. Its children are never visited, so
-    // what is not under the patch would be neither shapes nor pixels, and
-    // its text, painted, would sit on the canvas (white on white, measured).
+  }
+
+  /**
+   * The shown part of every descendant that leaves b, whatever moved it
+   * there: a dropdown, a card pulled down by a relative `top` or a negative
+   * margin, content taller than a fixed height, a box positioned against an
+   * ancestor outside b (it escapes b's own overflow clip), one in b's shadow
+   * tree. b's children are never visited, so what is not under the patch
+   * would be neither shapes nor pixels. Only shown ones, cut by their own
+   * containing-block chain: a hidden popover still has a box, a closed
+   * dropdown wiped out by its own clip-path or clip shows nothing, and b's
+   * overflow clips its content but not a box positioned outside it. Only
+   * those leaving b: a union over every descendant took in boxes broken
+   * across columns. The flat tree, as painted; at most 2 000 boxes.
+   */
+  #leaving(b: Box): DocRect[] {
     const inside = this.#fragments(b).reduce(union);
+    const out: DocRect[] = [];
+    const stack = [...b.kids].reverse();
     let n = 0;
-    for (const d of el.querySelectorAll("*")) {
+    for (let k = stack.pop(); k; k = stack.pop()) {
+      if (!isBox(k)) continue;
       if (++n > 2_000) break;
-      if (!this.#boxes.has(d)) continue;
-      const r = this.#layout.toDoc(d.getBoundingClientRect(), ctx);
-      if (!(r.width > 0 && r.height > 0) || within(r, inside) || !this.#layout.isRendered(d)) continue;
-      // Only what shows: a clipping ancestor between the two cuts it, and so
-      // do the box's own clip-path and clip (a closed dropdown wiped out by
-      // an inset); its overflow clips its content, not its border.
-      const clip = this.#layout.shapeClip(d, ctx);
+      for (let i = k.kids.length - 1; i >= 0; i--) stack.push(k.kids[i] as Box | Text);
+      if (k.cs.display === "none") continue;
+      const r = this.#layout.toDoc(k.el.getBoundingClientRect(), k.ctx);
+      if (!(r.width > 0 && r.height > 0) || within(r, inside) || !this.#layout.isRendered(k.el)) continue;
+      const clip = this.#layout.shapeClip(k.el, k.ctx);
       const shown = clip && intersect(r, clip);
       if (shown) out.push(shown);
     }
@@ -1128,19 +1184,25 @@ class Builder {
       const first = i === 0;
       const last = i === frags.length - 1;
       // box-decoration-break: slice — a wrapped inline box has its start edge on the
-      // first fragment and its end edge on the last.
-      const startEdge = single || (rtl ? last : first);
-      const endEdge = single || (rtl ? first : last);
+      // first fragment and its end edge on the last; in RTL the start is the right.
+      const startEdge = single || first;
+      const endEdge = single || last;
       const leftEdge = rtl ? endEdge : startEdge;
       const rightEdge = rtl ? startEdge : endEdge;
       const all = this.#radii(cs, frag);
       const radii = all && (single ? all : this.#sliceRadii(all, leftEdge, rightEdge));
       if ((bg && bg.a > 0) || gradient) {
         const edges: Quad = [bt, rightEdge ? br : 0, bb, leftEdge ? bl : 0];
-        const area = this.#backgroundArea(cs, frag, edges);
+        const pads: Quad = [
+          px(cs.paddingTop),
+          rightEdge ? px(cs.paddingRight) : 0,
+          px(cs.paddingBottom),
+          leftEdge ? px(cs.paddingLeft) : 0,
+        ];
+        const area = this.#backgroundArea(cs, frag, edges, pads);
         const r = area === frag ? radii : undefined;
         // The gradient is laid out over the origin box, the op is the painted area.
-        const origin = gradient && this.#backgroundArea(cs, frag, edges, cs.backgroundOrigin);
+        const origin = gradient && this.#backgroundArea(cs, frag, edges, pads, cs.backgroundOrigin);
         const dx = origin ? origin.x - area.x : 0;
         const dy = origin ? origin.y - area.y : 0;
         ops.push({
@@ -1181,23 +1243,23 @@ class Builder {
     return out.some(([x, y]) => x > 0 && y > 0) ? out : undefined;
   }
 
-  /** The box a background is painted in (`background-clip`), or another of its boxes. */
+  /**
+   * The box a background is painted in (`background-clip`), or another of
+   * its boxes. `border` and `padding` are the fragment's: none on a side a
+   * wrapped inline box was cut at.
+   */
   #backgroundArea(
     cs: CSSStyleDeclaration,
     frag: DocRect,
-    border: [number, number, number, number],
+    border: Quad,
+    padding: Quad,
     clipTo = cs.backgroundClip,
   ): DocRect {
     if (clipTo === "padding-box") return inset(frag, ...border);
     if (clipTo === "content-box") {
       const [t, r, b, l] = border;
-      return inset(
-        frag,
-        t + px(cs.paddingTop),
-        r + px(cs.paddingRight),
-        b + px(cs.paddingBottom),
-        l + px(cs.paddingLeft),
-      );
+      const [pt, pr, pb, pl] = padding;
+      return inset(frag, t + pt, r + pr, b + pb, l + pl);
     }
     return frag;
   }
@@ -1329,12 +1391,12 @@ class Builder {
 
   // ------------------------------------------------------------ patches
 
-  #patch(b: Box | null, rects: DocRect[], reason: UnsupportedReason): void {
+  /** `rects` are b's own and cut by its clip; `shown` are already cut by their own (what leaves b). */
+  #patch(b: Box | null, rects: DocRect[], reason: UnsupportedReason, shown: DocRect[] = []): void {
     const clip = b ? this.#ownClip(b) : this.region;
     let any = false;
-    for (const r of rects) {
-      const shownPart = clip && intersect(r, clip);
-      const inside = shownPart && intersect(shownPart, this.region);
+    for (const r of [...rects.map((own) => clip && intersect(own, clip)), ...shown]) {
+      const inside = r && intersect(r, this.region);
       // Thinner than a layout unit: float noise where boxes adjoin at a zoom, not a part of the picture.
       if (!inside || inside.width < 1 / 64 || inside.height < 1 / 64) continue;
       this.#patches.push({ ...inside, reason });
@@ -1527,8 +1589,11 @@ class Builder {
     const cy = run.top + run.height / 2;
     // The pixels already show it.
     if (this.#patches.some((p) => contains(p, cx, cy))) return null;
+    // The paint walk never reached it (inside a patched box, yet outside its
+    // patch): drawn, it would sit on the canvas without what is under it.
+    const seq = this.#textSeq.get(source.node);
+    if (seq === undefined) return null;
     // A box painted later hides it.
-    const seq = this.#textSeq.get(source.node) ?? Number.POSITIVE_INFINITY;
     const band = this.#painted.get(Math.floor(cy / BAND)) ?? [];
     if (band.some((o) => o.seq > seq && contains(o.rect, cx, cy))) return null;
     const colour = this.#textColour(box);
