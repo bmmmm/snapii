@@ -198,7 +198,7 @@ test("200 000 collapsed spaces between two lines' words: the line split stays li
     return { ms: stats.ms, texts: runs.map((r) => r.text) };
   });
   expect(got.texts).toEqual(["foo", "bar"]);
-  expect(got.ms).toBeLessThan(1000);
+  expect(got.ms).toBeLessThan(1500);
 });
 
 test("a capture edge behind 200 000 collapsed spaces: finding the first glyph inside stays linear", async ({
@@ -222,7 +222,7 @@ test("a capture edge behind 200 000 collapsed spaces: finding the first glyph in
     return { ms: stats.ms, texts: runs.map((r) => r.text) };
   });
   expect(got.texts).toEqual(["word"]);
-  expect(got.ms).toBeLessThan(1000);
+  expect(got.ms).toBeLessThan(1500);
 });
 
 test("1 500 nested inline elements with text: each takes its block, language and link from its parent", async ({

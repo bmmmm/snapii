@@ -332,8 +332,11 @@ export async function collectTextRunsDetailed(
         ? "italic"
         : "normal";
     const fontSize = Number.parseFloat(cs.fontSize) || 0;
-    // The computed size is before CSS zoom, the text is painted zoomed (measured, both browsers).
-    const zoom = (el as Element & { currentCSSZoom?: number }).currentCSSZoom ?? 1;
+    // The computed size is before CSS zoom, the text is painted zoomed; a
+    // display: contents element (a slot) reports 1, its boxed ancestor the
+    // zoom (measured, both browsers).
+    const boxed = closestComposed(el, (e) => layout.style(e).display !== "contents") ?? el;
+    const zoom = (boxed as Element & { currentCSSZoom?: number }).currentCSSZoom ?? 1;
     const fontWeight = Number.parseFloat(cs.fontWeight) || 400;
     const from = inheritedOf(el);
     info = {
@@ -441,14 +444,17 @@ export async function collectTextRunsDetailed(
       for (let a = flatParent(node); a; a = flatParent(a)) ancestors.add(a);
       const last = texts[lastRun] as (typeof texts)[number];
       for (let j = lastRun + 1; j < i; j++) {
-        // A text node that made no run: one laid out holding a space is a boundary, one without a box is not.
+        // A text node that made no run: one laid out in this line's flow holding a
+        // space is a boundary; one without a box or out of the flow (an absolutely
+        // positioned or floated box) is not.
         const t = texts[j] as (typeof texts)[number];
         const p = flatParent(t.node);
-        if (p && /\s/.test(t.node.data) && layout.hasBox(p)) return "";
+        if (p && /\s/.test(t.node.data) && layout.hasBox(p) && infoOf(p, ctx).root === info.root) return "";
       }
       for (const e of elements.slice(last.at, (texts[i] as (typeof texts)[number]).at)) {
         if (ancestors.has(e) || !layout.hasBox(e)) continue;
-        if (ATOMIC.has(e.localName) || layout.style(e).display.startsWith("inline-")) return "";
+        const d = layout.style(e).display;
+        if (ATOMIC.has(e.localName) || d.startsWith("inline-") || INLINE_ATOMIC.has(d)) return "";
       }
       return prev.source.node.data.slice(-2);
     };

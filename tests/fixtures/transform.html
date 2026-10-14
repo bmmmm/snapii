@@ -31,7 +31,8 @@
           "Bar HomeAbout XYes Cd",
           "Foobar FooBar Foobar Foobar",
           "Foobar Foobar Foobar Foobar",
-          "FooBar FooBar Foobar"
+          "FooBar FooBar Foobar",
+          "FooBar Foobar Foo Bar Foobar"
         ],
         "absent": ["Straße", "istanbul", "MIXED", "ONe", "Homeabout", "Xyes", "cd", "Foobar FooBar FooBar"]
       }
@@ -53,7 +54,11 @@
       <p style="text-transform: capitalize">foo<x-slot>bar</x-slot> foo<span></span>bar foo<span style="display: none">x y</span>bar foo<br style="display: none" />bar</p>
       <!-- Laid out but not painted is still a boundary (a visibility:hidden space, a transparent picture); an empty
            absolutely positioned box is none (both browsers; after an empty float they differ, so that case is not here). -->
-      <p style="text-transform: capitalize">foo<span style="visibility: hidden"> </span>bar foo<img style="opacity: 0; width: 10px; height: 10px" alt="" />bar foo<span style="position: absolute"></span>bar</p>
+      <p style="text-transform: capitalize">foo<span style="visibility: hidden"> </span>bar foo<img src="images/quadrants.png" style="opacity: 0; width: 10px; height: 10px" alt="" />bar foo<span style="position: absolute"></span>bar</p>
+      <!-- An empty -webkit-inline-box starts a word like an inline-block; out-of-flow text between two words does not,
+           hidden or not; a space in a display:contents element does; an empty button made display:contents has no box
+           and does not (both browsers). -->
+      <p style="text-transform: capitalize">foo<span style="display: -webkit-inline-box"></span>bar foo<span style="position: absolute; visibility: hidden">a b</span>bar foo<span style="display: contents"> </span>bar foo<button style="display: contents"></button>bar</p>
     </main>
   </body>
 </html>

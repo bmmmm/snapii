@@ -128,13 +128,11 @@ export class Layout {
   }
 
   /**
-   * Whether el takes part in layout, painted or not (visibility: hidden and
-   * opacity: 0 keep their box); display: contents asks its nearest boxed
-   * ancestor.
+   * Whether el has a box of its own, painted or not (visibility: hidden and
+   * opacity: 0 keep theirs); display: contents and display: none have none.
    */
   hasBox(el: Element): boolean {
-    const boxed = closestComposed(el, (e) => this.style(e).display !== "contents");
-    return (boxed?.getClientRects().length ?? 0) > 0;
+    return el.getClientRects().length > 0;
   }
 
   /**

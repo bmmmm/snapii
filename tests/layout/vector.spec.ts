@@ -652,6 +652,23 @@ test("pictures that cannot be drawn use none of the pixel budget", async ({ page
   expect(pictureOps(scene.ops)).toHaveLength(1);
 });
 
+test("pictures that cannot be drawn are tried up to four times the pixel budget, then patched unread", async ({
+  page,
+}) => {
+  // Twelve pictures of another origin of 5.8 Mpx each: eleven (63 Mpx) are
+  // tried and fail, the twelfth would take the tries past 64 Mi px.
+  await page.goto("/fixtures/smoke.html");
+  const other = new URL(page.url());
+  other.hostname = "localhost";
+  other.pathname = "/fixtures/images/quadrants.png";
+  const img = `<img src="${other.href}" width="2400" height="2400">`;
+  const scene = await sceneOf(
+    page,
+    `<main id="cap" style="display:flex;width:28800px">${img.repeat(12)}</main>`,
+  );
+  expect(scene.unsupported).toEqual({ image: 11, budget: 1 });
+});
+
 test("pictures over the data URL budget are patches", async ({ page }) => {
   // Three canvases of 3 Mpx opaque noise, each 12 M (RGB) to 16 M (RGBA)
   // characters as a PNG data URL: two fit in 32 MiB, three do not.
@@ -880,7 +897,7 @@ test("text under CSS zoom: the run carries the size it is painted at", async ({ 
   await page.goto("/fixtures/smoke.html");
   await page.evaluate(() => {
     document.body.innerHTML =
-      '<main id="cap" style="width:300px"><p style="zoom:2;font:16px serif;margin:0">Zoomed</p></main>';
+      '<main id="cap" style="width:300px"><p style="zoom:2;font:16px serif;margin:0">Zoomed <span style="display:contents">contents</span></p></main>';
   });
   await page.addScriptTag({ path: "dist-test/harness.js" });
   const sizes = await page.evaluate(async () => {
@@ -888,7 +905,8 @@ test("text under CSS zoom: the run carries the size it is painted at", async ({ 
     const { runs } = await h.debug.collectTextRunsDetailed(document, h.debug.captureRect("#cap"), {});
     return runs.map((r) => r.fontSize);
   });
-  expect(sizes).toEqual([32]);
+  // A display: contents parent reports a zoom of 1 (both browsers): the size comes from its boxed ancestor.
+  expect(sizes).toEqual([32, 32]);
 });
 
 test("patches: a patched box's own text that runs out of it is in its patch", async ({ page }) => {
@@ -898,6 +916,12 @@ test("patches: a patched box's own text that runs out of it is in its patch", as
     '<main id="cap" style="width:300px;font:16px/24px serif"><div style="height:20px;background-image:radial-gradient(rgb(200,200,200),rgb(120,120,120))">tall<br>below</div><div style="height:40px"></div></main>',
   );
   expect(Math.max(...scene.patches.map((p) => p.y + p.height))).toBeGreaterThanOrEqual(44);
+  // One text node wrapping into six lines out of the box: one patch for what leaves, not one per line.
+  const wrapped = await sceneOf(
+    page,
+    '<main id="cap" style="width:300px;font:16px/24px serif"><div style="width:60px;height:20px;filter:opacity(1)">one two three four five six</div><div style="height:140px"></div></main>',
+  );
+  expect(wrapped.patches.length).toBeLessThanOrEqual(2);
 });
 
 test("patches: an inline SVG's content beyond its viewport does not grow its patch", async ({ page }) => {
@@ -946,6 +970,12 @@ test("patches: a fieldset's rendered legend is its first legend in flow, a float
     '<main id="cap" style="width:300px"><fieldset style="border:2px solid rgb(0,0,0)"><legend style="float:left">a</legend>text</fieldset></main>',
   );
   expect(floated.unsupported).toEqual({});
+  // Nor is one without a box: the next legend is the rendered one.
+  const hidden = await sceneOf(
+    page,
+    '<main id="cap" style="width:300px"><fieldset style="border:2px solid rgb(0,0,0)"><legend style="display:none">a</legend><legend>b</legend>text</fieldset></main>',
+  );
+  expect(hidden.unsupported).toEqual({ border: 1 });
 });
 
 test("over the patch budget, the merge leaves no two patches overlapping", async ({ page }) => {

@@ -103,6 +103,9 @@ const MAX_PICTURE_PIXELS = 16 * 1024 * 1024;
 // The longest canvas side both engines draw on: beyond it Firefox throws and
 // Chromium reads back nothing (measured 2026-10-05).
 const MAX_PICTURE_SIDE = 65_535;
+// A picture that cannot be drawn (another origin, blank) uses none of the
+// budget, but each try draws it: tries stop at four times the budget.
+const MAX_PICTURE_TRIES = 4 * MAX_PICTURE_PIXELS;
 
 /** The walk ran out of budget: the region becomes one patch. */
 class OverBudget extends Error {}
@@ -363,6 +366,7 @@ class Builder {
   /** The decoration that reaches each box's text (#decorationOf). */
   readonly #decorations = new Map<Box, TextDecoration | null | undefined>();
   #picturePixels = 0;
+  #pictureTries = 0;
   #pictureChars = 0;
   #seq = 0;
   #alpha = 1;
@@ -601,6 +605,7 @@ class Builder {
       (k): k is Box =>
         isBox(k) &&
         k.el.localName === "legend" &&
+        k.cs.display !== "none" &&
         k.cs.float === "none" &&
         !/absolute|fixed/.test(k.cs.position),
     );
@@ -677,6 +682,8 @@ class Builder {
     if (w > MAX_PICTURE_SIDE || h > MAX_PICTURE_SIDE) return "budget";
     // Charged once drawn: a picture of another origin, a blank or unencodable one takes none.
     if (this.#picturePixels + w * h > MAX_PICTURE_PIXELS) return "budget";
+    if (this.#pictureTries + w * h > MAX_PICTURE_TRIES) return "budget";
+    this.#pictureTries += w * h;
 
     const canvas = createHtml("canvas");
     canvas.width = w;
@@ -901,8 +908,8 @@ class Builder {
       cs.position === "sticky" ||
       Number.parseFloat(cs.opacity) < 1 ||
       cs.isolation === "isolate" ||
-      // container-type: size and inline-size apply size and style containment,
-      // neither a stacking context (measured, both browsers).
+      // Paint or layout containment (container-type's size and style
+      // containment makes none: measured, both browsers).
       /paint|layout|strict|content/.test(cs.contain) ||
       /opacity|transform|filter|isolation/.test(cs.willChange)
     );
@@ -1084,11 +1091,14 @@ class Builder {
       // The content clip of its parent: its own overflow too, which cuts its text.
       const clip = this.#layout.clip(parent.el, parent.ctx);
       if (!clip) return;
+      // One rect around its lines that leave: a strip per line would each be a patch of its own.
+      let leaving: DocRect | null = null;
       for (const r of range.getClientRects()) {
         const d = this.#layout.toDoc(r, parent.ctx);
         const shown = d.width > 0 && d.height > 0 && !within(d, inside) && intersect(d, clip);
-        if (shown) out.push(shown);
+        if (shown) leaving = leaving ? union(leaving, shown) : shown;
       }
+      if (leaving) out.push(leaving);
     };
     const stack: Box[] = [];
     for (let i = b.kids.length - 1; i >= 0; i--) {
