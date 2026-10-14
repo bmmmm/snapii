@@ -857,6 +857,63 @@ test("text under CSS zoom: the run carries the size it is painted at", async ({ 
   expect(sizes).toEqual([32]);
 });
 
+test("patches: a patched box's own text that runs out of it is in its patch", async ({ page }) => {
+  // Two 24 px lines in a 20 px box: the second line lies wholly below it.
+  const scene = await sceneOf(
+    page,
+    '<main id="cap" style="width:300px;font:16px/24px serif"><div style="height:20px;background-image:radial-gradient(rgb(200,200,200),rgb(120,120,120))">tall<br>below</div><div style="height:40px"></div></main>',
+  );
+  expect(Math.max(...scene.patches.map((p) => p.y + p.height))).toBeGreaterThanOrEqual(44);
+});
+
+test("patches: an inline SVG's content beyond its viewport does not grow its patch", async ({ page }) => {
+  const scene = await sceneOf(
+    page,
+    '<main id="cap" style="width:400px;font:16px/24px serif"><p style="margin:0">left <svg width="24" height="24" viewBox="0 0 24 24"><rect x="-100" width="300" height="24"></rect></svg> right</p></main>',
+  );
+  expect(scene.patches.map((p) => [p.reason, p.width, p.height])).toEqual([["svg", 24, 24]]);
+  // Inside a box patched for another reason, the SVG's content is not walked either.
+  const inBox = await sceneOf(
+    page,
+    '<main id="cap" style="width:400px"><div style="margin-left:150px;width:100px;filter:opacity(1)"><svg width="24" height="24" viewBox="0 0 24 24"><rect x="-100" width="300" height="24"></rect></svg></div></main>',
+  );
+  expect(inBox.patches.map((p) => [p.reason, p.x, p.width])).toEqual([["effect", 150, 100]]);
+});
+
+test("patches: an inside marker of a patched item is in the item's patch and not counted again", async ({
+  page,
+}) => {
+  const scene = await sceneOf(
+    page,
+    '<main id="cap" style="width:300px"><ul style="list-style-position:inside;text-shadow:1px 1px rgb(255,0,0)"><li>item</li></ul></main>',
+  );
+  expect(scene.unsupported).toEqual({ "text-effect": 1 });
+});
+
+test("patches: hidden text behind display: contents needs none, whatever its style", async ({ page }) => {
+  const scene = await sceneOf(
+    page,
+    '<main id="cap" style="width:300px"><p>shown <span style="display:contents;visibility:hidden;text-shadow:1px 1px rgb(255,0,0)">hidden</span></p></main>',
+  );
+  expect(scene.unsupported).toEqual({});
+});
+
+test("patches: a fieldset's rendered legend is its first legend in flow, a floated one before it does not count", async ({
+  page,
+}) => {
+  const scene = await sceneOf(
+    page,
+    '<main id="cap" style="width:300px"><fieldset style="border:2px solid rgb(0,0,0)"><legend style="float:left">a</legend><legend>b</legend>text</fieldset></main>',
+  );
+  expect(scene.unsupported).toEqual({ border: 1 });
+  // A floated legend alone is no rendered legend: the box is one rect.
+  const floated = await sceneOf(
+    page,
+    '<main id="cap" style="width:300px"><fieldset style="border:2px solid rgb(0,0,0)"><legend style="float:left">a</legend>text</fieldset></main>',
+  );
+  expect(floated.unsupported).toEqual({});
+});
+
 /** Every op of the scene, groups flattened. */
 const flatOps = (ops: Scene["ops"]): Scene["ops"][number][] =>
   ops.flatMap((op) => (op.op === "group" ? flatOps(op.children) : [op]));

@@ -19,7 +19,8 @@
       leaving box is absolutely positioned against an ancestor outside it
       ("Escaping drop"), when a clip between the box and its container would
       cut it but not the leaving box ("Escaping menu"), and when it lies in
-      the box's shadow tree ("Shadow card").
+      the box's shadow tree ("Shadow card"), and for the box's own text running
+      out of it ("text below").
     -->
     <style>
       body { margin: 0; padding: 20px; font: 16px/1.5 serif; background: rgb(255, 255, 255); }
@@ -49,14 +50,17 @@
           "Escaping drop",
           "Escaping menu",
           "Shadow card",
-          "After the shadow hero."
+          "After the shadow hero.",
+          "Direct tall",
+          "text below",
+          "After the direct text."
         ],
         "vector": {
           "tolerance": 0.005,
           "maxPatchArea": 0.7,
-          "unsupported": { "gradient": 8 },
-          "hidden": ["Card text", "Tall text", "goes on below", "Clipped card", "Framed card", "Escaping drop", "Escaping menu", "Shadow card"],
-          "visible": ["Before the hero.", "Under the menu.", "After the hero.", "After the shadow hero."]
+          "unsupported": { "gradient": 9 },
+          "hidden": ["Card text", "Tall text", "goes on below", "Clipped card", "Framed card", "Escaping drop", "Escaping menu", "Shadow card", "Direct tall", "text below"],
+          "visible": ["Before the hero.", "Under the menu.", "After the hero.", "After the shadow hero.", "After the direct text."]
         }
       }
     </script>
@@ -81,6 +85,9 @@
       <div class="hero" id="shadow-hero"></div>
       <div style="height: 50px"></div>
       <p>After the shadow hero.</p>
+      <div class="hero short">Direct tall<br />text below</div>
+      <div style="height: 40px"></div>
+      <p>After the direct text.</p>
     </main>
     <script>
       document.getElementById("shadow-hero").attachShadow({ mode: "open" }).innerHTML =

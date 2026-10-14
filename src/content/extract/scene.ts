@@ -162,6 +162,13 @@ interface Layer {
 
 const isBox = (x: Box | Layer | Text): x is Box => "kids" in x;
 
+/** An <svg> that clips its content to its viewport (the default). */
+const sealed = (b: Box): boolean =>
+  b.el.namespaceURI === SVG_NS &&
+  b.el.localName === "svg" &&
+  b.cs.overflowX !== "visible" &&
+  b.cs.overflowY !== "visible";
+
 /** Text painted in a way SVG text cannot be: a shadow, a stroke, a background clipped to it. */
 const textEffect = (cs: CSSStyleDeclaration): boolean =>
   cs.textShadow !== "none" ||
@@ -581,9 +588,14 @@ class Builder {
    */
   #legendShown(b: Box): boolean {
     const { cs } = b;
-    const legend = b.kids.find((k): k is Box => isBox(k) && k.el.localName === "legend");
-    if (!legend || legend.cs.float !== "none" || /absolute|fixed/.test(legend.cs.position)) return false;
-    if (!this.#layout.isRendered(legend.el)) return false;
+    const legend = b.kids.find(
+      (k): k is Box =>
+        isBox(k) &&
+        k.el.localName === "legend" &&
+        k.cs.float === "none" &&
+        !/absolute|fixed/.test(k.cs.position),
+    );
+    if (!legend || !this.#layout.isRendered(legend.el)) return false;
     const bg = parseColor(cs.backgroundColor);
     return sides(cs).some(shown) || (bg !== null && bg.a > 0) || cs.backgroundImage !== "none";
   }
@@ -596,7 +608,7 @@ class Builder {
   #textReason(b: Box): UnsupportedReason | null {
     const { cs } = b;
     const texts = b.kids.filter((k): k is Text => !isBox(k) && k.data.trim() !== "");
-    if (texts.length === 0) return null;
+    if (texts.length === 0 || !this.#layout.isRendered(b.el)) return null;
     if (textEffect(cs) || this.#decorationOf(b) === undefined) return "text-effect";
     if (parseColor(cs.color) === null || this.#textColour(b) === null) return "color";
     if (!cs.writingMode.startsWith("horizontal")) return "vertical";
@@ -925,9 +937,10 @@ class Builder {
         const own = cs.overflowX !== "visible" || cs.overflowY !== "visible";
         if (!own || r.width * r.height <= 1) continue;
       }
-      // Before a patch of the item: an outside marker lies beside its box, not in it.
-      this.#marker(k);
       const reason = this.#reasonOf(k);
+      // An outside marker lies beside the item's box, so a patch of the item
+      // leaves it out; an inside one is in it.
+      if (!reason || cs.listStylePosition === "outside") this.#marker(k);
       if (reason) {
         // body (or a frame's root) paints wherever its content runs, not only
         // inside its own box: it takes the region, as the root does in build().
@@ -1038,18 +1051,52 @@ class Builder {
    * dropdown wiped out by its own clip-path or clip shows nothing, and b's
    * overflow clips its content but not a box positioned outside it. Only
    * those leaving b: a union over every descendant took in boxes broken
-   * across columns. The flat tree, as painted; at most 2 000 boxes.
+   * across columns. Text too, b's own among it: a line running out of a
+   * box of fixed height is in no box that leaves. The flat tree, as
+   * painted; at most 2 000 boxes. The content of an <svg> that clips stays
+   * in its viewport, which the layout's clips do not know: not walked.
    */
   #leaving(b: Box): DocRect[] {
-    const inside = this.#fragments(b).reduce(union);
     const out: DocRect[] = [];
-    const stack = [...b.kids].reverse();
+    if (sealed(b)) return out;
+    const inside = this.#fragments(b).reduce(union);
+    const ranges = new Map<Document, Range>();
+    const text = (t: Text, parent: Box): void => {
+      let range = ranges.get(parent.el.ownerDocument);
+      if (!range) {
+        range = parent.el.ownerDocument.createRange();
+        ranges.set(parent.el.ownerDocument, range);
+      }
+      range.selectNodeContents(t);
+      const all = this.#layout.toDoc(range.getBoundingClientRect(), parent.ctx);
+      if (!(all.width > 0 && all.height > 0) || within(all, inside) || !this.#layout.isRendered(parent.el))
+        return;
+      // The content clip of its parent: its own overflow too, which cuts its text.
+      const clip = this.#layout.clip(parent.el, parent.ctx);
+      if (!clip) return;
+      for (const r of range.getClientRects()) {
+        const d = this.#layout.toDoc(r, parent.ctx);
+        const shown = d.width > 0 && d.height > 0 && !within(d, inside) && intersect(d, clip);
+        if (shown) out.push(shown);
+      }
+    };
+    const stack: Box[] = [];
+    for (let i = b.kids.length - 1; i >= 0; i--) {
+      const k = b.kids[i] as Box | Text;
+      if (isBox(k)) stack.push(k);
+      else text(k, b);
+    }
     let n = 0;
     for (let k = stack.pop(); k; k = stack.pop()) {
-      if (!isBox(k)) continue;
       if (++n > 2_000) break;
-      for (let i = k.kids.length - 1; i >= 0; i--) stack.push(k.kids[i] as Box | Text);
       if (k.cs.display === "none") continue;
+      if (!sealed(k)) {
+        for (let i = k.kids.length - 1; i >= 0; i--) {
+          const kid = k.kids[i] as Box | Text;
+          if (isBox(kid)) stack.push(kid);
+          else text(kid, k);
+        }
+      }
       const r = this.#layout.toDoc(k.el.getBoundingClientRect(), k.ctx);
       if (!(r.width > 0 && r.height > 0) || within(r, inside) || !this.#layout.isRendered(k.el)) continue;
       const clip = this.#layout.shapeClip(k.el, k.ctx);
