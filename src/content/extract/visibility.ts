@@ -247,9 +247,12 @@ export class Layout {
    * Whether something else is painted over the centre of rect (document
    * coordinates). The skip subtree (the snapii overlay, still up while
    * collecting) is looked through. Only points inside the viewport can be
-   * hit-tested; others count as not occluded.
+   * hit-tested; others count as not occluded. Neither can text under
+   * pointer-events: none (inherited, so the owner's value covers its
+   * ancestors): elementsFromPoint skips it and finds what it is painted over.
    */
   occluded(owner: Element, rect: DocRect, ctx: FrameContext, skip: Element | null | undefined): boolean {
+    if (this.style(owner).pointerEvents === "none") return false;
     const g = this.frame(ctx);
     const win = ctx.doc.defaultView as Window;
     const cx = rect.x + rect.width / 2 - g.dx;

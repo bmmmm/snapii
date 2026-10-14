@@ -7,7 +7,9 @@
       With occlusionCheck, a line under an opaque box is dropped; the box's own
       text stays. #overlay stands in for the snapii overlay, which covers the
       viewport while collecting: it is passed as skip, so it is neither
-      extracted nor allowed to hide what lies beneath it.
+      extracted nor allowed to hide what lies beneath it. The caption over the
+      picture has pointer-events: none, so hit-testing finds the picture under
+      it: it is painted on top and stays.
     -->
     <style>
       body { margin: 0; padding: 20px; font: 16px/24px serif; }
@@ -15,13 +17,16 @@
       #cap p { margin: 0; }
       .cover { position: absolute; left: 0; top: 24px; width: 100%; height: 24px; background: #fff; }
       #overlay { position: fixed; inset: 0; padding: 30px 0 0 600px; }
+      .hero { position: relative; height: 48px; }
+      .pic { height: 48px; background: #ccd; }
+      .caption { position: absolute; left: 0; top: 12px; margin: 0; font: inherit; pointer-events: none; }
     </style>
     <script type="application/json" id="expect">
       {
         "capture": "#cap",
         "options": { "occlusionCheck": true },
         "skip": "#overlay",
-        "lines": ["Visible line.", "Line after.", "Cover note."],
+        "lines": ["Visible line.", "Line after.", "Caption over a picture.", "Cover note."],
         "absent": ["HIDDENBEHIND", "Overlay toolbar"]
       }
     </script>
@@ -31,6 +36,7 @@
       <p>Visible line.</p>
       <p>HIDDENBEHIND covered line.</p>
       <p>Line after.</p>
+      <div class="hero"><div class="pic"></div><h2 class="caption">Caption over a picture.</h2></div>
       <div class="cover">Cover note.</div>
     </main>
     <div id="overlay">Overlay toolbar</div>
