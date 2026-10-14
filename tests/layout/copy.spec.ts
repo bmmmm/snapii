@@ -73,6 +73,17 @@ test("copy text: text outside the capture rect is left out of the HTML", async (
   expect(res.plain).toBe("First bold italic paragraph with a real link and a script link.");
 });
 
+test("copy text: blank lines in preserved text stay, one empty line each", async ({ page }) => {
+  await page.goto("/fixtures/pre.html");
+  await page.addScriptTag({ path: "dist-test/harness.js" });
+  const plain = await page.evaluate(async () => {
+    const h = window.__snapii;
+    const { runs } = await h.debug.collectTextRunsDetailed(document, h.debug.captureRect("#blanks"));
+    return h.runsToPlainText(runs);
+  });
+  expect(plain).toBe("a\n\nb\n\n\ncd\n\ne\n\nf\n\ng");
+});
+
 test("writeClipboard: content clipboard first, background as fallback, rejects only if both fail", async ({
   page,
 }) => {

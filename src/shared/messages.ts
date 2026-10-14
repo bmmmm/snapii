@@ -57,7 +57,9 @@ const isTextRun = (x: unknown): boolean =>
   isStr(x.color) &&
   isStrOrNull(x.lang) &&
   isDir(x.dir) &&
-  isHref(x.href);
+  isHref(x.href) &&
+  (x.blankLinesBefore === undefined ||
+    (Number.isInteger(x.blankLinesBefore) && (x.blankLinesBefore as number) >= 0));
 
 const isLinkArea = (x: unknown): boolean => isRec(x) && isRect(x) && isStr(x.alt) && isHref(x.href);
 

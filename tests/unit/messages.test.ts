@@ -97,6 +97,9 @@ const mutations: Array<[string, (m: Loose) => void]> = [
   ["run width negative", (m) => (m.runs[0].width = -40)],
   ["run height negative", (m) => (m.runs[0].height = -1)],
   ["run fontSize negative", (m) => (m.runs[0].fontSize = -16)],
+  ["run blankLinesBefore negative", (m) => (m.runs[0].blankLinesBefore = -1)],
+  ["run blankLinesBefore fractional", (m) => (m.runs[0].blankLinesBefore = 1.5)],
+  ["run blankLinesBefore a string", (m) => (m.runs[0].blankLinesBefore = "2")],
   ["link width negative", (m) => (m.links[0].width = -10)],
   // The save spreads the model into the render input: an extra key would reach the renderer.
   ["model with a foreign key", (m) => (m.ocr = { runs: [], info: { engine: "<forged>", status: "pwned" } })],
@@ -105,6 +108,8 @@ const mutations: Array<[string, (m: Loose) => void]> = [
 test("isToBackground: accepts a well-formed save", () => {
   assert.equal(isToBackground({ type: "save", model: model() }), true);
   assert.equal(isToBackground({ type: "save", model: { ...model(), runs: [], links: [] } }), true);
+  const blank = { ...model().runs[0], blankLinesBefore: 2 };
+  assert.equal(isToBackground({ type: "save", model: { ...model(), runs: [blank] } }), true);
   // Image areas are optional (sent only with OCR on).
   const imageAreas = [{ x: 0, y: 0, width: 30, height: 20, kind: "background" }];
   assert.equal(isToBackground({ type: "save", model: { ...model(), imageAreas } }), true);

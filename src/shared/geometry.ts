@@ -143,28 +143,29 @@ export function lineIndexOf(groups: readonly LineGroup[], r: DocRect): number {
 
 type Lineable = Pick<TextRun, "y" | "top" | "height" | "block" | "line">;
 
+/** The shorter run's vertical centre lies inside the taller run's box. */
+function centred(a: Lineable, b: Lineable): boolean {
+  const [short, tall] = a.height <= b.height ? [a, b] : [b, a];
+  const centre = short.top + short.height / 2;
+  return centre >= tall.top && centre <= tall.top + tall.height;
+}
+
 /**
  * Numbers visual lines across runs in document order: a run starts a new
- * line when it belongs to another block, when its vertical centre lies
- * outside the previous run's box, or when it starts at or below the previous
- * run's baseline. The last rule matters when the previous box is tall: a
- * run that carries a ::first-letter drop cap reaches into the next line, and
- * whether that line's centre falls inside it depends on the platform's font
- * metrics (Linux CI merged the two lines, macOS did not).
+ * line when it belongs to another block, when the shorter of it and the
+ * previous run has its vertical centre outside the taller one's box (either
+ * order: "Price: <big>$99</big>" puts the tall box's centre above the short
+ * one), or when it starts at or below the previous run's baseline. The last
+ * rule matters when the previous box is tall: a run that carries a
+ * ::first-letter drop cap reaches into the next line, and whether that
+ * line's centre falls inside it depends on the platform's font metrics
+ * (Linux CI merged the two lines, macOS did not).
  */
 export function assignLines<T extends Lineable>(runs: readonly T[]): T[] {
   let line = -1;
   let prev: T | undefined;
   return runs.map((run) => {
-    const centre = run.top + run.height / 2;
-    if (
-      !prev ||
-      run.block !== prev.block ||
-      centre < prev.top ||
-      centre > prev.top + prev.height ||
-      run.top >= prev.y
-    )
-      line++;
+    if (!prev || run.block !== prev.block || !centred(run, prev) || run.top >= prev.y) line++;
     prev = run;
     return { ...run, line };
   });

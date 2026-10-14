@@ -30,6 +30,8 @@ export interface TextRun {
   href: string | null;
   line: number;
   block: number;
+  /** Empty lines of preserved text (pre, pre-line) between the previous run's line and this one's; absent for none. */
+  blankLinesBefore?: number;
 }
 
 export interface LinkArea {

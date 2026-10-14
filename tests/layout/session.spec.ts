@@ -435,6 +435,17 @@ test("copy page link: an address with nothing to remove does not claim tracking 
   expect((await clips(page))[0]?.plain).toBe(url);
 });
 
+test("copy page link: empty pairs in the query are no trackers, the address stays as written", async ({
+  page,
+}) => {
+  await load(page, "/fixtures/overlay.html?a=1&&b=2");
+  await begin(page, { ok: true, filename: "x.svg" });
+  await pickElement(page, "para");
+  await clickButton(page, "copy-page-link", "Copied page link");
+  const url = await page.evaluate(() => location.href);
+  expect((await clips(page))[0]?.plain).toBe(url);
+});
+
 test("copy page link: title and address are escaped in the html", async ({ page }) => {
   await load(page, "/fixtures/overlay.html?a=1&b=2");
   await page.evaluate(() => {
@@ -720,6 +731,22 @@ test("copy text of text only in a shadow tree: the HTML is the plain text as a p
     plain: "Shadow tree text between them.",
     html: "<p>Shadow tree text between them.</p>",
   });
+});
+
+test("copy text over light-DOM and shadow-tree text: the HTML holds all of it, in the plain text's order", async ({
+  page,
+}) => {
+  await load(page, DRAG_ORDER);
+  await begin(page, { ok: true, filename: "x.svg" });
+  await drag(page, 40, 50, 700, 230);
+  await clickCopy(page);
+  const [clip] = await clips(page);
+  const texts = [
+    "Beta paragraph closes the slotted pair.",
+    "Shadow tree text between them.",
+    "Alpha paragraph comes first in the markup.",
+  ];
+  expect(clip).toEqual({ plain: texts.join("\n\n"), html: texts.map((t) => `<p>${t}</p>`).join("") });
 });
 
 for (const action of ["copy-text", "copy-link", "copy-page-link"] as const) {

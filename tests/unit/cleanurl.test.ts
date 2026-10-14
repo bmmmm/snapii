@@ -40,6 +40,8 @@ const cases: [name: string, input: string, want: string][] = [
     "https://example.com/?%ZZ=1&utm_%ZZ=2&a=2",
     "https://example.com/?%ZZ=1&a=2",
   ],
+  ["without a tracker an empty query stays", "https://example.com/a?", "https://example.com/a?"],
+  ["without a tracker empty pairs stay", "https://example.com/?a=1&&b=2&", "https://example.com/?a=1&&b=2&"],
   ["a name without a value", "https://example.com/?utm_source&k=v", "https://example.com/?k=v"],
   [
     "names that merely contain or resemble one stay",

@@ -6,13 +6,16 @@ import type { TextRun } from "./types.ts";
 /**
  * Runs of one visual line are joined without separator (normalizeLines has
  * already placed the spaces between them); a new line starts a new text
- * line, a new block an empty line in between.
+ * line, after the empty lines of preserved text before it, a new block an
+ * empty line in between.
  */
 export function runsToPlainText(runs: readonly TextRun[]): string {
   let out = "";
   let prev: TextRun | undefined;
   for (const run of runs) {
-    if (prev && run.line !== prev.line) out += run.block === prev.block ? "\n" : "\n\n";
+    if (prev && run.line !== prev.line) {
+      out += run.block === prev.block ? "\n".repeat(1 + (run.blankLinesBefore ?? 0)) : "\n\n";
+    }
     out += run.text;
     prev = run;
   }

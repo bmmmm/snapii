@@ -10,6 +10,7 @@ import {
   collapse,
   isIconText,
   isPreserved,
+  keepsBreaks,
   normalizeLines,
 } from "../../shared/whitespace.ts";
 import { baselineY, fontMetrics } from "./baseline.ts";
@@ -72,6 +73,17 @@ export function hrefOf(el: Element, pageURL: string): string | null {
 function langOf(el: Element): string | null {
   const owner = closestComposed(el, (e) => e.hasAttribute("lang") || e.hasAttributeNS(XML, "lang"));
   return owner?.getAttribute("lang") || owner?.getAttributeNS(XML, "lang") || null;
+}
+
+/** white-space-collapse where the engine has it, else the legacy white-space. */
+const whiteSpaceOf = (cs: CSSStyleDeclaration): string =>
+  cs.getPropertyValue("white-space-collapse") || cs.whiteSpace;
+
+/** Newlines in data[from, to). */
+function newlines(data: string, from: number, to = data.length): number {
+  let n = 0;
+  for (let i = data.indexOf("\n", from); i !== -1 && i < to; i = data.indexOf("\n", i + 1)) n++;
+  return n;
 }
 
 function isBlockLevel(display: string): boolean {
@@ -268,7 +280,7 @@ export async function collectTextRunsDetailed(
       visible: layout.isRendered(el),
       vertical: !cs.writingMode.startsWith("horizontal"),
       clip: layout.clip(el, ctx),
-      whiteSpace: cs.getPropertyValue("white-space-collapse") || cs.whiteSpace,
+      whiteSpace: whiteSpaceOf(cs),
       transform: cs.textTransform,
       fontKey: `${fontStyle} ${fontWeight} ${fontSize}px ${cs.fontFamily}`,
       fontFamily: cs.fontFamily,
@@ -293,7 +305,25 @@ export async function collectTextRunsDetailed(
   const raw: RawRun[] = [];
   /** Index in `texts` of the node the last raw run came from. */
   let lastRun = -1;
+  /**
+   * Segment breaks of preserved text since the last run's last character:
+   * two or more before a run of the same block are empty lines between, which
+   * no run carries (a "\n" slice collapses to nothing, a "\n\n" text node
+   * between two spans has no glyph and no rect).
+   */
+  let breaks = 0;
+  /** The last run's block: only text inside it can stand between that run and the next one of its block. */
+  let lastBlock: Element | null = null;
+  /** The node in hand and the offset after its last run's text, for the breaks that follow it. */
+  let tail: { node: Text; from: number } | null = null;
   for (const [i, { node, ctx }] of texts.entries()) {
+    if (tail && lastBlock?.contains(tail.node) && tail.node.data.includes("\n", tail.from)) {
+      const p = flatParent(tail.node);
+      if (p && keepsBreaks(whiteSpaceOf(layout.style(p))) && layout.isRendered(p)) {
+        breaks += newlines(tail.node.data, tail.from);
+      }
+    }
+    tail = { node, from: 0 };
     if (!node.data) continue;
     if (!layout.frame(ctx).clip) continue;
     let range = ranges.get(ctx.doc);
@@ -374,6 +404,11 @@ export async function collectTextRunsDetailed(
         before(start, box),
       );
       if (!text || isIconText(text)) continue;
+      // A slice's leading and trailing newlines end the line before it or its own.
+      const slice = keepsBreaks(info.whiteSpace) ? node.data.slice(start, end) : "";
+      const lead = slice.length - slice.replace(/^\n+/, "").length;
+      const trail = slice.length - slice.replace(/\n+$/, "").length;
+      const gap = breaks + (slice ? newlines(node.data, tail.from, start + lead) : 0);
       let block = blocks.get(info.block);
       if (block === undefined) {
         block = blocks.size;
@@ -398,10 +433,14 @@ export async function collectTextRunsDetailed(
         href: info.href,
         line: 0,
         block,
+        ...(gap > 1 ? { blankLinesBefore: gap - 1 } : {}),
         preserved: isPreserved(info.whiteSpace),
         source: { node, start, end, clip },
       });
       lastRun = i;
+      breaks = 0;
+      lastBlock = info.block;
+      tail.from = end - trail;
     }
   }
 

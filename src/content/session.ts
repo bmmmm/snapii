@@ -403,13 +403,14 @@ export function startSession(deps: SessionDeps): SessionHandle {
     }
     const plain = runsToPlainText(runs);
     const ctx = { baseURL: document.baseURI, pageURL: location.href };
-    const range = selectionRange(selection, sources);
+    // A range never holds shadow-tree or frame content: with any text there (a
+    // drag over it, or a picked shadow host or iframe) the clone would paste
+    // without it, so the HTML is the plain text's paragraphs instead.
+    const outside = sources.some((s) => s.node.getRootNode() !== document);
+    const range = outside ? null : selectionRange(selection, sources);
     const cloned = range
       ? fragmentToCleanHtml(toSNodes(cloneVisibleRange(range, new Set(sources.map((s) => s.node)))), ctx)
       : "";
-    // A range never holds shadow-tree or frame content: text that lives only
-    // there (a drag over it, or a picked shadow host or iframe) would paste as
-    // nothing in a rich editor, so it goes in as the plain text's paragraphs.
     const html = cloned.trim() !== "" ? cloned : fragmentToCleanHtml(plainParagraphs(plain), ctx);
     await deps.writeClipboard({ plain, html });
     notify(COPIED_TEXT_TOAST);

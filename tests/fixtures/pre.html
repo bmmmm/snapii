@@ -18,7 +18,13 @@
           "pre-wrap   keeps   gaps",
           "pre-line folds",
           "spaces",
-          "Normal text folds everything."
+          "Normal text folds everything.",
+          "a",
+          "b",
+          "cd",
+          "e",
+          "f",
+          "g"
         ]
       }
     </script>
@@ -34,6 +40,17 @@ spaces</p>
         Normal   text
         folds    everything.
       </p>
+      <!-- copy.spec: blank lines in one node, two in a row, one in a node of its own between spans; pre-line keeps them too. -->
+      <div id="blanks"><pre>a
+
+b
+
+
+c<span>d</span>
+
+<span>e</span></pre><p class="pre-line">f
+
+g</p></div>
     </main>
   </body>
 </html>

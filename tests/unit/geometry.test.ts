@@ -146,6 +146,27 @@ test("assignLines: a run below a drop-cap run's baseline starts a new line", () 
   );
 });
 
+test("assignLines: a run three times taller on the same baseline stays on the line, in either order", () => {
+  // 16 px and 48 px text on one baseline (y 114.5): the tall box's centre lies
+  // above the short one's box, the short box's centre inside the tall one.
+  const short = { ...run(100, 18, 0), y: 114.5 };
+  const tall = { ...run(70.5, 55, 0), y: 114.5 };
+  assert.deepEqual(
+    assignLines([short, tall]).map((r) => r.line),
+    [0, 0],
+  );
+  assert.deepEqual(
+    assignLines([tall, short]).map((r) => r.line),
+    [0, 0],
+  );
+  // The next line below either still starts a new one.
+  const below = { ...run(130, 18, 0), y: 144.5 };
+  assert.deepEqual(
+    assignLines([short, tall, below]).map((r) => r.line),
+    [0, 0, 1],
+  );
+});
+
 test("runsRelativeTo: shifts x, baseline and top by the region origin", () => {
   const [moved] = runsRelativeTo([{ ...run(100, 20, 0), x: 50, y: 116 }], R(40, 90, 500, 500));
   assert.equal(moved?.x, 10);

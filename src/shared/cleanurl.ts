@@ -50,8 +50,9 @@ function isTracking(pair: string): boolean {
 /**
  * `href` without a `#:~:text=` directive and, with `removeTrackers`, without
  * tracking parameters; what is left (other parameters in their order and
- * spelling, a plain fragment such as `#section`) stays; an empty `?` goes with
- * the trackers. A non-http(s) or unparsable address comes back as it was.
+ * spelling, a plain fragment such as `#section`) stays; empty pairs and an
+ * empty `?` go with the trackers, and only with them. A non-http(s) or
+ * unparsable address comes back as it was.
  */
 export function cleanPageUrl(href: string, removeTrackers = true): string {
   let url: URL;
@@ -62,12 +63,11 @@ export function cleanPageUrl(href: string, removeTrackers = true): string {
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") return href;
   // Split by hand: URLSearchParams would re-encode what the page wrote.
-  if (removeTrackers) {
-    url.search = url.search
-      .slice(1)
-      .split("&")
-      .filter((pair) => pair !== "" && !isTracking(pair))
-      .join("&");
+  const pairs = url.search.slice(1).split("&");
+  // Without a tracker the query stays as written, empty pairs included, so
+  // the copy says "tracking removed" only when there was some.
+  if (removeTrackers && pairs.some(isTracking)) {
+    url.search = pairs.filter((pair) => pair !== "" && !isTracking(pair)).join("&");
   }
   const directive = url.hash.indexOf(":~:");
   if (directive !== -1) {

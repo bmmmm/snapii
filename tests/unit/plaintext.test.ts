@@ -45,3 +45,8 @@ test("runsToPlainText: lines of one block are separated by one newline, blocks b
 test("runsToPlainText: a line made of several blocks (inline-block) stays one line", () => {
   assert.equal(runsToPlainText([run("a ", 0, 0), run("b", 0, 1), run("c", 1, 1)]), "a b\nc");
 });
+
+test("runsToPlainText: a run after blank lines of preserved text gets that many empty lines", () => {
+  const runs = [run("a", 0, 0), { ...run("b", 1, 0), blankLinesBefore: 2 }, run("c", 2, 0), run("d", 3, 1)];
+  assert.equal(runsToPlainText(runs), "a\n\n\nb\nc\n\nd");
+});

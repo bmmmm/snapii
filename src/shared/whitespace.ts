@@ -11,6 +11,13 @@ export function isPreserved(whiteSpace: string): boolean {
   return PRESERVING.has(whiteSpace);
 }
 
+// Values that keep segment breaks (newlines) as line breaks.
+const BREAKING = new Set(["pre", "pre-wrap", "pre-line", "break-spaces", "preserve", "preserve-breaks"]);
+
+export function keepsBreaks(whiteSpace: string): boolean {
+  return BREAKING.has(whiteSpace);
+}
+
 /**
  * Collapses one line's slice of a text node like CSS does: runs of
  * [ \t\n\r\f] become one space (normal, nowrap, pre-line). Preserved text
