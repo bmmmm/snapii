@@ -752,6 +752,27 @@ test("a press without a prior pointer move selects the element under the pointer
   expect(await actions(page)).toEqual([{ action: "save", mode: "element", rect: PARA, id: "para" }]);
 });
 
+test("after an ArrowUp walk a press without a move selects the drawn highlight, even when the page changed under the pointer", async ({
+  page,
+}) => {
+  await start(page);
+  await page.mouse.move(200, 250);
+  await expect.poll(() => box(page)).toEqual(PARA);
+  await page.keyboard.press("ArrowUp");
+  expect(await box(page)).toEqual(CARD);
+  // A slide of a carousel takes the place of #para; nothing redraws the box.
+  await page.evaluate(() => {
+    const slide = document.createElement("div");
+    slide.id = "slide";
+    slide.style.cssText = "position:absolute;left:50px;top:120px;width:400px;height:80px";
+    (document.getElementById("card") as HTMLElement).append(slide);
+  });
+  await page.mouse.down();
+  await page.mouse.up();
+  await page.keyboard.press("Enter");
+  expect(await actions(page)).toEqual([{ action: "save", mode: "element", rect: CARD, id: "card" }]);
+});
+
 test("Enter held on a toolbar button reached by Tab acts once, and the page never sees the keyup of a closing Enter", async ({
   page,
 }) => {
@@ -843,4 +864,12 @@ test("a slotted element's parent is the shadow-side wrapper around its slot, for
   expect(await box(page)).toEqual(HOST);
   await page.keyboard.press("ArrowDown");
   expect(await box(page)).toEqual(CARD_IN_SHADOW);
+  // Tall enough to be picked itself: ArrowUp from the slotted element reaches the wrapper.
+  await page.evaluate(() => {
+    (document.getElementById("slotted") as HTMLElement).style.height = "40px";
+  });
+  await page.mouse.move(201, 641);
+  await expect.poll(() => box(page)).toEqual({ x: 130, y: 630, width: 560, height: 40 });
+  await page.keyboard.press("ArrowUp");
+  expect(await box(page)).toEqual({ ...CARD_IN_SHADOW, height: 80 });
 });

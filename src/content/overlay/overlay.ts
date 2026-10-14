@@ -161,12 +161,13 @@ export function startOverlay(opts: {
     if (!frame) frame = requestAnimationFrame(updateHover);
   }
 
-  /** Runs a pending hover update now, so a press acts on what is under the pointer. */
-  function flushHover(): void {
-    if (frame) {
-      cancelAnimationFrame(frame);
-      updateHover();
-    }
+  /**
+   * Runs a pending hover update now, so a press acts on what is under the
+   * pointer; with `force` also when none is pending.
+   */
+  function flushHover(force = false): void {
+    if (frame) cancelAnimationFrame(frame);
+    if (frame || force) updateHover();
   }
 
   function select(next: Selection): void {
@@ -281,6 +282,8 @@ export function startOverlay(opts: {
     // acting on those would let the page pick a region and save it.
     if (!e.isTrusted) return;
     const m = e as MouseEvent;
+    /** No hover update has seen the pointer yet. */
+    const unseen = pointer.x < 0;
     pointer = { x: m.clientX, y: m.clientY };
     switch (e.type) {
       case "mousemove":
@@ -307,10 +310,10 @@ export function startOverlay(opts: {
           hovered = null;
           updateHover();
         } else {
-          // A press with no move before it (the pointer already rested on
-          // the target when the overlay opened) has no hover update pending.
-          if (frame) cancelAnimationFrame(frame);
-          updateHover();
+          // A press with no move before it (the pointer already rested on the
+          // target when the overlay opened) picks first; later presses act on
+          // the drawn highlight, an ArrowUp walk included.
+          flushHover(unseen);
         }
         if (state !== "hover") return;
         press = page();
