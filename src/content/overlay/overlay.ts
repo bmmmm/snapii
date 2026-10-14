@@ -5,6 +5,7 @@
 // Screenshots (40 px drag threshold, Escape cancels, H1–H6 skipped).
 import { placeToolbar } from "../../shared/place.ts";
 import type { DocRect } from "../../shared/types.ts";
+import { shadowRootOf } from "../shadow.ts";
 import { clampedRect, docRectOf, parentOf, pickAt, visibleViewport } from "./pick.ts";
 import { adoptStyles, createHtml, OVERLAY_CSS, setImportant, styleHost } from "./styles.ts";
 import { buttonForKey, createToolbar, type ToolbarButton } from "./toolbar.ts";
@@ -40,9 +41,11 @@ const HINT_TEXT = "Click an element or drag an area · ↑ ↓ parent/child · Q
 // Swallowed so the page never reacts while the overlay is up. Pointer events
 // are only stopped, not default-prevented: preventDefault on pointerdown would
 // suppress the compatibility mouse events the state machine runs on.
+// beforeinput keeps a focused page field from changing under keys the
+// overlay does not handle (typing, deleting, pasting).
 const MOUSE_EVENTS = ["mousedown", "mousemove", "mouseup", "click", "dblclick", "auxclick", "contextmenu"];
 const STOP_ONLY_EVENTS = ["pointerdown", "pointermove", "pointerup", "keypress"];
-const PREVENT_EVENTS = ["selectstart", "dragstart"];
+const PREVENT_EVENTS = ["selectstart", "dragstart", "beforeinput"];
 // The second click of a double-click on a button that closed the overlay
 // comes within this (Windows' default double-click time is 500 ms).
 const DOUBLE_CLICK_MS = 500;
@@ -303,7 +306,12 @@ export function startOverlay(opts: {
           lastPick = null;
           hovered = null;
           updateHover();
-        } else flushHover();
+        } else {
+          // A press with no move before it (the pointer already rested on
+          // the target when the overlay opened) has no hover update pending.
+          if (frame) cancelAnimationFrame(frame);
+          updateHover();
+        }
         if (state !== "hover") return;
         press = page();
         state = "pressed";
@@ -355,6 +363,8 @@ export function startOverlay(opts: {
         const focused = toolbar.focused();
         if (focused) {
           e.preventDefault();
+          if (e.repeat) break;
+          held = e.key.toLowerCase();
           onButton(focused);
           break;
         }
@@ -450,7 +460,15 @@ export function startOverlay(opts: {
   // hint's keys typed into the frame (measured on Firefox 157: "q" landed
   // in its textarea, Escape did nothing). Focus leaves the frame while the
   // overlay is up and goes back to it when the overlay is gone.
-  const framed = document.activeElement;
+  let framed = document.activeElement;
+  // A frame inside a shadow tree shows as its host in the document.
+  for (
+    let inner = framed && shadowRootOf(framed)?.activeElement;
+    inner;
+    inner = shadowRootOf(inner)?.activeElement
+  ) {
+    framed = inner;
+  }
   const unfocused = framed instanceof HTMLElement && FRAME_TAGS.has(framed.localName) ? framed : null;
   unfocused?.blur();
 

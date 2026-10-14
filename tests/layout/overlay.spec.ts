@@ -710,3 +710,137 @@ test("Enter and Space on a toolbar button reached by Tab press that button, not 
   expect(await actions(page)).toHaveLength(1);
   expect(await page.evaluate(() => (window as unknown as TestWindow).__cancelled)).toBe(1);
 });
+
+test("keys the overlay does not handle leave a focused page field untouched; after the overlay they type again", async ({
+  page,
+}) => {
+  await load(page, "/fixtures/overlay.html");
+  await page.evaluate(() => {
+    const w = window as unknown as TestWindow;
+    w.__pageEvents = 0;
+    const input = document.createElement("input");
+    input.id = "search";
+    input.value = "abc";
+    input.style.cssText = "position:absolute;left:100px;top:600px";
+    input.addEventListener("input", () => w.__pageEvents++);
+    document.body.append(input);
+    input.focus();
+  });
+  const field = () =>
+    page.evaluate(() => ({
+      value: (document.getElementById("search") as HTMLInputElement).value,
+      inputs: (window as unknown as TestWindow).__pageEvents,
+    }));
+  await begin(page);
+  await page.keyboard.press("a");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press(" ");
+  expect(await field()).toEqual({ value: "abc", inputs: 0 });
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("x");
+  expect(await field()).toEqual({ value: "abcx", inputs: 1 });
+});
+
+test("a press without a prior pointer move selects the element under the pointer", async ({ page }) => {
+  await load(page, "/fixtures/overlay.html");
+  // The pointer already rests on #para when the overlay opens (shortcut, then a tap).
+  await page.mouse.move(200, 250);
+  await begin(page);
+  await page.mouse.down();
+  await page.mouse.up();
+  await page.keyboard.press("Enter");
+  expect(await actions(page)).toEqual([{ action: "save", mode: "element", rect: PARA, id: "para" }]);
+});
+
+test("Enter held on a toolbar button reached by Tab acts once, and the page never sees the keyup of a closing Enter", async ({
+  page,
+}) => {
+  await load(page, "/fixtures/overlay.html");
+  await page.evaluate(() => {
+    const w = window as unknown as TestWindow;
+    w.__pageEvents = 0;
+    document.addEventListener("keyup", () => w.__pageEvents++, true);
+  });
+  await begin(page);
+  await clickAt(page, 200, 250); // select #para
+  await expect.poll(() => box(page)).toEqual(PARA);
+  const focus = (action: string) =>
+    page.evaluate((a) => {
+      const root = (window as unknown as TestWindow).__roots["snapii-overlay"] as ShadowRoot;
+      (root.querySelector(`button[data-action="${a}"]`) as HTMLButtonElement).focus();
+    }, action);
+  await focus("copy-text");
+  await page.keyboard.down("Enter");
+  await page.keyboard.down("Enter"); // auto-repeat
+  await page.keyboard.up("Enter");
+  expect(await actions(page)).toEqual([{ action: "copy-text", mode: "element", rect: PARA, id: "para" }]);
+  await focus("cancel");
+  await page.keyboard.down("Enter");
+  expect(await page.evaluate(() => (window as unknown as TestWindow).__cancelled)).toBe(1);
+  await page.keyboard.up("Enter");
+  expect(await page.evaluate(() => (window as unknown as TestWindow).__pageEvents)).toBe(0);
+});
+
+test("focus inside a frame in a shadow root: the overlay's keys still work, the frame gets none", async ({
+  page,
+}) => {
+  await load(page, "/fixtures/overlay.html");
+  await page.evaluate(async () => {
+    const host = document.createElement("div");
+    host.id = "framehost";
+    host.style.cssText = "position:absolute;left:100px;top:600px";
+    const root = host.attachShadow({ mode: "open" });
+    const frame = document.createElement("iframe");
+    frame.style.cssText = "width:300px;height:120px";
+    frame.srcdoc = "<textarea id='t' rows='3' cols='30'></textarea>";
+    const loaded = new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
+    root.append(frame);
+    document.body.append(host);
+    await loaded;
+    frame.contentDocument?.querySelector("textarea")?.focus();
+  });
+  const inFrame = () =>
+    page.evaluate(() => {
+      const host = document.querySelector("#framehost") as HTMLElement;
+      const frame = host.shadowRoot?.querySelector("iframe") as HTMLIFrameElement;
+      return {
+        topActive: document.activeElement?.id ?? null,
+        inner: host.shadowRoot?.activeElement?.localName ?? null,
+        value: frame.contentDocument?.querySelector("textarea")?.value ?? null,
+      };
+    });
+  expect(await inFrame()).toEqual({ topActive: "framehost", inner: "iframe", value: "" });
+  await begin(page);
+  await page.keyboard.press("q");
+  await page.keyboard.press("Escape");
+  expect(await page.evaluate(() => (window as unknown as TestWindow).__cancelled)).toBe(1);
+  expect(await inFrame()).toEqual({ topActive: "framehost", inner: "iframe", value: "" });
+});
+
+test("a slotted element's parent is the shadow-side wrapper around its slot, for the pick and for ArrowUp", async ({
+  page,
+}) => {
+  await load(page, "/fixtures/overlay.html");
+  await page.evaluate(() => {
+    const host = document.createElement("div");
+    host.style.cssText = "position:absolute;left:100px;top:600px;width:600px;padding:10px;background:#ddd";
+    const root = host.attachShadow({ mode: "open" });
+    root.innerHTML = '<div style="padding:20px;background:#fff"><slot></slot></div>';
+    const p = document.createElement("p");
+    p.id = "slotted";
+    p.style.cssText = "margin:0;width:560px;height:20px";
+    p.textContent = "Slotted text";
+    host.append(p);
+    document.body.append(host);
+  });
+  await begin(page);
+  const CARD_IN_SHADOW = { x: 110, y: 610, width: 600, height: 60 };
+  const HOST = { x: 100, y: 600, width: 620, height: 80 };
+  // The 20 px paragraph is below the pick's minimum height: the walk goes on to the wrapper.
+  await page.mouse.move(200, 640);
+  await expect.poll(() => box(page)).toEqual(CARD_IN_SHADOW);
+  await page.keyboard.press("ArrowUp");
+  expect(await box(page)).toEqual(HOST);
+  await page.keyboard.press("ArrowDown");
+  expect(await box(page)).toEqual(CARD_IN_SHADOW);
+});

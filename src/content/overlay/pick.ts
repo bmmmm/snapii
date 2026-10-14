@@ -4,10 +4,15 @@
 // itself is the pure pickCandidate() in shared/pick.ts.
 import { type ChainEntry, pickCandidate } from "../../shared/pick.ts";
 import type { DocRect } from "../../shared/types.ts";
-import { shadowRootOf } from "../shadow.ts";
+import { assignedSlotOf, shadowRootOf } from "../shadow.ts";
 
-/** Parent in the composed tree: steps from a shadow root's top to its host. */
+/**
+ * Parent in the composed tree: a slotted element's slot, and from a shadow
+ * root's top its host.
+ */
 export function composedParent(el: Element): Element | null {
+  const slot = assignedSlotOf(el);
+  if (slot) return slot;
   if (el.parentElement) return el.parentElement;
   const parent = el.parentNode;
   return parent instanceof ShadowRoot ? parent.host : null;
