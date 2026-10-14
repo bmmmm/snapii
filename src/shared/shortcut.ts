@@ -203,10 +203,16 @@ const ARIA_KEYS: Record<string, string> = {
   Down: "ArrowDown",
   Left: "ArrowLeft",
   Right: "ArrowRight",
+  // Chromium's macOS key symbols (ui/base/accelerators, KeyCodeToMacSymbol).
   "↑": "ArrowUp",
   "↓": "ArrowDown",
   "←": "ArrowLeft",
   "→": "ArrowRight",
+  "↖": "Home",
+  "↘": "End",
+  "⇞": "PageUp",
+  "⇟": "PageDown",
+  "⌦": "Delete",
 };
 const ARIA_GLYPHS: Record<string, string> = { "⌃": "Control", "⌥": "Alt", "⇧": "Shift", "⌘": "Meta" };
 

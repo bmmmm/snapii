@@ -250,9 +250,12 @@ export class Layout {
    * hit-tested; others count as not occluded. Neither can text under
    * pointer-events: none (inherited, so the owner's value covers its
    * ancestors): elementsFromPoint skips it and finds what it is painted over.
+   * Unless the page switched it off as a whole (body or the root, as dialog
+   * libraries do while a modal is open): there what the hit finds still
+   * decides, as for any text.
    */
   occluded(owner: Element, rect: DocRect, ctx: FrameContext, skip: Element | null | undefined): boolean {
-    if (this.style(owner).pointerEvents === "none") return false;
+    if (this.#pointerless(owner)) return false;
     const g = this.frame(ctx);
     const win = ctx.doc.defaultView as Window;
     const cx = rect.x + rect.width / 2 - g.dx;
@@ -270,5 +273,14 @@ export class Layout {
     }
     if (!hit) return false;
     return !within(owner, hit) && !within(hit, owner);
+  }
+
+  /** el has pointer-events: none from an element of its own, not from body or the root. */
+  #pointerless(el: Element): boolean {
+    if (this.style(el).pointerEvents !== "none") return false;
+    let origin = el;
+    for (let p = flatParent(el); p && this.style(p).pointerEvents === "none"; p = flatParent(p)) origin = p;
+    const doc = el.ownerDocument;
+    return origin !== doc.body && origin !== doc.documentElement;
   }
 }

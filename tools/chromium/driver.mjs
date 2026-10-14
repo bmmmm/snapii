@@ -297,6 +297,7 @@ export class Driver {
         captureDisabled: document.getElementById("capture").disabled,
         status: document.getElementById("status").textContent,
         shortcut: document.getElementById("capture-shortcut").textContent,
+        aria: document.getElementById("capture").getAttribute("aria-keyshortcuts"),
         about: document.getElementById("about")?.textContent ?? null,
         ocrDisabled: document.querySelector('input[name="ocr"]').disabled,
         // Per picture: null while loading, else whether it has pixels.

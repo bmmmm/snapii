@@ -27,6 +27,8 @@ test("popup on a web page: the capture button is ready, with the bound shortcut 
   assert.equal(state.captureDisabled, false);
   assert.equal(state.status, "");
   assert.equal(state.shortcut, SHORTCUT);
+  // Key names for the screen reader, not the symbols macOS shows.
+  assert.equal(state.aria, process.platform === "darwin" ? "Shift+Meta+E" : "Alt+Shift+S");
   assert.match(state.about, /^snapii \d+\.\d+\.\d+ · .* · Chromium \d+$/);
   // The logo is the same file in both builds.
   const images = await g.until(async () => {

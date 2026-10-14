@@ -309,6 +309,11 @@ test("ariaShortcut: Chromium's macOS symbols become key names", () => {
   assert.equal(ariaShortcut("⇧⌘E", "mac"), "Shift+Meta+E");
   assert.equal(ariaShortcut("⌃⌥↑", "mac"), "Control+Alt+ArrowUp");
   assert.equal(ariaShortcut("⌘,", "mac"), "Meta+,");
+  assert.equal(ariaShortcut("⌥⇧↖", "mac"), "Alt+Shift+Home");
+  assert.equal(ariaShortcut("⌘↘", "mac"), "Meta+End");
+  assert.equal(ariaShortcut("⌘⇞", "mac"), "Meta+PageUp");
+  assert.equal(ariaShortcut("⌘⇟", "mac"), "Meta+PageDown");
+  assert.equal(ariaShortcut("⌘⌦", "mac"), "Meta+Delete");
 });
 
 test("suggestedKeyFor: the platform's own manifest key, else the default", () => {
