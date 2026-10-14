@@ -824,6 +824,24 @@ test("gradients: laid out over the padding box (their origin), painted over the 
   ]);
 });
 
+test("patches: one that lies inside another is not captured again; the container keeps its reason", async ({
+  page,
+}) => {
+  // The body's gradient goes to the canvas, which SVG cannot draw: the region is a patch.
+  await page.addInitScript(() => {
+    window.prepare = () => {
+      document.documentElement.style.background = "none";
+      document.body.style.background = "linear-gradient(rgb(255, 0, 0), rgb(0, 0, 255))";
+    };
+  });
+  const scene = await sceneOf(
+    page,
+    '<main id="cap" style="width:200px;height:60px"><div style="width:50px;height:20px;background:rgb(0,128,0);filter:opacity(1)"></div></main>',
+  );
+  expect(scene.unsupported).toEqual({ gradient: 1, effect: 1 });
+  expect(scene.patches).toEqual([{ x: 0, y: 0, width: 200, height: 60, reason: "gradient" }]);
+});
+
 /** Each patch's pixels, cut from the region's screenshot on whole pixels (DPR 1, CSS scale). */
 async function cropTiles(page: Page, png: Buffer, patches: Patch[]): Promise<RasterTile[]> {
   return page.evaluate(

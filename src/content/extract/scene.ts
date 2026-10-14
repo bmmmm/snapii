@@ -393,6 +393,7 @@ class Builder {
       for (const k of Object.keys(this.#unsupported)) delete this.#unsupported[k as UnsupportedReason];
       this.#patch(null, [this.region], "budget");
     }
+    this.#dropContained();
     this.#limitPatches();
     const text = this.opts.runs.map((run, i) => this.#textPaint(run, this.opts.sources[i]));
     const dx = -this.region.x;
@@ -1362,6 +1363,36 @@ class Builder {
     const start = rtl ? box.x + box.width - r - px(cs.paddingRight) : box.x + l + px(cs.paddingLeft);
     const x = rtl ? (outside ? start : start - w) : outside ? start - w : start;
     this.#patch(b, [{ x, y: top, width: w, height: lh }], "marker");
+  }
+
+  /**
+   * Drops every patch that lies within another (an image on a body whose
+   * gradient makes the region a patch): its pixels are in the other one's
+   * already, and each patch is captured on its own. Largest first, indexed
+   * by the bands each kept one spans; far over budget the bands below take
+   * over anyway.
+   */
+  #dropContained(): void {
+    if (this.#patches.length < 2 || this.#patches.length > 2 * MAX_PATCHES) return;
+    const area = (p: Patch): number => p.width * p.height;
+    const band = (y: number): number => Math.floor((y - this.region.y) / BAND);
+    const bands = new Map<number, Patch[]>();
+    const dropped = new Set<Patch>();
+    for (const p of [...this.#patches].sort((a, b) => area(b) - area(a))) {
+      // A patch that holds p spans the band of p's top edge.
+      if (bands.get(band(p.y))?.some((q) => within(p, q))) {
+        dropped.add(p);
+        continue;
+      }
+      for (let k = band(p.y); k <= band(p.y + p.height); k++) {
+        const list = bands.get(k);
+        if (list) list.push(p);
+        else bands.set(k, [p]);
+      }
+    }
+    if (dropped.size > 0) {
+      this.#patches.splice(0, this.#patches.length, ...this.#patches.filter((p) => !dropped.has(p)));
+    }
   }
 
   /**

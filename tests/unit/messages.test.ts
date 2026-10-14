@@ -242,6 +242,17 @@ function nested(n: number): Loose {
 
 // Each mutation breaks exactly one field of an otherwise valid scene.
 const sceneMutations: Array<[string, (s: Loose) => void]> = [
+  // The renderer rounds a text clip from no radii; a forged one would make it throw.
+  [
+    "text clip with radii",
+    (s) =>
+      (s.text[0].clip.radii = [
+        [1, 1],
+        [1, 1],
+        [1, 1],
+        [1, 1],
+      ]),
+  ],
   ["canvas missing", (s) => delete s.canvas],
   ["canvas a CSS string", (s) => (s.canvas = "white")],
   ["canvas channel above 255", (s) => (s.canvas.r = 256)],

@@ -93,12 +93,14 @@ export async function save(
   // overlay now instead of keeping the page blocked through OCR and download.
   // Not awaited: the save goes on whether or not the tab still listens.
   // Vector output has no OCR: there is no picture of the whole region to read.
+  // The content script collects image areas only when OCR was on as the
+  // session started; switched on since, there is nothing to recognise.
+  const ocrOn = !scene && settings.ocr && model.imageAreas !== undefined;
   const areas = model.imageAreas ?? [];
-  const ocrRuns = !scene && settings.ocr && areas.length > 0;
-  deps.tellTab(tab.id, { type: "captured", ocr: ocrRuns }).catch(() => {});
+  deps.tellTab(tab.id, { type: "captured", ocr: ocrOn && areas.length > 0 }).catch(() => {});
 
   // On the captured pixels, so the page is not read twice.
-  const ocr = !scene && settings.ocr ? await deps.recognize(areas, captured.tiles, model.runs) : OCR_DISABLED;
+  const ocr = ocrOn ? await deps.recognize(areas, captured.tiles, model.runs) : OCR_DISABLED;
 
   let svg: string;
   try {

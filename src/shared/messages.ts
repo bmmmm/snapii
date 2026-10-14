@@ -215,7 +215,8 @@ const isTextPaint = (x: unknown): boolean =>
   x === null ||
   (isRec(x) &&
     isPaint(x.fill) &&
-    (x.clip === undefined || isRect(x.clip)) &&
+    // A run's clip is the collector's, never rounded.
+    (x.clip === undefined || (isRect(x.clip) && (x.clip as Rec).radii === undefined)) &&
     (x.letterSpacing === undefined || isNum(x.letterSpacing)) &&
     (x.decoration === undefined || isDecoration(x.decoration)));
 

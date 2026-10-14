@@ -109,6 +109,18 @@ test("save: `captured` says ocr:false when no recognition runs (setting off, or 
   assert.ok(noAreas.log.includes('tell:7:{"type":"captured","ocr":false}'), noAreas.log.join(" "));
 });
 
+test("save: OCR switched on while the overlay was open (no image areas collected) runs no recognition", async () => {
+  const { d, log } = deps({ ocr: true });
+  await save(model(), TAB, d);
+  assert.deepEqual(log, [
+    "capture:start",
+    "capture:last-tile",
+    'tell:7:{"type":"captured","ocr":false}',
+    "render:disabled",
+    "download",
+  ]);
+});
+
 test("save: a failed capture sends no `captured` (the overlay comes back for a retry)", async () => {
   for (const error of [new Error("tab changed during capture"), new TooLargeError("too big")]) {
     const { d, log } = deps({ ocr: true }, { capture: error });
