@@ -2,7 +2,8 @@
 // One text node of a million characters on a single line (a raw .js or .json
 // file as the browser shows it), cut by the capture's edge: trimming the line
 // to the clip reads one rect per character, so it has to stop once the clip
-// is behind it.
+// is behind it. Likewise a long run of collapsed spaces, which has no rects
+// to find, and a deeply nested inline tree.
 import { expect, type Page, test } from "@playwright/test";
 
 const WORDS = 200_000; // "word " × 200 000 = 1 MB
@@ -181,4 +182,96 @@ test("a bidi line is scanned to its end: the right-to-left part re-enters the cl
   });
   expect(texts.length).toBe(1);
   expect(texts[0]).toMatch(/^abc [א-ת]/);
+});
+
+test("200 000 collapsed spaces between two lines' words: the line split stays linear", async ({ page }) => {
+  // Each step of the search for where line 2 starts read back through every
+  // space to "foo" (2.0 s in Firefox, 2.6 s in Chromium before).
+  await page.goto("/fixtures/smoke.html");
+  await page.evaluate(() => {
+    document.body.innerHTML = `<p id="cap" style="width:30px;font:16px monospace;margin:0">foo${" ".repeat(200_000)}bar</p>`;
+  });
+  await page.addScriptTag({ path: "dist-test/harness.js" });
+  const got = await page.evaluate(async () => {
+    const h = window.__snapii;
+    const { runs, stats } = await h.debug.collectTextRunsDetailed(document, h.debug.captureRect("#cap"), {});
+    return { ms: stats.ms, texts: runs.map((r) => r.text) };
+  });
+  expect(got.texts).toEqual(["foo", "bar"]);
+  expect(got.ms).toBeLessThan(1000);
+});
+
+test("a capture edge behind 200 000 collapsed spaces: finding the first glyph inside stays linear", async ({
+  page,
+}) => {
+  // Each step of the search for the edge read forward through the spaces to
+  // the end of the line, not just to the search's upper bound (2.3 s / 2.9 s before).
+  await page.goto("/fixtures/smoke.html");
+  await page.evaluate(() => {
+    document.body.innerHTML = `<p id="cap" style="white-space:nowrap;width:max-content;font:16px monospace;margin:0">x${" ".repeat(200_000)}word</p>`;
+  });
+  await page.addScriptTag({ path: "dist-test/harness.js" });
+  const got = await page.evaluate(async () => {
+    const h = window.__snapii;
+    const cap = h.debug.captureRect("#cap");
+    const { runs, stats } = await h.debug.collectTextRunsDetailed(
+      document,
+      { ...cap, x: cap.x + 12, width: cap.width - 12 },
+      {},
+    );
+    return { ms: stats.ms, texts: runs.map((r) => r.text) };
+  });
+  expect(got.texts).toEqual(["word"]);
+  expect(got.ms).toBeLessThan(1000);
+});
+
+test("1 500 nested inline elements with text: each takes its block, language and link from its parent", async ({
+  page,
+}) => {
+  // Walking every ancestor for each of them read 0.5 to 1.1 million attributes.
+  await page.goto("/fixtures/smoke.html");
+  await page.addScriptTag({ path: "dist-test/harness.js" });
+  const got = await page.evaluate(async () => {
+    const main = document.createElement("main");
+    main.id = "cap";
+    main.lang = "de";
+    let at: HTMLElement = main;
+    for (let i = 0; i < 1500; i++) {
+      const u = document.createElement(i === 700 ? "a" : "u");
+      if (i === 700) u.setAttribute("href", "/x");
+      u.append("a ");
+      at.append(u);
+      at = u;
+    }
+    document.body.replaceChildren(main);
+    const h = window.__snapii;
+    let reads = 0;
+    const orig = Element.prototype.hasAttribute;
+    Element.prototype.hasAttribute = function (this: Element, name: string) {
+      reads++;
+      return orig.call(this, name);
+    };
+    try {
+      const { runs, sources } = await h.debug.collectTextRunsDetailed(
+        document,
+        h.debug.captureRect("#cap"),
+        {},
+      );
+      const link = document.querySelector("a") as HTMLAnchorElement;
+      const inLink = sources.map((src) => link.contains(src.node));
+      return {
+        reads,
+        langs: [...new Set(runs.map((r) => r.lang))],
+        inLink: inLink.filter(Boolean).length,
+        // Linked exactly where the text is inside the <a>.
+        wrong: runs.filter((r, i) => (r.href !== null) !== inLink[i]).length,
+      };
+    } finally {
+      Element.prototype.hasAttribute = orig;
+    }
+  });
+  expect(got.langs).toEqual(["de"]);
+  expect(got.inLink).toBeGreaterThan(1);
+  expect(got.wrong).toBe(0);
+  expect(got.reads).toBeLessThan(20 * 1500);
 });

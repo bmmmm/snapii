@@ -58,7 +58,11 @@ function isLinkish(el: Element): boolean {
 /** URL the element is (inside) a link to, decided by linkFor. */
 export function hrefOf(el: Element, pageURL: string): string | null {
   const target = closestComposed(el, isLinkish);
-  if (!target) return null;
+  return target ? linkOf(target, pageURL) : null;
+}
+
+/** What a link-ish element links to, decided by linkFor. */
+function linkOf(target: Element, pageURL: string): string | null {
   const button = target.localName === "button";
   return linkFor({
     tag: target.localName,
@@ -72,10 +76,9 @@ export function hrefOf(el: Element, pageURL: string): string | null {
   });
 }
 
-function langOf(el: Element): string | null {
-  const owner = closestComposed(el, (e) => e.hasAttribute("lang") || e.hasAttributeNS(XML, "lang"));
-  return owner?.getAttribute("lang") || owner?.getAttributeNS(XML, "lang") || null;
-}
+const hasLang = (e: Element): boolean => e.hasAttribute("lang") || e.hasAttributeNS(XML, "lang");
+const ownLang = (e: Element): string | null =>
+  e.getAttribute("lang") || e.getAttributeNS(XML, "lang") || null;
 
 /** white-space-collapse where the engine has it, else the legacy white-space. */
 const whiteSpaceOf = (cs: CSSStyleDeclaration): string =>
@@ -208,8 +211,9 @@ function firstAtClip(
   clip: DocRect,
   toDoc: (r: DocRect) => DocRect,
 ): number {
-  const glyph = (i: number): { at: number; rect: DocRect } | null => {
-    for (let j = i; j < end; j++) {
+  /** The first glyph from i on, before `to`. */
+  const glyph = (i: number, to = end): { at: number; rect: DocRect } | null => {
+    for (let j = i; j < to; j++) {
       const [r] = sliceRects(node, range, j, j + 1);
       if (r) return { at: j, rect: toDoc(r) };
     }
@@ -228,7 +232,8 @@ function firstAtClip(
   let hi = end;
   while (lo < hi) {
     const mid = (lo + hi) >>> 1;
-    const g = glyph(mid);
+    // None before hi: the first glyph from mid on is at or after hi, which is reached.
+    const g = glyph(mid, hi);
     if (!g || reached(g.rect)) hi = mid;
     else lo = g.at + 1;
   }
@@ -283,6 +288,40 @@ export async function collectTextRunsDetailed(
   const parents = new Map<Element, ParentInfo>();
   const blocks = new Map<Element, number>();
 
+  /**
+   * What an element takes from its flat-tree ancestors: its block, its
+   * word root, its language and its link — each its own if it sets one,
+   * else its parent's. Up to the nearest element already known, then back
+   * down: a deep inline tree costs a step per element, not a walk to the
+   * root for each (1 500 nested <u> read a million attributes).
+   */
+  const inherited = new Map<
+    Element,
+    { block: Element | null; root: Element | null; lang: string | null; href: string | null }
+  >();
+  const inheritedOf = (el: Element) => {
+    const chain: Element[] = [];
+    let at: Element | null = el;
+    while (at && !inherited.has(at)) {
+      chain.push(at);
+      at = flatParent(at);
+    }
+    let up = at ? inherited.get(at) : undefined;
+    for (const e of chain.reverse()) {
+      const d = layout.style(e).display;
+      const block = startsBlock(e, d);
+      const own = {
+        block: block ? e : (up?.block ?? null),
+        root: block || d.startsWith("inline-") || INLINE_ATOMIC.has(d) ? e : (up?.root ?? null),
+        lang: hasLang(e) ? ownLang(e) : (up?.lang ?? null),
+        href: isLinkish(e) ? linkOf(e, pageURL) : (up?.href ?? null),
+      };
+      inherited.set(e, own);
+      up = own;
+    }
+    return up as NonNullable<typeof up>;
+  };
+
   const infoOf = (el: Element, ctx: FrameContext): ParentInfo => {
     let info = parents.get(el);
     if (info) return info;
@@ -296,7 +335,7 @@ export async function collectTextRunsDetailed(
     // The computed size is before CSS zoom, the text is painted zoomed (measured, both browsers).
     const zoom = (el as Element & { currentCSSZoom?: number }).currentCSSZoom ?? 1;
     const fontWeight = Number.parseFloat(cs.fontWeight) || 400;
-    const block = closestComposed(el, (e) => startsBlock(e, layout.style(e).display)) ?? el;
+    const from = inheritedOf(el);
     info = {
       visible: layout.isRendered(el),
       vertical: !cs.writingMode.startsWith("horizontal"),
@@ -309,15 +348,11 @@ export async function collectTextRunsDetailed(
       fontWeight,
       fontStyle,
       color: cs.color,
-      lang: langOf(el),
+      lang: from.lang,
       dir: cs.direction === "rtl" ? "rtl" : "ltr",
-      href: hrefOf(el, pageURL),
-      block,
-      root:
-        closestComposed(el, (e) => {
-          const d = layout.style(e).display;
-          return startsBlock(e, d) || d.startsWith("inline-") || INLINE_ATOMIC.has(d);
-        }) ?? el,
+      href: from.href,
+      block: from.block ?? el,
+      root: from.root ?? el,
     };
     parents.set(el, info);
     return info;

@@ -345,6 +345,8 @@ class Builder {
   readonly #layout = new Layout();
   readonly #boxes = new Map<Element, Box>();
   readonly #patches: Patch[] = [];
+  /** The final patches by the BAND rows they span (document y), for the text's lookups. */
+  readonly #patchBands = new Map<number, Patch[]>();
   readonly #unsupported: Partial<Record<UnsupportedReason, number>> = {};
   /** Opaque fills in paint order, by band of BAND px, for text a later box hides. */
   readonly #painted = new Map<number, { rect: DocRect; seq: number }[]>();
@@ -409,6 +411,13 @@ class Builder {
     }
     this.#dropContained();
     this.#limitPatches();
+    for (const p of this.#patches) {
+      for (let k = Math.floor(p.y / BAND); k <= Math.floor((p.y + p.height) / BAND); k++) {
+        const list = this.#patchBands.get(k);
+        if (list) list.push(p);
+        else this.#patchBands.set(k, [p]);
+      }
+    }
     const text = this.opts.runs.map((run, i) => this.#textPaint(run, this.opts.sources[i]));
     const dx = -this.region.x;
     const dy = -this.region.y;
@@ -666,8 +675,8 @@ class Builder {
     const w = Math.max(1, Math.round(visible.width * dpr));
     const h = Math.max(1, Math.round(visible.height * dpr));
     if (w > MAX_PICTURE_SIDE || h > MAX_PICTURE_SIDE) return "budget";
+    // Charged once drawn: a picture of another origin, a blank or unencodable one takes none.
     if (this.#picturePixels + w * h > MAX_PICTURE_PIXELS) return "budget";
-    this.#picturePixels += w * h;
 
     const canvas = createHtml("canvas");
     canvas.width = w;
@@ -746,6 +755,7 @@ class Builder {
     if (!dataURL.startsWith("data:image/")) return reason;
     if (this.#pictureChars + dataURL.length > MAX_PICTURE_CHARS) return "budget";
     this.#pictureChars += dataURL.length;
+    this.#picturePixels += w * h;
     this.#pictures.set(b, { op: { op: "image", ...visible, dataURL }, opaque });
     return null;
   }
@@ -1515,11 +1525,16 @@ class Builder {
     const merged: Patch[] = [];
     for (const p of this.#patches.length > 2 * MAX_PATCHES ? [] : this.#patches) {
       let cur: Patch = p;
-      for (let i = merged.length - 1; i >= 0; i--) {
-        const m = merged[i] as Patch;
-        if (intersect(m, cur)) {
-          cur = { ...union(m, cur), reason: m.reason };
-          merged.splice(i, 1);
+      // A union can reach an entry the pass went by: again until none is met.
+      for (let grew = true; grew; ) {
+        grew = false;
+        for (let i = merged.length - 1; i >= 0; i--) {
+          const m = merged[i] as Patch;
+          if (intersect(m, cur)) {
+            cur = { ...union(m, cur), reason: m.reason };
+            merged.splice(i, 1);
+            grew = true;
+          }
         }
       }
       merged.push(cur);
@@ -1636,7 +1651,7 @@ class Builder {
     const cx = run.x + run.width / 2;
     const cy = run.top + run.height / 2;
     // The pixels already show it.
-    if (this.#patches.some((p) => contains(p, cx, cy))) return null;
+    if (this.#patchBands.get(Math.floor(cy / BAND))?.some((p) => contains(p, cx, cy))) return null;
     // The paint walk never reached it (inside a patched box, yet outside its
     // patch): drawn, it would sit on the canvas without what is under it.
     const seq = this.#textSeq.get(source.node);

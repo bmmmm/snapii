@@ -607,15 +607,49 @@ test("a picture the canvas cannot draw, read or encode is a patch, not a failed 
   expect(pictureOps(scene.ops).map((op) => op.width)).toEqual([45]);
 });
 
-test("pictures over the pixel budget are patches, counted before anything is drawn", async ({ page }) => {
-  // Three blank canvases of 6 Mpx: the first two are drawn (and read back
-  // empty), the third would take the pictures past 16 Mi px.
+test("pictures over the pixel budget are patches, checked before anything is drawn", async ({ page }) => {
+  // Three canvases of 6 Mpx in one colour: the first two are drawn, the
+  // third would take the pictures past 16 Mi px.
+  await page.addInitScript(() => {
+    window.prepare = () => {
+      for (const c of document.querySelectorAll("canvas")) {
+        const ctx = c.getContext("2d") as CanvasRenderingContext2D;
+        ctx.fillStyle = "rgb(0, 128, 255)";
+        ctx.fillRect(0, 0, c.width, c.height);
+      }
+    };
+  });
   const canvas = '<canvas width="2450" height="2450"></canvas>';
   const scene = await sceneOf(
     page,
     `<main id="cap" style="display:flex;width:7350px">${canvas}${canvas}${canvas}</main>`,
   );
-  expect(scene.unsupported).toEqual({ canvas: 2, budget: 1 });
+  expect(scene.unsupported).toEqual({ budget: 1 });
+  expect(pictureOps(scene.ops)).toHaveLength(2);
+});
+
+test("pictures that cannot be drawn use none of the pixel budget", async ({ page }) => {
+  // Two pictures of another origin (localhost, the page is 127.0.0.1) of
+  // 5.8 Mpx each, then a canvas of as many: only the canvas can be drawn,
+  // and it is, though all three together are over 16 Mi px. A blank canvas
+  // (nothing to draw) uses none either.
+  await page.addInitScript(() => {
+    window.prepare = () => {
+      const c = document.getElementById("full") as HTMLCanvasElement;
+      (c.getContext("2d") as CanvasRenderingContext2D).fillRect(0, 0, c.width, c.height);
+    };
+  });
+  await page.goto("/fixtures/smoke.html");
+  const other = new URL(page.url());
+  other.hostname = "localhost";
+  other.pathname = "/fixtures/images/quadrants.png";
+  const img = `<img src="${other.href}" width="2400" height="2400">`;
+  const scene = await sceneOf(
+    page,
+    `<main id="cap" style="display:flex;width:12000px">${img}${img}<canvas width="2400" height="2400"></canvas><canvas id="full" width="2400" height="2400"></canvas></main>`,
+  );
+  expect(scene.unsupported).toEqual({ image: 2, canvas: 1 });
+  expect(pictureOps(scene.ops)).toHaveLength(1);
 });
 
 test("pictures over the data URL budget are patches", async ({ page }) => {
@@ -912,6 +946,44 @@ test("patches: a fieldset's rendered legend is its first legend in flow, a float
     '<main id="cap" style="width:300px"><fieldset style="border:2px solid rgb(0,0,0)"><legend style="float:left">a</legend>text</fieldset></main>',
   );
   expect(floated.unsupported).toEqual({});
+});
+
+test("over the patch budget, the merge leaves no two patches overlapping", async ({ page }) => {
+  // A and C overlap; B overlaps neither, but the union of A and C. Merged in
+  // the order A, B, C, the union met B only after B was passed. 1 000 pairs
+  // of overlapping boxes elsewhere take the count over 2 000 and merge to
+  // 1 000, under the budget, so the merge result is what is kept.
+  const box = (x: number, y: number, w: number, h: number) =>
+    `<i style="position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;filter:opacity(1)"></i>`;
+  const pairs = Array.from({ length: 1000 }, (_, i) => {
+    const x = (i % 40) * 20;
+    const y = 100 + Math.floor(i / 40) * 20;
+    return box(x, y, 10, 10) + box(x + 5, y + 5, 10, 10);
+  }).join("");
+  const scene = await sceneOf(
+    page,
+    `<main id="cap" style="position:relative;width:800px;height:640px">${box(0, 0, 10, 10)}${box(20, 0, 10, 4)}${box(5, 5, 20, 20)}${pairs}</main>`,
+  );
+  expect(scene.unsupported.budget ?? 0).toBe(0);
+  const overlaps = scene.patches.flatMap((p, i) =>
+    scene.patches
+      .slice(i + 1)
+      .filter(
+        (q) => p.x < q.x + q.width && q.x < p.x + p.width && p.y < q.y + q.height && q.y < p.y + p.height,
+      ),
+  );
+  expect(overlaps).toEqual([]);
+});
+
+test("text under a tall patch of another box is hidden in every band the patch spans", async ({ page }) => {
+  // The run lies 1 000 px down, four bands of 256 px below the patch's top:
+  // the scene finds the patches for a run by its band.
+  const scene = await sceneOf(
+    page,
+    '<main id="cap" style="position:relative;width:300px;height:1200px"><p style="margin:0;padding-top:1000px">deep text</p><div style="position:absolute;left:0;top:0;width:300px;height:1200px;filter:opacity(0.5);background:rgb(255,0,0)"></div></main>',
+  );
+  expect(scene.patches.map((p) => [p.reason, p.y, p.height])).toEqual([["effect", 0, 1200]]);
+  expect(scene.text).toEqual([null]);
 });
 
 /** Every op of the scene, groups flattened. */

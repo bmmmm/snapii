@@ -62,12 +62,17 @@ export function splitIntoLines(node: Text, range: Range, keep?: (rect: DocRect) 
   const len = data.length;
   if (groups.length <= 1) return groups.map((g) => ({ start: 0, end: len, rect: g.rect, parts: g.parts }));
 
-  const lineOf = (i: number): number => {
-    for (let j = i; j >= 0; j--) {
+  /**
+   * The line of offset i, or -1 for one before the line searched: with no
+   * glyph from `stop` to i, i takes the line of a character before `stop`,
+   * which the search has already placed before it.
+   */
+  const lineOf = (i: number, stop: number): number => {
+    for (let j = i; j >= stop; j--) {
       const [r] = sliceRects(node, range, j, j + 1);
       if (r) return lineIndexOf(groups, r);
     }
-    return 0;
+    return -1;
   };
   const starts = new Map<number, number>([[0, 0]]);
   // Start of the latest line found; lines are searched in order.
@@ -76,12 +81,13 @@ export function splitIntoLines(node: Text, range: Range, keep?: (rect: DocRect) 
     if (k >= groups.length) return len;
     const known = starts.get(k);
     if (known !== undefined) return known;
-    // Smallest offset whose line is k or later; lines only advance with content order.
+    // Smallest offset whose line is k or later; lines only advance with content
+    // order, so every offset before lo is on an earlier line.
     let lo = floor + 1;
     let hi = len;
     while (lo < hi) {
       const mid = (lo + hi) >>> 1;
-      if (lineOf(mid) >= k) hi = mid;
+      if (lineOf(mid, lo) >= k) hi = mid;
       else lo = mid + 1;
     }
     // Firefox gives a pair's high half a zero-width rect and its low half the
