@@ -435,6 +435,23 @@ test("copy page link: an address with nothing to remove does not claim tracking 
   expect((await clips(page))[0]?.plain).toBe(url);
 });
 
+test("copy text with a word in a shadow tree inside a line of page text: the HTML keeps the page's links", async ({
+  page,
+}) => {
+  await load(page);
+  await page.evaluate(() => {
+    const p = document.getElementById("para") as HTMLElement;
+    p.innerHTML = 'Posted <time-stamp></time-stamp> by <a href="/u">someone</a>.';
+    (p.querySelector("time-stamp") as HTMLElement).attachShadow({ mode: "open" }).textContent = "today";
+  });
+  await begin(page, { ok: true, filename: "x.svg" });
+  await pickElement(page, "para");
+  await clickCopy(page);
+  const [clip] = await clips(page);
+  expect(clip?.plain).toBe("Posted today by someone.");
+  expect(clip?.html).toMatch(/<a href="[^"]*\/u">someone<\/a>/);
+});
+
 test("copy page link: empty pairs in the query are no trackers, the address stays as written", async ({
   page,
 }) => {

@@ -155,17 +155,28 @@ function centred(a: Lineable, b: Lineable): boolean {
  * line when it belongs to another block, when the shorter of it and the
  * previous run has its vertical centre outside the taller one's box (either
  * order: "Price: <big>$99</big>" puts the tall box's centre above the short
- * one), or when it starts at or below the previous run's baseline. The last
- * rule matters when the previous box is tall: a run that carries a
- * ::first-letter drop cap reaches into the next line, and whether that
- * line's centre falls inside it depends on the platform's font metrics
- * (Linux CI merged the two lines, macOS did not).
+ * one), when its baseline lies lower than the previous run's by as much as
+ * the shorter of the two is tall (a big font on the next line under a tight
+ * line-height reaches up over the short run; a superscript's shift is far
+ * less, and a floated drop cap's own run has the lower baseline, not the
+ * text after it), or when it starts at or below the previous run's baseline. The last rule matters when the
+ * previous box is tall: a run that carries a ::first-letter drop cap reaches
+ * into the next line, and whether that line's centre falls inside it
+ * depends on the platform's font metrics (Linux CI merged the two lines,
+ * macOS did not).
  */
 export function assignLines<T extends Lineable>(runs: readonly T[]): T[] {
   let line = -1;
   let prev: T | undefined;
   return runs.map((run) => {
-    if (!prev || run.block !== prev.block || !centred(run, prev) || run.top >= prev.y) line++;
+    if (
+      !prev ||
+      run.block !== prev.block ||
+      !centred(run, prev) ||
+      run.y - prev.y >= Math.min(run.height, prev.height) ||
+      run.top >= prev.y
+    )
+      line++;
     prev = run;
     return { ...run, line };
   });

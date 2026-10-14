@@ -84,6 +84,19 @@ test("copy text: blank lines in preserved text stay, one empty line each", async
   expect(plain).toBe("a\n\nb\n\n\ncd\n\ne\n\nf\n\ng");
 });
 
+test("copy text: newlines outside the line flow add no blank line; an indented pre-line keeps its own", async ({
+  page,
+}) => {
+  await page.goto("/fixtures/pre.html");
+  await page.addScriptTag({ path: "dist-test/harness.js" });
+  const plain = await page.evaluate(async () => {
+    const h = window.__snapii;
+    const { runs } = await h.debug.collectTextRunsDetailed(document, h.debug.captureRect("#notblank"));
+    return h.runsToPlainText(runs);
+  });
+  expect(plain).toBe("h\ni\nj\nk\n\nl\n\nm");
+});
+
 test("writeClipboard: content clipboard first, background as fallback, rejects only if both fail", async ({
   page,
 }) => {

@@ -45,6 +45,7 @@ export interface RunSource {
 const EPS = 0.5;
 const XLINK = "http://www.w3.org/1999/xlink";
 const XML = "http://www.w3.org/XML/1998/namespace";
+const XHTML = "http://www.w3.org/1999/xhtml";
 
 function isLinkish(el: Element): boolean {
   const n = el.localName;
@@ -82,7 +83,7 @@ const whiteSpaceOf = (cs: CSSStyleDeclaration): string =>
 /** Newlines in data[from, to). */
 function newlines(data: string, from: number, to = data.length): number {
   let n = 0;
-  for (let i = data.indexOf("\n", from); i !== -1 && i < to; i = data.indexOf("\n", i + 1)) n++;
+  for (let i = from; i < to; i++) if (data.charCodeAt(i) === 10) n++;
   return n;
 }
 
@@ -302,6 +303,20 @@ export async function collectTextRunsDetailed(
     return info;
   };
 
+  /**
+   * The newlines of tail.node after tail.from, where they break lines of
+   * `block`'s own inline flow: rendered HTML text whose parent keeps
+   * breaks, laid out in the block itself — not in an inline-block, a form
+   * control, an out-of-flow box (its own block) or SVG markup.
+   */
+  const tailBreaks = (tail: { node: Text; ctx: FrameContext; from: number }, block: Element): number => {
+    const p = flatParent(tail.node);
+    if (!p || p.namespaceURI !== XHTML || !closestComposed(p, (e) => e === block)) return 0;
+    const info = infoOf(p, tail.ctx);
+    if (info.root !== block || !info.visible || !keepsBreaks(info.whiteSpace)) return 0;
+    return newlines(tail.node.data, tail.from);
+  };
+
   const raw: RawRun[] = [];
   /** Index in `texts` of the node the last raw run came from. */
   let lastRun = -1;
@@ -315,15 +330,10 @@ export async function collectTextRunsDetailed(
   /** The last run's block: only text inside it can stand between that run and the next one of its block. */
   let lastBlock: Element | null = null;
   /** The node in hand and the offset after its last run's text, for the breaks that follow it. */
-  let tail: { node: Text; from: number } | null = null;
+  let tail: { node: Text; ctx: FrameContext; from: number } | null = null;
   for (const [i, { node, ctx }] of texts.entries()) {
-    if (tail && lastBlock?.contains(tail.node) && tail.node.data.includes("\n", tail.from)) {
-      const p = flatParent(tail.node);
-      if (p && keepsBreaks(whiteSpaceOf(layout.style(p))) && layout.isRendered(p)) {
-        breaks += newlines(tail.node.data, tail.from);
-      }
-    }
-    tail = { node, from: 0 };
+    if (tail && lastBlock && tail.node.data.includes("\n", tail.from)) breaks += tailBreaks(tail, lastBlock);
+    tail = { node, ctx, from: 0 };
     if (!node.data) continue;
     if (!layout.frame(ctx).clip) continue;
     let range = ranges.get(ctx.doc);
@@ -404,10 +414,11 @@ export async function collectTextRunsDetailed(
         before(start, box),
       );
       if (!text || isIconText(text)) continue;
-      // A slice's leading and trailing newlines end the line before it or its own.
+      // The newlines around a slice's text end the line before it or its own
+      // (collapsed spaces beside them have no glyph and stay in the slice).
       const slice = keepsBreaks(info.whiteSpace) ? node.data.slice(start, end) : "";
-      const lead = slice.length - slice.replace(/^\n+/, "").length;
-      const trail = slice.length - slice.replace(/\n+$/, "").length;
+      const lead = slice.length - slice.replace(/^[ \t\n\r\f]+/, "").length;
+      const trail = slice.length - slice.replace(/[ \t\n\r\f]+$/, "").length;
       const gap = breaks + (slice ? newlines(node.data, tail.from, start + lead) : 0);
       let block = blocks.get(info.block);
       if (block === undefined) {

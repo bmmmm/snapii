@@ -403,10 +403,15 @@ export function startSession(deps: SessionDeps): SessionHandle {
     }
     const plain = runsToPlainText(runs);
     const ctx = { baseURL: document.baseURI, pageURL: location.href };
-    // A range never holds shadow-tree or frame content: with any text there (a
-    // drag over it, or a picked shadow host or iframe) the clone would paste
-    // without it, so the HTML is the plain text's paragraphs instead.
-    const outside = sources.some((s) => s.node.getRootNode() !== document);
+    // A range never holds shadow-tree or frame content. Where whole lines
+    // live only there (a drag over a web component's paragraphs, a picked
+    // shadow host or iframe) the clone would paste without them, so the HTML
+    // is the plain text's paragraphs; a word inside a line of page text (a
+    // timestamp element) is left out of the HTML instead, which keeps the
+    // page's links and emphasis.
+    const own = (i: number): boolean => sources[i]?.node.getRootNode() === document;
+    const ownLines = new Set(runs.filter((_, i) => own(i)).map((r) => r.line));
+    const outside = runs.some((r, i) => !own(i) && !ownLines.has(r.line));
     const range = outside ? null : selectionRange(selection, sources);
     const cloned = range
       ? fragmentToCleanHtml(toSNodes(cloneVisibleRange(range, new Set(sources.map((s) => s.node)))), ctx)

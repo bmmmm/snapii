@@ -24,7 +24,13 @@
           "cd",
           "e",
           "f",
-          "g"
+          "g",
+          "h",
+          "i",
+          "j",
+          "k",
+          "l",
+          "m"
         ]
       }
     </script>
@@ -51,6 +57,19 @@ c<span>d</span>
 <span>e</span></pre><p class="pre-line">f
 
 g</p></div>
+      <!-- copy.spec: newlines outside the pre's own line flow make no blank line (SVG markup, an
+           out-of-flow screen-reader span, a textarea's value); an indented pre-line keeps its blank line. -->
+      <div id="notblank"><pre>h<svg width="12" height="12">
+  <circle cx="6" cy="6" r="5"></circle>
+</svg>
+i<span style="position: absolute; clip: rect(0 0 0 0)">sr
+</span>
+j<textarea rows="1" cols="3">t
+
+u</textarea>
+k</pre><p class="pre-line">    l
+
+    m</p></div>
     </main>
   </body>
 </html>

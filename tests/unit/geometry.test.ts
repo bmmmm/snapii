@@ -165,6 +165,29 @@ test("assignLines: a run three times taller on the same baseline stays on the li
     assignLines([short, tall, below]).map((r) => r.line),
     [0, 0, 1],
   );
+  // A tall run on the next line under a tight line-height reaches up over the
+  // short one's centre, but its baseline lies a line below.
+  const pro = { ...run(0, 18.4, 0), y: 14.7 };
+  const price = { ...run(7.7, 55, 0), y: 50.7 };
+  assert.deepEqual(
+    assignLines([pro, price]).map((r) => r.line),
+    [0, 1],
+  );
+  // Chromium's own run for a floated drop cap: its baseline lies 28 px below
+  // the line's (first-letter.html), the text after it is on its line.
+  const cap = { ...run(10, 68, 0), y: 63 };
+  const rest = { ...run(12, 23, 0), y: 35 };
+  assert.deepEqual(
+    assignLines([cap, rest]).map((r) => r.line),
+    [0, 0],
+  );
+  // A superscript and the text after it share the line.
+  const base = { ...run(100, 18, 0), y: 114 };
+  const sup = { ...run(95, 14, 0), y: 106 };
+  assert.deepEqual(
+    assignLines([base, sup, { ...base, x: 30 }]).map((r) => r.line),
+    [0, 0, 0],
+  );
 });
 
 test("runsRelativeTo: shifts x, baseline and top by the region origin", () => {
