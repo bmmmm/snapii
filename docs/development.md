@@ -3,7 +3,7 @@
 pnpm only (a `preinstall` guard rejects npm and yarn); Node 24 or newer.
 
 ```sh
-pnpm install
+pnpm install --frozen-lockfile
 pnpm check        # tsc (src and tests) + biome
 pnpm test         # unit tests (node --test), then layout tests in Playwright's Firefox and Chromium
 pnpm test:glue    # builds, then drives the real extension in Firefox through Marionette
@@ -22,11 +22,19 @@ pnpm start        # fresh Firefox profile with dist/ loaded (add --start-url <ur
   binary; branded Chrome no longer takes `--load-extension`). It binds ports
   8470–8479 (server) and 2970–2979 (DevTools), shifted by
   `SNAPII_GLUE_PORT_OFFSET` as well.
+- Both glue suites and `pnpm drive` must run outside a process sandbox:
+  browser launch, sockets and local ports are required. For a second checkout,
+  use `SNAPII_GLUE_PORT_OFFSET=20`; 10 would overlap the first checkout's
+  Chromium ports. For parallel layout runs set a different `SNAPII_PORT`
+  (default 8438), so the tests do not reuse another checkout's fixture server.
 - `pnpm test:glue` and `pnpm start` need Firefox **157 or newer** at
   `/Applications/Firefox.app` (macOS path). The glue tests run headless at
   device-pixel ratio 2 and bind local ports 8460–8469 (server) and
   2960–2969 (Marionette); `SNAPII_GLUE_PORT_OFFSET=<n>` shifts both, and
   `SNAPII_GLUE_OUT=<dir>` keeps profiles, logs and the downloaded files.
+  Set `SNAPII_FIREFOX=/path/to/firefox` for the glue suite and `pnpm drive`.
+  `pnpm start` has a fixed macOS path; elsewhere use
+  `pnpm exec web-ext run --source-dir dist --firefox=/path/to/firefox`.
 - What the automated run cannot check (real keyboard, real display, other
   apps' clipboards, other viewers) is in
   [tests/MANUAL-CHECKLIST.md](../tests/MANUAL-CHECKLIST.md).
@@ -90,8 +98,11 @@ these decisions:
   raster output.
 - **V-D3 The smallest box as pixels.** An element that cannot be drawn as
   shapes becomes a patch over its box, grown by what its shadows and filters
-  paint beyond it, and, unless it clips its overflow both ways, over the
-  shown absolute and fixed descendants that leave it (a dropdown); its text
+  paint beyond it, and, where its content can escape, over the
+  shown descendants and text that leave it, including its own text, relative
+  positioning, negative margins and content taller than a fixed-height box.
+  Their own clips still apply; the walk examines at most 2,000 descendant
+  boxes and leaves clipped inline SVG content inside its viewport. Its text
   stays in the text layer, invisible, because the pixels show it. The record
   counts the patched elements per reason. On five real pages this kept 71–98 % of the area as shapes before
   pictures, gradients and shadows were drawn (four of five at 85 % or more).
@@ -156,6 +167,18 @@ expectations have a `vector` block must stay within its tolerance, 2 % by
 default, the others only report it),
 checks the text layer, the links, hostile values and that the save message
 passes the background's validator.
+
+CI runs `pnpm check`, `pnpm test`, `pnpm build`, `pnpm lint:ext` and
+`pnpm test:glue:chromium` (`.github/workflows/tests.yml`). Firefox glue
+remains a local gate. Playwright retries twice in CI; a pass only on retry
+still needs investigation.
+
+Before a release, run both glue suites as well as the CI checks, then record
+the human checks in `tests/MANUAL-CHECKLIST.md` with the browser version, OS
+and package hash. A checklist entry describes a required check, not evidence
+that the current package passed it. Build before packaging: `pnpm package`
+and `pnpm package:chromium` archive the existing output directories; they do
+not rebuild or sign them.
 
 ## Driving Firefox interactively
 

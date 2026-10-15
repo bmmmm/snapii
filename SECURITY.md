@@ -40,8 +40,8 @@ is in scope:
   from the extension, the OCR engine or the saved file when opened — breaks
   that promise.
 - **Permission creep.** snapii runs with `activeTab`, `scripting`, `downloads`,
-  `clipboardWrite` and `storage`, and no host permissions. A way to act on a
-  tab you did not click snapii in is in scope.
+  `clipboardWrite` and `storage`, plus `offscreen` in Chromium, and no host
+  permissions. A way to act on a tab you did not click snapii in is in scope.
 - **The download file name.** It is built from the page title
   (`src/shared/filename.ts`); a title that escapes the download directory or
   produces a dangerous file type is in scope.
@@ -53,13 +53,19 @@ is in scope:
   link — by design and documented in the README's "Privacy" section and
   [docs/details.md](docs/details.md#privacy-and-permissions). Check a file
   before sharing it.
+- **Documented vector contents.** Vector output retains full box geometry
+  and the embedded picture pixels described in
+  [Privacy and permissions](docs/details.md#privacy-and-permissions), including
+  pixels covered by another element. That documented behaviour is distinct
+  from extracting hidden DOM text or form values.
 - **A page blocking snapii.** A page can, for example, pre-register snapii's
   custom-element names so the overlay does not appear. That is denial of
   service against yourself on that page, a known limitation, not a
   vulnerability.
-- **Pages Firefox protects.** snapii cannot run on `about:` pages, the PDF
-  viewer or addons.mozilla.org; that is Firefox's rule.
-- **Vulnerabilities in Firefox, tesseract.js or text-fragments-polyfill
+- **Pages the browser protects.** snapii cannot run on Firefox's `about:`
+  pages, PDF viewer or addons.mozilla.org, or Chromium's browser pages, PDF
+  viewer or Web Store; those restrictions belong to the browser.
+- **Vulnerabilities in Firefox, Chromium, tesseract.js or text-fragments-polyfill
   themselves** — report those upstream. How snapii *uses* them is in scope.
 - **Viewers.** How a third-party program renders or scripts SVG files in
   general.

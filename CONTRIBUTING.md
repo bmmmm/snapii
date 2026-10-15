@@ -12,7 +12,7 @@ fail without it and whose scope is bounded can be reviewed in minutes.
 ## Setup
 
 ```console
-$ pnpm install                            # pnpm only — a preinstall guard blocks npm and yarn
+$ pnpm install --frozen-lockfile          # pnpm only — a preinstall guard blocks npm and yarn
 $ pnpm exec playwright install firefox    # once, for the layout tests
 $ pnpm check                              # tsc (src and tests) + biome
 $ pnpm exec playwright install chromium   # once, for the layout and the Chromium glue tests
@@ -81,7 +81,8 @@ that answer is what gets an issue fixed instead of left waiting.
 
 Every bug form asks for the **version line** at the bottom of snapii's menu
 or settings page (e.g. `snapii 0.1.0 · 862b4ba · built 2026-10-01 15:45 UTC ·
-Firefox 157.0`): it names the exact build and the Firefox version.
+Firefox 157.0`): it names the exact build and browser version (Chromium
+builds name Chromium instead).
 
 - **Text in the SVG is missing, wrong or misplaced** — *does Copy text on the
   same selection get it right?* Copy text reads the page the same way the
@@ -169,7 +170,8 @@ Every behavioural change needs a test that fails without it.
 - **Glue** (`tests/glue/*.test.mjs`, `pnpm test:glue`) — the built extension
   in the installed Firefox through Marionette: popup, shortcut, save, copy,
   OCR. Not run in CI (it needs a release Firefox); run it locally whenever you
-  touch `src/background/`, `src/content/`, the popup or the options page.
+  touch `src/background/`, `src/content/`, `src/offscreen/`, the popup or the
+  options page.
 - **Chromium glue** (`tests/glue-chromium/*.test.mjs`, `pnpm test:glue:chromium`):
   `dist-chromium/` in Playwright's Chromium, driven by `tools/chromium/driver.mjs`:
   popup, save, copy, OCR through the offscreen document, the options page, a
@@ -197,8 +199,9 @@ of what is still open to the job summary. It **never fails your build** —
 advisory only, a reading aid for the reviewer. Unlike a linter or a checker,
 snapii cannot be pointed at its own pull request, so nothing runs the project
 on the diff itself; review rests on the claims and the tests. The **tests**
-workflow (`pnpm check`, `pnpm test`, build, `web-ext lint`) is the one that
-has to pass.
+workflow (`pnpm check`, `pnpm test`, `pnpm build`, `pnpm lint:ext` and
+`pnpm test:glue:chromium`) is the one that has to pass. Firefox glue remains
+a local gate; both glue suites must run outside a process sandbox.
 
 Write claims as one bullet per user-visible change, files, functions and SVG
 elements in `backticks`, issues as `#N`. Claim what the change *does*, not

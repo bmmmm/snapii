@@ -102,6 +102,10 @@ picture. Raster stays the default and its files are unchanged.
   `html` has no background of its own, paints the whole page and makes the
   **whole selection one patch**; so does any of the reasons above on `html`
   or `body` itself.
+
+  Patches also cover visible text and descendants that overflow the patched
+  box, subject to their clips; this includes text in a fixed-height box and
+  descendants moved by relative positioning or negative margins.
 - **Record.** The JSON adds `output: "vector"` and `scene`: the number of
   drawing operations, of patches, their area and the patched elements per
   reason. It has no `ocr`. `tiles` are the patches (a large one split into
@@ -147,7 +151,9 @@ Limits:
   pixels are outside the visible area…"); shapes and text may lie anywhere.
 - Pictures beyond about 16.8 million pixels or 32 Mi characters of data URL
   (about 24 MiB of encoded image) together, or longer than 65,535 device px,
-  become patches.
+  become patches. Unreadable or empty pictures do not consume the stored
+  picture budget. Drawing attempts have a separate limit of about 67.1
+  million pixels per scene, so repeated failures also fall back to patches.
 
 How close it comes: rendered back in the same browser at device-pixel ratio
 1 (`tests/layout/vector.spec.ts` in Playwright's Firefox and Chromium on
@@ -238,8 +244,11 @@ transparent; how these viewers handle it has not been checked yet.
   The metadata counts the skipped frames.
 - **Vertical writing modes** are skipped (counted in the metadata).
 - **Shadow DOM:** text inside open shadow roots is extracted (tested).
-  Closed roots are read through Firefox's content-script accessor, but no
-  automated test covers them.
+  Closed roots are read through Firefox's content-script accessor and
+  Chromium's extension API. The layout test covers closed roots and assigned
+  slots with an API stub; Chromium glue also checks extraction through the
+  real extension API. Firefox's closed-root accessor has no dedicated glue
+  test.
 - **Top layer:** a `<dialog>` opened with `showModal()` or a popover is
   painted above the overlay by the browser, whatever the overlay's z-index;
   such content is not selectable through the overlay. (Follows from how the
@@ -324,3 +333,4 @@ Permissions, and why each one is declared:
 | `downloads` | Saving the SVG. |
 | `clipboardWrite` | Copy text, Copy element link and Copy page link, also on pages without a secure origin. |
 | `storage` | The settings above, and the one-time flag. |
+| `offscreen` (Chromium only) | A temporary document for OCR and clipboard writes that the service worker cannot perform. It closes after the last request in flight. |

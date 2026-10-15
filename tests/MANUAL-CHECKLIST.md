@@ -1,6 +1,6 @@
 # Manual checklist (Firefox)
 
-Items 1–15. Each is marked
+Items 1–16, followed by the Chromium checks. Each Firefox item is marked
 
 - `auto (tests/glue/<file>: <test>)` — `pnpm test:glue` drives the installed
   Firefox headless at DPR 2 through Marionette and checks it; the human only

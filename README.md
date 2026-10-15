@@ -56,7 +56,7 @@ signed release, load it from source:
 ```sh
 git clone https://github.com/bmmmm/snapii.git
 cd snapii
-pnpm install      # pnpm only; Node 24+
+pnpm install --frozen-lockfile   # pnpm only; Node 24+
 pnpm build        # writes the extension to dist/
 ```
 
@@ -70,7 +70,8 @@ Developer Edition or Nightly with `xpinstall.signatures.required` set to
 `web-ext-artifacts/snapii-<version>.zip` via `about:addons` → gear → **Install
 Add-on From File…**. Signed builds will be attached to the GitHub releases.
 
-To update: `git pull && pnpm build`, then **Reload** in `about:debugging`.
+To update: `git pull && pnpm install --frozen-lockfile && pnpm build`, then
+**Reload** in `about:debugging`.
 
 ### Chromium (experimental)
 
@@ -133,14 +134,18 @@ with tokens in the address.
   limits, file sizes, permissions
 - [docs/development.md](docs/development.md) — build, tests, driving Firefox
 
+- [tests/MANUAL-CHECKLIST.md](tests/MANUAL-CHECKLIST.md) — manual browser checks
+  for release preparation
+
 GPL-3.0-or-later ([LICENSE](LICENSE), third-party code in [NOTICE](NOTICE)).
 
 ## Development
 
 ```sh
-pnpm install
+pnpm install --frozen-lockfile
+pnpm exec playwright install --with-deps firefox chromium
 pnpm check && pnpm test   # types, lint, unit and layout tests
 pnpm test:glue            # end-to-end in the real Firefox (headless)
 pnpm test:glue:chromium   # end-to-end in Playwright's Chromium
-pnpm build && pnpm start  # try it in a fresh Firefox profile
+pnpm build && pnpm start  # try it in a fresh Firefox profile (macOS default)
 ```
