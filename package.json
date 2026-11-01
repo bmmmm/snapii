@@ -30,7 +30,7 @@
     "@types/node": "^26.6.6",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
-    "web-ext": "^10.7.0"
+    "web-ext": "^10.8.0"
   },
   "dependencies": {
     "@tesseract.js-data/deu": "1.0.0",
