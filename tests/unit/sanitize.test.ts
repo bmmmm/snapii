@@ -92,6 +92,26 @@ test("sanitize: abbr keeps its title", () => {
   );
 });
 
+test("sanitize: title is kept on abbr only, every other kept element loses it", () => {
+  assert.equal(
+    clean(
+      el("p", { title: "tooltip" }, t("a")),
+      el("a", { href: "https://x/", title: "tooltip" }, t("b")),
+      el("span", { title: "tooltip", lang: "en" }, t("c")),
+      el("abbr", {}, t("d")),
+    ),
+    '<p>a</p><a href="https://x/">b</a><span lang="en">c</span><abbr>d</abbr>',
+  );
+});
+
+test("sanitize: an empty href under the <base> of another page stays a link to that page", () => {
+  const ctx = { baseURL: "https://other/doc", pageURL: "https://p/dir/page" };
+  assert.equal(
+    fragmentToCleanHtml([el("a", { href: "" }, t("x"))], ctx),
+    '<a href="https://other/doc">x</a>',
+  );
+});
+
 test("sanitize: unknown and unlisted elements are unwrapped, content kept", () => {
   assert.equal(
     clean(
