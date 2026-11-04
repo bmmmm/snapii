@@ -1252,3 +1252,32 @@ test("without viewport-only the same selection is saved (Firefox captures beyond
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await calls(page)).length).toBe(1);
 });
+
+for (const query of ["dir=ltr", "dir=rtl", "dir=rtl&wm=vertical-lr"]) {
+  test(`a page scrolled towards its far end (${query}): Save and Copy text get the picked element's box`, async ({
+    page,
+  }) => {
+    // Right to left, the target lies at a negative document x; bottom to top
+    // (vertical-lr, rtl) at a negative y. The region must be its box as in
+    // the left-to-right page, not one cut off at zero.
+    await load(page, `rtl-scrolled.html?${query}`);
+    const box = await page.evaluate(() => {
+      const t = document.getElementById("target") as HTMLElement;
+      t.scrollIntoView({ block: "center", inline: "center" });
+      const r = t.getBoundingClientRect();
+      return { x: r.x + scrollX, y: r.y + scrollY, width: r.width, height: r.height, scrollX, scrollY };
+    });
+    if (query !== "dir=ltr") expect(Math.min(box.scrollX, box.scrollY)).toBeLessThan(0);
+    await begin(page, { ok: true, filename: "x.svg" });
+    await pickElement(page, "target");
+    await clickCopy(page);
+    expect((await clips(page))[0]?.plain).toBe("Scrolled target text");
+    await clickButton(page, "save");
+    await expect.poll(async () => (await calls(page)).length).toBe(1);
+    const [call] = await calls(page);
+    const { x, y, width, height } = box;
+    expect(call?.model.region).toEqual({ x, y, width, height });
+    expect(call?.model.runs.map((r) => r.text).join(" ")).toBe("Scrolled target text");
+    expect(call?.model.page.scroll).toEqual({ x: box.scrollX, y: box.scrollY });
+  });
+}

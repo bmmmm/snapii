@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>rtl-scrolled</title>
+    <!--
+      A page wider and taller than the viewport, laid out right to left (or
+      with ?wm=vertical-lr bottom to top): its scroll origin is the far edge,
+      so scrolling towards the target gives scrollX (scrollY) below zero and
+      the target lies at negative document coordinates. ?dir=ltr is the same
+      page left to right. The query is read before the body is laid out. The
+      target's own text stays horizontal: vertical text is not extracted.
+    -->
+    <script>
+      const q = new URLSearchParams(location.search);
+      document.documentElement.dir = q.get("dir") ?? "rtl";
+      if (q.has("wm")) document.documentElement.style.writingMode = q.get("wm");
+    </script>
+    <style>
+      body { margin: 0; font: 16px/1.5 serif; }
+      .wide { width: 2400px; height: 2400px; padding-block-start: 100px; box-sizing: border-box; }
+      .at { margin-inline-start: 1700px; }
+      #target { writing-mode: horizontal-tb; direction: ltr; width: 300px; height: 60px; margin: 0; background: #eef; }
+    </style>
+  </head>
+  <body>
+    <div class="wide"><div class="at"><p id="target">Scrolled target text</p></div></div>
+  </body>
+</html>

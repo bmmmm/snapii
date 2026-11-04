@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { type CaptureDeps, captureTiles, TAB_CHANGED } from "../../src/background/capture.ts";
+import {
+  type CaptureDeps,
+  captureTiles,
+  NegativeRectError,
+  TAB_CHANGED,
+} from "../../src/background/capture.ts";
 import { DEFAULT_SETTINGS } from "../../src/shared/settings.ts";
 import { type PlannedTile, planTiles } from "../../src/shared/tiles.ts";
 
@@ -82,4 +87,21 @@ test("captureTiles: a tab not selected at the start captures nothing", async () 
   const { d, log } = deps(() => ({ active: false, windowId: WINDOW }));
   await assert.rejects(captureTiles(target, PLAN, 1, DEFAULT_SETTINGS, d), new Error(TAB_CHANGED));
   assert.deepEqual(log, ["get:changed"]);
+});
+
+test("captureTiles: a tile at a negative document position (a right-to-left page) is refused before any capture", async () => {
+  // Where captureVisibleTab's rect lies below zero is not measured (S1/S2 were left to right).
+  for (const at of [
+    { x: -700, y: 100 },
+    { x: 100, y: -40 },
+  ]) {
+    const plan = planTiles({ ...at, width: 300, height: 60 }, 1, {
+      maxSide: 1e4,
+      maxArea: 1e9,
+      maxTilePixels: 1e9,
+    });
+    const { d, log } = deps(() => selected);
+    await assert.rejects(captureTiles(target, plan, 1, DEFAULT_SETTINGS, d), NegativeRectError);
+    assert.deepEqual(log, []);
+  }
 });

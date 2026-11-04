@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <title>snapii glue rtl</title>
+    <!--
+      A right-to-left page 2400 px wide: scrolled towards #target, scrollX is
+      below zero and #target (300x60, one flat colour behind short text) lies
+      at a negative document x.
+    -->
+    <style>
+      html, body { margin: 0; background: #fff; }
+      body { font: 16px/1.5 serif; color: #000; }
+      .wide { width: 2400px; height: 400px; padding-top: 100px; box-sizing: border-box; }
+      #target { width: 300px; height: 60px; margin: 0 1700px 0 0; background: rgb(200, 100, 50); }
+    </style>
+  </head>
+  <body>
+    <div class="wide"><p id="target">RTL target</p></div>
+  </body>
+</html>

@@ -270,6 +270,11 @@ transparent; how these viewers handle it has not been checked yet.
   between the pick and the capture show up as they are.
 - A region too large for the browser's capture limits is refused with a toast
   ("This area is too large to capture").
+- **Right-to-left pages scrolled sideways** (and pages laid out bottom to
+  top): a selection there lies at negative document coordinates. Copy text
+  and Chromium's Save handle it; Firefox's Save refuses it ("capture
+  failed"), because where Firefox's capture places a rect below zero has not
+  been measured.
 
 ## File size
 

@@ -162,3 +162,23 @@ test("planViewportCrop: a region outside the picture is refused", () => {
     /outside the captured viewport/,
   );
 });
+
+test("planViewportCrop: a right-to-left page scrolled into negative x crops relative to the viewport", () => {
+  // scrollX -850: the viewport starts at document x -850, a region at -700 lies 150 px into it.
+  const crop = planViewportCrop(
+    { x: -700, y: 100, width: 300, height: 60 },
+    page(2, { x: -850, y: 0 }),
+    { width: 2000, height: 1426 },
+    1e8,
+  );
+  assert.deepEqual(crop.source, { x: 300, y: 200, width: 600, height: 120 });
+  assert.deepEqual(crop.rel, { x: 0, y: 0, width: 300, height: 60 });
+  assert.equal(
+    fitsViewport({ x: -700, y: 100, width: 300, height: 60 }, { x: -850, y: 0, width: 1000, height: 713 }),
+    true,
+  );
+  assert.equal(
+    fitsViewport({ x: -900, y: 100, width: 300, height: 60 }, { x: -850, y: 0, width: 1000, height: 713 }),
+    false,
+  );
+});
