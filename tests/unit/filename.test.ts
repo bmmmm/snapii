@@ -114,3 +114,21 @@ test("makeFilename: without a time the title gets its bytes", () => {
   assert.equal(name, `snapii ${"x".repeat(109)}.svg`);
   assert.equal(name.length, MAX_FILENAME_LENGTH);
 });
+
+test("makeFilename: an IPv6 host without a title is named without brackets, its colons as dashes", () => {
+  // The dashed form of Windows' ipv6-literal.net names; ":" is no file name character.
+  const at = { title: "", capturedAt: "2026-10-01T00:00:00.000Z" };
+  assert.equal(
+    makeFilename(page({ ...at, url: "https://[::1]:8080/" })),
+    "snapii --1 2026-10-01 02-00-00.svg",
+  );
+  assert.equal(
+    makeFilename(page({ ...at, url: "http://[2001:db8::a:1]/x" })),
+    "snapii 2001-db8--a-1 2026-10-01 02-00-00.svg",
+  );
+  // IPv4 and names stay as they are.
+  assert.equal(
+    makeFilename(page({ ...at, url: "http://192.0.2.1:81/" })),
+    "snapii 192.0.2.1 2026-10-01 02-00-00.svg",
+  );
+});

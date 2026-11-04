@@ -23,9 +23,11 @@ function clean(text: string): string {
   return text.replace(UNSAFE, " ").replace(/\s+/gu, " ").trim();
 }
 
+/** The host name; an IPv6 address without its brackets and with dashes for colons (as ipv6-literal.net names do). */
 function host(url: string): string {
   try {
-    return new URL(url).hostname;
+    const name = new URL(url).hostname;
+    return name.startsWith("[") ? name.slice(1, -1).replaceAll(":", "-") : name;
   } catch {
     return "";
   }
