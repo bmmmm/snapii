@@ -7,7 +7,7 @@ import { placeToolbar } from "../../shared/place.ts";
 import type { DocRect } from "../../shared/types.ts";
 import { shadowRootOf } from "../shadow.ts";
 import { clampedRect, docRectOf, parentOf, pickAt, visibleViewport } from "./pick.ts";
-import { adoptStyles, createHtml, OVERLAY_CSS, setImportant, styleHost } from "./styles.ts";
+import { adoptStyles, appendFixed, createHtml, OVERLAY_CSS, setImportant, styleHost } from "./styles.ts";
 import { buttonForKey, createToolbar, type ToolbarButton } from "./toolbar.ts";
 
 export interface Selection {
@@ -488,7 +488,7 @@ export function startOverlay(opts: {
     host.remove();
   }
 
-  document.documentElement.append(host);
+  appendFixed(host);
   render();
 
   return {

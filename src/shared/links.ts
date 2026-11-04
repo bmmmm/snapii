@@ -44,8 +44,9 @@ export function linkFor(c: LinkCandidate | null): string | null {
   if (!c) return null;
   const tag = c.tag.toLowerCase();
   if (tag !== "a" && tag !== "area") return null;
-  const raw = c.href?.trim();
-  if (!raw) return null;
+  if (c.href === null) return null;
+  // An empty href is the base URL: the page itself (dropped below), or another page under a <base>.
+  const raw = c.href.trim();
   let url: URL;
   try {
     url = new URL(raw, c.baseURL);

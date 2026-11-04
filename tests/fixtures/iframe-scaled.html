@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>iframe-scaled</title>
+    <!--
+      A same-origin frame shown at another scale than it is laid out in (a CSS
+      transform: scale() or zoom on it or on an ancestor) cannot have its text
+      placed by the frame's own coordinates: the runs would lie off the picture
+      and be cut to the scaled frame's box. It is skipped like an unreadable
+      frame (counted, its text left to the picture); an ordinary frame, one of
+      a fractional width included, is read.
+    -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; }
+      iframe { display: block; width: 400px; height: 110px; border: 3px solid #888; padding: 7px; }
+      iframe.fraction { width: 33.37%; }
+      iframe.scaled { transform: scale(0.5); transform-origin: 0 0; margin-bottom: -60px; }
+      iframe.zoomed { zoom: 0.5; }
+      .wrap { transform: scale(0.5); transform-origin: 0 0; height: 60px; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Parent before.", "Child heading", "Child text with a link.", "Parent after."],
+        "links": [{ "text": "a link", "href": "/child-target" }],
+        "stats": { "skippedFrames": 3 }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>Parent before.</p>
+      <iframe class="fraction" src="iframe-child.html" title="plain"></iframe>
+      <iframe class="scaled" src="iframe-child.html" title="transformed"></iframe>
+      <iframe class="zoomed" src="iframe-child.html" title="zoomed"></iframe>
+      <div class="wrap"><iframe src="iframe-child.html" title="in a scaled wrapper"></iframe></div>
+      <p>Parent after.</p>
+    </main>
+  </body>
+</html>
