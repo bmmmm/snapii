@@ -14,6 +14,21 @@ const FRAGMENT = 11;
 // Never rendered as text, and walking them is wasted work on large pages.
 const NOT_RENDERED = new Set(["head", "script", "style", "template", "noscript"]);
 
+/**
+ * A frame shown at another size than it is laid out at: a CSS transform:
+ * scale() or zoom on it or on an ancestor (offsetWidth is the layout size,
+ * the client rect the painted one). What is inside it is measured in its own
+ * unscaled coordinates, which the frame geometry does not scale, so its text
+ * would land off the picture and be cut to the scaled box. Nothing of a
+ * rotated one fits either; only a half turn keeps the size, and is not seen.
+ */
+function isScaled(frame: Element): boolean {
+  const { width, height } = frame.getBoundingClientRect();
+  const { offsetWidth, offsetHeight } = frame as HTMLElement;
+  // offsetWidth is rounded: a fractional width is not a scale.
+  return Math.abs(width - offsetWidth) > 1 || Math.abs(height - offsetHeight) > 1;
+}
+
 /** The document a node lives in, plus how to get from there to the top. */
 export interface FrameContext {
   doc: Document;
@@ -30,7 +45,7 @@ export interface FlatNode {
 export interface WalkOptions {
   /** Subtree left out entirely (the snapii overlay host). */
   skip?: Element | null;
-  /** Called for frames whose document is not readable (cross-origin, sandboxed). */
+  /** Called for frames whose document is not read: not readable (cross-origin, sandboxed) or shown scaled. */
   onOpaqueFrame?: (frame: Element, ctx: FrameContext) => void;
 }
 
@@ -87,7 +102,7 @@ export function* walkFlatTree(root: Document | Element, opts: WalkOptions = {}):
       } catch {
         // Some engines throw instead of returning null for cross-origin frames.
       }
-      if (inner?.documentElement) {
+      if (inner?.documentElement && !isScaled(el)) {
         stack.push({ list: [inner.documentElement], i: 0, ctx: { doc: inner, frame: el, parent: ctx } });
       } else {
         opts.onOpaqueFrame?.(el, ctx);
