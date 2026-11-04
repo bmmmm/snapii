@@ -41,6 +41,25 @@ test("applyTextTransform: lowercase, capitalize, none", () => {
   assert.equal(applyTextTransform("as is", "none", "en"), "as is");
 });
 
+test("applyTextTransform: capitalize starts a word after a dash, a quote and other punctuation, as Firefox and Chromium do", () => {
+  // Measured in Firefox 155 and Chromium 153 (text-transform on "xx<c>yy").
+  assert.equal(
+    applyTextTransform("e-mail co\u2011op state\u2013of\u2014art", "capitalize", "en"),
+    "E-Mail Co\u2011Op State\u2013Of\u2014Art",
+  );
+  for (const c of '.,:;!?/\\"\u201c&@*#%\u2026') {
+    assert.equal(applyTextTransform(`xx${c}yy`, "capitalize", "en"), `Xx${c}Yy`, JSON.stringify(c));
+  }
+  // An apostrophe, a middle dot, a connector, a digit and a soft hyphen go on inside a word.
+  for (const c of "'\u2019\u00b7_1\u00ad") {
+    assert.equal(applyTextTransform(`xx${c}yy`, "capitalize", "en"), `Xx${c}yy`, JSON.stringify(c));
+  }
+  assert.equal(applyTextTransform("3.5kg U.S.A. e.g.", "capitalize", "en"), "3.5kg U.S.A. E.G.");
+  // A run that begins after the hyphen a word wrapped at starts a word; one that begins inside it does not.
+  assert.equal(applyTextTransform("op", "capitalize", "en", "o-"), "Op");
+  assert.equal(applyTextTransform("op", "capitalize", "en", "oo"), "op");
+});
+
 test("isIconText: only private-use code points (and spaces)", () => {
   assert.equal(isIconText("\ue001"), true);
   assert.equal(isIconText(" \ue001 \u{f0001} "), true);
