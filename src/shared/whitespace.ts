@@ -100,8 +100,8 @@ const capitalize = (text: string, lang: string | null): string =>
  * Applies the computed text-transform. uppercase may change the length
  * (ß -> SS); the renderer's textLength absorbs that. capitalize title-cases
  * the first letter of every word (see `capitalize`), so "don't" keeps its t.
- * `before` is what is rendered right before `text` (its last two characters
- * are enough): a word goes on across a run's start — a slice cut at the
+ * `before` is what is rendered right before `text` (`wordTail` of it is
+ * enough): a word goes on across a run's start — a slice cut at the
  * capture edge, a line wrap, an inline boundary like foo<b>bar</b> — and a
  * run starting inside one keeps its case, as on the page.
  */
@@ -119,6 +119,23 @@ export function applyTextTransform(
     return capitalize(before + text, lang).slice(capitalize(before, lang).length);
   }
   return text;
+}
+
+/**
+ * The end of `text` up to `end` that decides whether capitalize starts a word
+ * right after it: back to and including its last letter, digit or white
+ * space. Marks, joiners and apostrophes before it go on inside the word
+ * ("x\u0301\u0301" + "ab"), so a fixed number of characters is not enough.
+ */
+export function wordTail(text: string, end = text.length): string {
+  let i = end;
+  while (i > 0) {
+    const low = text.charCodeAt(i - 1);
+    const pair = i > 1 && low >= 0xdc00 && low <= 0xdfff && (text.charCodeAt(i - 2) & 0xfc00) === 0xd800;
+    i -= pair ? 2 : 1;
+    if (/^[\s\p{L}\p{N}]/u.test(text.slice(i, i + 2))) break;
+  }
+  return text.slice(i, end);
 }
 
 // Private Use Area: icon fonts map their glyphs here; the text is meaningless.

@@ -34,7 +34,10 @@
           "FooBar FooBar Foobar",
           "FooBar Foobar Foo Bar Foobar FooBar",
           "E-Mail, State-Of-The-Art, A.B; 3.5kg Don't",
-          "ǅungla ᾼx ǈ ǋ ǲ ᾈ აბ"
+          "ǅungla ᾼx ǈ ǋ ǲ ᾈ აბ",
+          "X́́",
+          "a",
+          "b"
         ],
         "absent": ["Straße", "istanbul", "MIXED", "ONe", "Homeabout", "Xyes", "cd", "Foobar FooBar FooBar"]
       }
@@ -65,6 +68,8 @@
       <p style="text-transform: capitalize">e-mail, state-of-the-art, a.b; 3.5kg don't</p>
       <!-- Titlecase, not uppercase: a digraph, a Greek letter with ypogegrammeni and Georgian Mkhedruli (both browsers). -->
       <p style="text-transform: capitalize">ǆungla ᾳx ǉ ǌ ǳ ᾀ აბ</p>
+      <!-- A word wrapped after two combining marks goes on (both browsers): one character per line. -->
+      <p style="text-transform: capitalize; width: 0; line-break: anywhere">x&#x301;&#x301;ab</p>
     </main>
   </body>
 </html>

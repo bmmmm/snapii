@@ -8,6 +8,7 @@ import {
   isPreserved,
   type LineText,
   normalizeLines,
+  wordTail,
 } from "../../src/shared/whitespace.ts";
 
 test("collapse: normal, nowrap and pre-line fold [ \\t\\n\\r\\f]+ into one space", () => {
@@ -122,4 +123,23 @@ test("applyTextTransform: capitalize keeps the upper-case mapping where the engi
   // ß, ligatures, Ǆ and the Greek and Armenian letters whose titlecase is two code points: Firefox
   // title-cases (Ss, Fi, ǅ), Chromium keeps ß and ﬁ. snapii stays with toUpperCase until they agree.
   assert.equal(applyTextTransform("ßa ﬁx ﬆy Ǆz ᾲw և", "capitalize", "de"), "SSa FIx STy Ǆz ᾺΙw ԵՒ");
+});
+
+test("wordTail: back to the last letter, digit or space, so a wrapped word goes on after marks and joiners", () => {
+  assert.equal(wordTail("ox\u0301\u0301"), "x\u0301\u0301");
+  assert.equal(wordTail("o x\u200d\u200d'"), "x\u200d\u200d'");
+  assert.equal(wordTail("a 👍🏽"), " 👍🏽");
+  assert.equal(wordTail("x𝐀🇩🇪"), "𝐀🇩🇪");
+  assert.equal(wordTail("x9"), "9");
+  assert.equal(wordTail("''"), "''");
+  assert.equal(wordTail("ab cd", 3), " ");
+  assert.equal(wordTail(""), "");
+  for (const before of ["ox\u0301\u0301", "x\u0301'", "x\u200d\u200d", "x'\u00b7"]) {
+    assert.equal(
+      applyTextTransform("ab", "capitalize", "en", wordTail(before)),
+      "ab",
+      JSON.stringify(before),
+    );
+  }
+  assert.equal(applyTextTransform("ab", "capitalize", "en", wordTail("x\u0301-")), "Ab");
 });
