@@ -650,6 +650,36 @@ test("overlay and toast start on an SVG document", async ({ page }) => {
   await expect.poll(() => page.evaluate(() => document.querySelector("snapii-toast"))).toBeNull();
 });
 
+test("an <html> with a transform keeps the highlight, the toolbar and the toast in the viewport (scrolled)", async ({
+  page,
+}) => {
+  await load(page, "/fixtures/overlay.html");
+  // A transform on <html> makes it the containing block of fixed boxes: placed
+  // there they would be offset by the scroll position, off the screen.
+  await page.addStyleTag({ content: "html { transform: translateZ(0); }" });
+  await begin(page);
+  await scrollTo(page, 150);
+  await clickAt(page, 200, 100); // #para at client y 70..150
+  await expect.poll(() => box(page)).toEqual({ ...PARA, y: PARA.y - 150 });
+  const placed = await page.evaluate(() => {
+    const roots = (window as unknown as TestWindow).__roots;
+    (window.__snapii.showToast as typeof showToast)("Saved", 60_000);
+    const rectOf = (root: ShadowRoot, sel: string): DocRect => {
+      const r = (root.querySelector(sel) as HTMLElement).getBoundingClientRect();
+      return { x: r.x, y: r.y, width: r.width, height: r.height };
+    };
+    return {
+      toolbar: rectOf(roots["snapii-overlay"] as ShadowRoot, ".toolbar"),
+      toast: rectOf(roots["snapii-toast"] as ShadowRoot, ".toast"),
+      viewport: { width: innerWidth, height: innerHeight },
+    };
+  });
+  expect(placed.toolbar.y).toBe(PARA.y - 150 + PARA.height + GAP);
+  // The toast sits 24 px above the bottom of the viewport, not of the page.
+  // Layout rounding differs per engine (695.9999847 in Firefox).
+  expect(placed.toast.y + placed.toast.height).toBeCloseTo(placed.viewport.height - 24, 2);
+});
+
 test("showToast shows the message and removes itself", async ({ page }) => {
   await load(page, "/fixtures/overlay.html");
   await page.evaluate(() => (window.__snapii.showToast as typeof showToast)("Saved", 300));
