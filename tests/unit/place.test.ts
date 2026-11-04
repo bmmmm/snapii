@@ -51,3 +51,10 @@ test("a toolbar wider than the viewport sticks to its left edge", () => {
   const narrow = { x: 40, y: 0, width: 200, height: 600 };
   assert.equal(placeToolbar({ x: 60, y: 100, width: 150, height: 100 }, TB, narrow).x, 40);
 });
+
+test("above is exact at the viewport's top edge", () => {
+  // No room below (the selection runs past the viewport); above fits to the pixel.
+  const top = VP.y + TB.height + TOOLBAR_GAP;
+  const p = placeToolbar({ x: 200, y: top, width: 600, height: 3000 }, TB, VP);
+  assert.equal(p.y, VP.y);
+});
