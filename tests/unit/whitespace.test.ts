@@ -106,3 +106,20 @@ test("applyTextTransform: capitalize keeps a run that starts inside a word lower
   // The prefix is dropped whole, also when its own letter changes length.
   assert.equal(applyTextTransform("traße", "capitalize", "de", " ß"), "traße");
 });
+
+test("applyTextTransform: capitalize title-cases digraphs, Georgian and Greek with ypogegrammeni like both engines", () => {
+  // Firefox 155 and Chromium 153 agree on titlecase for exactly these: ǆ -> ǅ, ᾳ -> ᾼ, a title-case or
+  // Georgian Mkhedruli letter stays as it is. toUpperCase would give Ǆ, ΑΙ and Mtavruli.
+  assert.equal(applyTextTransform("ǆungla ᾳx ǉ ǌ ǳ ᾀ ῃ ῳ", "capitalize", "en"), "ǅungla ᾼx ǈ ǋ ǲ ᾈ ῌ ῼ");
+  assert.equal(applyTextTransform("ǅ ǈ ǋ ǲ ᾈ ᾼ ა ჿ", "capitalize", "en"), "ǅ ǈ ǋ ǲ ᾈ ᾼ ა ჿ");
+  assert.equal(applyTextTransform("ǆ", "capitalize", null), "ǅ");
+  assert.equal(applyTextTransform("ǆ", "capitalize", "not a tag!"), "ǅ");
+  // Only capitalize: uppercase keeps the full upper-case mapping.
+  assert.equal(applyTextTransform("ǆ ᾳ", "uppercase", "en"), "Ǆ ΑΙ");
+});
+
+test("applyTextTransform: capitalize keeps the upper-case mapping where the engines disagree on titlecase", () => {
+  // ß, ligatures, Ǆ and the Greek and Armenian letters whose titlecase is two code points: Firefox
+  // title-cases (Ss, Fi, ǅ), Chromium keeps ß and ﬁ. snapii stays with toUpperCase until they agree.
+  assert.equal(applyTextTransform("ßa ﬁx ﬆy Ǆz ᾲw և", "capitalize", "de"), "SSa FIx STy Ǆz ᾺΙw ԵՒ");
+});
