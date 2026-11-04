@@ -46,13 +46,22 @@ function lower(s: string, lang: string | null): string {
   }
 }
 
+// Where a word begins for capitalize: after white space, a dash, a quote or
+// other punctuation, but not after an apostrophe or a middle dot, which go on
+// inside a word ("don't", "l·l"). Firefox 155 and Chromium 153 agree on all
+// of that (measured on every punctuation, symbol, separator, mark and number
+// code point of the BMP) and differ on brackets, currency and maths symbols
+// and on ‘, which start none here.
 const capitalize = (text: string, lang: string | null): string =>
-  text.replace(/(^|\s)([^\s\p{L}\p{N}]*)(\p{L})/gu, (_, sp, lead, ch) => sp + lead + upper(ch, lang));
+  text.replace(
+    /(^|(?!['\u2018\u2019\u00b7])[\s\p{Pd}\p{Pi}\p{Pf}\p{Po}])([^\s\p{L}\p{N}]*)(\p{L})/gu,
+    (_, sep, lead, ch) => sep + lead + upper(ch, lang),
+  );
 
 /**
  * Applies the computed text-transform. uppercase may change the length
  * (ß -> SS); the renderer's textLength absorbs that. capitalize upper-cases
- * the first letter of every whitespace-separated word, so "don't" keeps its t.
+ * the first letter of every word (see `capitalize`), so "don't" keeps its t.
  * `before` is what is rendered right before `text` (its last two characters
  * are enough): a word goes on across a run's start — a slice cut at the
  * capture edge, a line wrap, an inline boundary like foo<b>bar</b> — and a
