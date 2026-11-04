@@ -23,6 +23,13 @@ const rows: [string, LinkCandidate | null, string | null][] = [
   ["javascript:void 0", a("javascript:void 0"), null],
   ["mailto:x@y", a("mailto:x@y"), "mailto:x@y"],
   ['href=""', a(""), null],
+  [
+    'href="" under the <base> of another page is a link to it',
+    a("", { baseURL: "https://cdn/b/" }),
+    "https://cdn/b/",
+  ],
+  ['href="  " likewise', a("  ", { baseURL: "https://cdn/b/" }), "https://cdn/b/"],
+  ['href="" under a <base> that is the page itself', a("", { baseURL: "https://p/a#x" }), null],
   ["no href", a(null), null],
   ["a role=button href=https://q", a("https://q", { role: "button" }), "https://q/"],
   ["button formaction=/s", a("/s", { tag: "button", formaction: true }), null],
