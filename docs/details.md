@@ -249,10 +249,13 @@ transparent; how these viewers handle it has not been checked yet.
   slots with an API stub; Chromium glue also checks extraction through the
   real extension API. Firefox's closed-root accessor has no dedicated glue
   test.
-- **Top layer:** a `<dialog>` opened with `showModal()` or a popover is
-  painted above the overlay by the browser, whatever the overlay's z-index;
-  such content is not selectable through the overlay. (Follows from how the
-  top layer works; not tested.)
+- **Top layer:** the overlay and the toast are in the top layer themselves
+  (so a page that makes `<html>` a containing block, with a `transform` for
+  one, cannot move them), where the last one added is painted on top: a
+  `<dialog>` opened with `showModal()` or a popover while snapii is up is
+  painted above the overlay, whatever its z-index, and such content is not
+  selectable through the overlay. One opened before it lies beneath it.
+  (Follows from how the top layer works; not tested.)
 - Text covered by another element is still included unless "Skip text covered
   by other elements" is on. Text hidden with `display`, `visibility`,
   `opacity`, clipping or `font-size: 0` is left out. Text with

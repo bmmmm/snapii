@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The selection toolbar (built into the overlay's shadow root) and the
 // short-lived toast shown after the overlay is gone.
-import { adoptStyles, createHtml, styleHost, TOAST_CSS } from "./styles.ts";
+import { adoptStyles, appendFixed, createHtml, styleHost, TOAST_CSS } from "./styles.ts";
 
 export type ToolbarButton = "save" | "copy-text" | "copy-link" | "copy-page-link" | "cancel";
 
@@ -114,7 +114,7 @@ export function showToast(message: string, ms = 2000): void {
   box.setAttribute("role", "status");
   box.textContent = message;
   root.append(box);
-  document.documentElement.append(host);
+  appendFixed(host);
   const current = {
     host,
     timer: setTimeout(() => {

@@ -33,6 +33,24 @@ export function styleHost(host: HTMLElement, extra: Record<string, string> = {})
   });
 }
 
+/**
+ * Appends a styleHost to <html> in the top layer. A fixed box lies against
+ * the viewport only while no ancestor is its containing block, and a
+ * transform, will-change: transform or contain: paint on <html> makes <html>
+ * one: the overlay and the toast would then sit at their offset in the
+ * document, off the screen once the page is scrolled. The top layer ignores
+ * the ancestors.
+ */
+export function appendFixed(host: HTMLElement): void {
+  host.popover = "manual";
+  document.documentElement.append(host);
+  try {
+    host.showPopover();
+  } catch {
+    // Where it cannot be shown (not an HTML page) the host stays an ordinary fixed box.
+  }
+}
+
 export function adoptStyles(root: ShadowRoot, css: string): void {
   try {
     const sheet = new CSSStyleSheet();
