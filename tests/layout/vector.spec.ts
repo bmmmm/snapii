@@ -74,7 +74,7 @@ interface Expect {
 
 const DIR = new URL("../fixtures/", import.meta.url);
 const OUT = new URL("../../test-results/vector/", import.meta.url);
-const NOT_FIXTURES = new Set(["smoke.html", "overlay.html", "overlay-csp.html"]);
+const NOT_FIXTURES = new Set(["smoke.html", "overlay.html", "overlay-csp.html", "rtl-scrolled.html"]);
 // Default fidelity gate for the vector fixtures (plan G2, calibrated at Gate B).
 const T = 0.02;
 
@@ -1405,3 +1405,40 @@ for (const file of fixtures) {
       .toBeLessThanOrEqual(vec.tolerance ?? T);
   });
 }
+
+test("patches: a same-origin frame turned half round or mirrored is patched, its text left out", async ({
+  page,
+}) => {
+  await page.goto("/fixtures/smoke.html");
+  await page.evaluate(async () => {
+    document.body.innerHTML =
+      '<main id="cap" style="width:500px;padding:10px">' +
+      '<iframe style="display:block;width:400px;height:110px;border:0;transform:rotate(180deg)" src="/fixtures/iframe-child.html"></iframe>' +
+      '<div style="scale:-1 1"><iframe style="display:block;width:400px;height:110px;border:0" src="/fixtures/iframe-child.html"></iframe></div>' +
+      "</main>";
+    await Promise.all(
+      [...document.querySelectorAll("iframe")].map(
+        (f) =>
+          new Promise((done) =>
+            f.contentDocument?.readyState === "complete" ? done(0) : f.addEventListener("load", done),
+          ),
+      ),
+    );
+  });
+  await page.addScriptTag({ path: "dist-test/harness.js" });
+  const scene = await page.evaluate(async () => {
+    const h = window.__snapii;
+    const capture = h.debug.captureRect("#cap");
+    const { runs, sources } = await h.debug.collectTextRunsDetailed(document, capture, {});
+    return h.buildScene(document, capture, { runs, sources });
+  });
+  // The turned frame is patched as a frame; the mirrored wrapper keeps its own
+  // reason, the frame inside it is not patched again.
+  expect(scene.patches.map((p) => [p.reason, p.x, p.y, p.width, p.height])).toEqual([
+    ["frame", 10, 10, 400, 110],
+    ["transform", 10, 120, 500, 110],
+  ]);
+  expect(scene.unsupported).toEqual({ frame: 1, transform: 1 });
+  // No text of either frame: unturned, it would lie where the picture is turned.
+  expect(scene.text).toEqual([]);
+});

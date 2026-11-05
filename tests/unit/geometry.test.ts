@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   assignLines,
+  documentArea,
   groupIntoLines,
   intersect,
   lineIndexOf,
@@ -210,4 +211,30 @@ test("runsRelativeTo: shifts x, baseline and top by the region origin", () => {
 test("linksRelativeTo: shifts x and y, keeps size", () => {
   const link: LinkArea = { x: 50, y: 100, width: 30, height: 40, alt: "a", href: null };
   assert.deepEqual(linksRelativeTo([link], R(40, 90, 500, 500)), [{ ...link, x: 10, y: 10 }]);
+});
+
+test("documentArea: the scroll range of every writing mode and direction, as measured in both engines", () => {
+  // Viewport 800×600, content 2400×3000. Firefox 155 and Chromium 153 gave
+  // the same minimum scroll position for each pair, on <html> and on <body>.
+  const minScroll: Record<string, [number, number]> = {
+    "horizontal-tb ltr": [0, 0],
+    "horizontal-tb rtl": [-1600, 0],
+    "vertical-rl ltr": [-1600, 0],
+    "vertical-rl rtl": [-1600, -2400],
+    "vertical-lr ltr": [0, 0],
+    "vertical-lr rtl": [0, -2400],
+    "sideways-rl ltr": [-1600, 0],
+    "sideways-rl rtl": [-1600, -2400],
+    "sideways-lr ltr": [0, -2400],
+    "sideways-lr rtl": [0, 0],
+  };
+  for (const [key, [x, y]] of Object.entries(minScroll)) {
+    const [writingMode = "", direction = ""] = key.split(" ");
+    const area = documentArea(
+      { writingMode, direction },
+      { width: 2400, height: 3000 },
+      { width: 800, height: 600 },
+    );
+    assert.deepEqual(area, { x, y, width: 2400, height: 3000 }, key);
+  }
 });

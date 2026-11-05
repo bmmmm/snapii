@@ -46,7 +46,7 @@ interface Expect {
 
 const DIR = new URL("../fixtures/", import.meta.url);
 const OUT = new URL("../../test-results/roundtrip/", import.meta.url);
-const NOT_FIXTURES = new Set(["smoke.html", "overlay.html", "overlay-csp.html"]);
+const NOT_FIXTURES = new Set(["smoke.html", "overlay.html", "overlay-csp.html", "rtl-scrolled.html"]);
 const X_TOL = 1;
 const V_TOL = 1;
 

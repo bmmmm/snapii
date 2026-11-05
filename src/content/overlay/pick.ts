@@ -2,6 +2,7 @@
 // DOM side of the hover pick: hit-testing under the overlay, the composed
 // ancestor chain, and the geometry helpers the overlay needs. The heuristic
 // itself is the pure pickCandidate() in shared/pick.ts.
+import { documentArea } from "../../shared/geometry.ts";
 import { type ChainEntry, pickCandidate } from "../../shared/pick.ts";
 import type { DocRect } from "../../shared/types.ts";
 import { assignedSlotOf, shadowRootOf } from "../shadow.ts";
@@ -84,20 +85,23 @@ export function parentOf(el: Element): Element | null {
   return null;
 }
 
-/** Document size the selection is clamped to. */
-function docSize(): { width: number; height: number } {
+/** The document area the selection is clamped to; it starts below zero on a right-to-left page. */
+function docArea(): DocRect {
   const de = document.documentElement;
-  return {
+  const { writingMode, direction } = getComputedStyle(document.body ?? de);
+  const view = viewportSize();
+  const scroll = {
     width: Math.max(de.scrollWidth, de.clientWidth),
     height: Math.max(de.scrollHeight, de.clientHeight),
   };
+  return documentArea({ writingMode, direction }, scroll, view);
 }
 
 /** Normalises two document points into a rect clamped to the document. */
 export function clampedRect(x0: number, y0: number, x1: number, y1: number): DocRect {
-  const { width, height } = docSize();
-  const cx = (v: number): number => Math.min(Math.max(v, 0), width);
-  const cy = (v: number): number => Math.min(Math.max(v, 0), height);
+  const area = docArea();
+  const cx = (v: number): number => Math.min(Math.max(v, area.x), area.x + area.width);
+  const cy = (v: number): number => Math.min(Math.max(v, area.y), area.y + area.height);
   const left = cx(Math.min(x0, x1));
   const top = cy(Math.min(y0, y1));
   return { x: left, y: top, width: cx(Math.max(x0, x1)) - left, height: cy(Math.max(y0, y1)) - top };
