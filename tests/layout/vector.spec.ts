@@ -166,6 +166,35 @@ test("over the patch budget, patches merge before the text's visibility is decid
   expect(got.shownInPatch, "no run painted over pixels that already show it").toBe(0);
 });
 
+// 140 000 operations, under MAX_OPS (150 000): many boxes in one layer, then one box with as many
+// shadows. Spread into push(), V8 throws a RangeError between 120 000 and 140 000 (Chromium 153; Firefox
+// takes 500 000) and the region became one budget patch.
+for (const [label, boxes, shadows] of [
+  ["many boxes in one layer", 1400, 100],
+  ["the shadows of one box", 1, 140_000],
+] as const) {
+  test(`up to the operation budget, ${label} stay vector, not a budget patch`, async ({ page }) => {
+    await page.goto("/fixtures/smoke.html");
+    await page.addScriptTag({ path: "dist-test/harness.js" });
+    const got = await page.evaluate(
+      ({ boxes, shadows }) => {
+        const list = Array.from({ length: shadows }, (_, i) => `${i % 4}px 0 0 1px rgba(0,0,0,0.5)`).join(
+          ",",
+        );
+        const box = `<i style="width:4px;height:4px;margin:6px 8px;box-shadow:${list}"></i>`;
+        document.body.innerHTML = `<main id="cap" style="width:1000px;display:flex;flex-wrap:wrap">${box.repeat(boxes)}</main>`;
+        const h = window.__snapii;
+        const scene = h.buildScene(document, h.debug.captureRect("#cap"), { runs: [], sources: [] });
+        const count = (ops: typeof scene.ops): number =>
+          ops.reduce((n, op) => n + 1 + (op.op === "group" ? count(op.children) : 0), 0);
+        return { ops: count(scene.ops), patches: scene.patches.length, unsupported: scene.unsupported };
+      },
+      { boxes, shadows },
+    );
+    expect(got).toEqual({ ops: boxes * shadows, patches: 0, unsupported: {} });
+  });
+}
+
 test("the skipped subtree (the overlay) is not in the scene", async ({ page }) => {
   await page.goto("/fixtures/smoke.html");
   await page.evaluate(() => {

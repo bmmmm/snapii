@@ -285,6 +285,15 @@ function inkMargin(cs: CSSStyleDeclaration): number {
   return m;
 }
 
+/**
+ * out.push(...ops) without the spread: V8 throws a RangeError ("Maximum call
+ * stack size exceeded") between 120 000 and 140 000 arguments (Chromium 153,
+ * measured), below MAX_OPS, and a layer or one box's shadows hold that many.
+ */
+function append(out: SceneOp[], ops: readonly SceneOp[]): void {
+  for (const op of ops) out.push(op);
+}
+
 const countOps = (ops: readonly SceneOp[]): number =>
   ops.reduce((n, op) => n + 1 + (op.op === "group" ? countOps(op.children) : 0), 0);
 
@@ -1030,7 +1039,7 @@ class Builder {
       this.#depth--;
       if (ops.length > 0) out.push({ op: "group", opacity: alpha, children: ops });
     } else {
-      out.push(...ops);
+      append(out, ops);
     }
   }
 
@@ -1302,7 +1311,8 @@ class Builder {
     this.#outlineOp(b, frags, ops);
     if (ops.length === 0) return;
     const extent = inked(frags.reduce(union));
-    out.push(...(this.#needsClip(clip, extent) ? [{ op: "group" as const, clip, children: ops }] : ops));
+    if (this.#needsClip(clip, extent)) out.push({ op: "group", clip, children: ops });
+    else append(out, ops);
   }
 
   #sliceRadii(r: Radii, left: boolean, right: boolean): Radii | undefined {
