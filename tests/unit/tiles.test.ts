@@ -128,6 +128,7 @@ test("planTiles: a small region is one tile with region-relative geometry", () =
 
 test("planTiles: empty region gives no tiles, absurd scale throws", () => {
   assert.deepEqual(planTiles({ x: 5, y: 5, width: 0, height: 10 }, 2, DEFAULT_LIMITS), []);
+  assert.deepEqual(planTiles({ x: 5, y: 5, width: 10, height: 0 }, 2, DEFAULT_LIMITS), []);
   assert.throws(() => planTiles({ x: 0, y: 0, width: 10, height: 10 }, 0, DEFAULT_LIMITS), RangeError);
   assert.throws(
     () => planTiles({ x: 0, y: 0, width: 10, height: 10 }, 1e6, { ...DEFAULT_LIMITS, maxSide: 1000 }),
@@ -297,4 +298,111 @@ test("planTiles: tiny limits at scales below 1 — a merged rest band or column 
   }
   // Most of the grid plans (only the smallest limits throw): the checks above ran on something.
   assert.ok(planned >= 300, `${planned} planned`);
+});
+
+test("deviceStep: the smallest CSS length of whole device px, up to 64; binary noise is no fraction", () => {
+  assert.equal(deviceStep(2), 1);
+  assert.equal(deviceStep(1 + 1 / 64), 64);
+  // 65 CSS px would be whole at this scale: beyond the search, so no guarantee.
+  assert.equal(deviceStep(1 + 1 / 65), 1);
+  // Noise either side of a whole device px, relative to its size, counts as whole.
+  assert.equal(deviceStep(1.5 - 1e-12), 2);
+  assert.equal(deviceStep(5000.5 + 1e-7), 2);
+  // More than that is a real fraction: 2 CSS px are 1.0000000015 device px.
+  assert.equal(deviceStep(0.5 + 0.75e-9), 1);
+});
+
+test("planTiles: under tiny limits that still leave room for a tile, a plan is found and holds them", () => {
+  const cases: [DocRect, number, TileLimits][] = [
+    [{ x: 0, y: 0, width: 1000, height: 0.5 }, 1.1, { maxSide: 64, maxArea: 97, maxTilePixels: 97 }],
+    [{ x: 0, y: 0, width: 3, height: 333 }, 1 + 1 / 64, { maxSide: 4, maxArea: 2, maxTilePixels: 2 }],
+    [{ x: 0, y: 0, width: 300, height: 1 }, 2, { maxSide: 32766, maxArea: 500, maxTilePixels: 1e12 }],
+    [
+      { x: 100.25, y: 0.3, width: 945.43, height: 7 },
+      0.75,
+      { maxSide: 64, maxArea: 40, maxTilePixels: 1e12 },
+    ],
+    [{ x: 100.25, y: 7, width: 0.5, height: 333 }, 1, { maxSide: 1000, maxArea: 40, maxTilePixels: 1e12 }],
+    [{ x: 100.25, y: 7, width: 41, height: 0.5 }, 1, { maxSide: 2, maxArea: 3, maxTilePixels: 1e12 }],
+    [
+      { x: 0.5, y: 0.3, width: 41, height: 1.7 },
+      0.50000000075,
+      { maxSide: 9, maxArea: 16, maxTilePixels: 1e12 },
+    ],
+  ];
+  for (const [region, scale, limits] of cases) {
+    const tiles = planTiles(region, scale, limits);
+    assertPartition(region, tiles);
+    assertLimits(tiles, scale, limits);
+  }
+});
+
+test("planTiles: a whole-pixel step that alone breaks a limit is dropped, one that fits is kept", () => {
+  // Scale 2/3: 3 CSS px are 2 × 2 device px, over an area of 3. With plain CSS px a
+  // 2 px wide column takes bands of 4 CSS px (2 + 1 device px of rest reserve, 3 px in all).
+  const dropped = planTiles({ x: 0, y: 0, width: 1, height: 5000 }, 2 / 3, {
+    maxSide: 3,
+    maxArea: 3,
+    maxTilePixels: 1e12,
+  });
+  assert.deepEqual(dropped[0]?.doc, { x: 0, y: 0, width: 2, height: 4 });
+  // Scale 0.6: 5 CSS px are 3 × 3 = 9 device px, within an area of 16: every cut stays on whole device px.
+  const kept = planTiles({ x: 13, y: 0.3, width: 1, height: 38_386.9 }, 0.6, {
+    maxSide: 1000,
+    maxArea: 16,
+    maxTilePixels: 16,
+  });
+  for (const t of kept.slice(1)) assert.equal(t.doc.y % 5, 0, `band at ${t.doc.y}`);
+});
+
+test("planTiles: full width as long as one band of the thinnest height fills the area exactly", () => {
+  // 9 CSS px at 1.25 are 11 device px; the step (4 CSS px) is 5 rows: 55 px, the whole area.
+  const tiles = planTiles({ x: 0, y: 0, width: 9, height: 8 }, 1.25, {
+    maxSide: 1000,
+    maxArea: 55,
+    maxTilePixels: 55,
+  });
+  assert.deepEqual(
+    tiles.map((t) => t.doc),
+    [
+      { x: 0, y: 0, width: 9, height: 4 },
+      { x: 0, y: 4, width: 9, height: 4 },
+    ],
+  );
+});
+
+test("planTiles: a column one device px wide gets bands as tall as the area allows", () => {
+  const tiles = planTiles({ x: 100.25, y: 7, width: 0.5, height: 333 }, 1, {
+    maxSide: 1000,
+    maxArea: 40,
+    maxTilePixels: 1e12,
+  });
+  assert.equal(tiles[0]?.doc.height, 40);
+});
+
+test("planTiles: an area too small for one CSS px throws instead of looping", async () => {
+  // 1 CSS px at scale 2 is 4 device px, over an area of 3. The column width comes out
+  // 0, and cutting by 0 would never end: run it where a hang can be stopped.
+  const { Worker } = await import("node:worker_threads");
+  const url = new URL("../../src/shared/tiles.ts", import.meta.url).href;
+  const worker = new Worker(
+    `import(${JSON.stringify(url)}).then(({ planTiles }) => {
+      try {
+        planTiles({ x: 0, y: 0, width: 10, height: 10 }, 2, { maxSide: 1000, maxArea: 3, maxTilePixels: 3 });
+        require("node:worker_threads").parentPort.postMessage("planned");
+      } catch (e) {
+        require("node:worker_threads").parentPort.postMessage(e.constructor.name);
+      }
+    });`,
+    { eval: true },
+  );
+  const outcome = await new Promise((resolve) => {
+    const timer = setTimeout(() => resolve("no answer in 5 s"), 5000);
+    worker.once("message", (m) => {
+      clearTimeout(timer);
+      resolve(m);
+    });
+  });
+  await worker.terminate();
+  assert.equal(outcome, "RangeError");
 });

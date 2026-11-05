@@ -3,11 +3,13 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { OutsideViewportError, TAB_CHANGED } from "../../../src/background/capture.ts";
 import {
+  captureRegion,
   captureViewportPatches,
   captureViewportRegion,
   type ViewportCaptureDeps,
 } from "../../../src/background/chromium/capture.ts";
 import { DEFAULT_SETTINGS } from "../../../src/shared/settings.ts";
+import type { PageMeta } from "../../../src/shared/types.ts";
 
 const TAB = 7;
 const WINDOW = 3;
@@ -222,4 +224,122 @@ test("captureViewportPatches: no patches, no capture, and still a finite scale (
   assert.deepEqual(result.tiles, []);
   assert.equal(result.zoom, 1.5);
   assert.equal(result.scale, 2);
+});
+
+test("captureViewportRegion: a scroll of up to half a pixel either way is no movement, more is", async () => {
+  // The page reports a fractional scroll position; scrollX/Y read later may round it.
+  const page = { ...PAGE, scroll: { x: 200, y: 1000 } };
+  const region = { x: 300, y: 1200, width: 300, height: 200 };
+  for (const scroll of [
+    { x: 200, y: 1000 },
+    { x: 200.5, y: 999.5 },
+    { x: 199.5, y: 1000.5 },
+  ]) {
+    const { d } = deps(() => selected, scroll);
+    const result = await captureViewportRegion(TAB, WINDOW, region, DEFAULT_SETTINGS, page, d);
+    assert.equal(result.tiles.length, 1, JSON.stringify(scroll));
+  }
+  for (const scroll of [
+    { x: 200.6, y: 1000 },
+    { x: 199.4, y: 1000 },
+    { x: 200, y: 1000.6 },
+    { x: 200, y: 999.4 },
+  ]) {
+    const { d } = deps(() => selected, scroll);
+    await assert.rejects(
+      captureViewportRegion(TAB, WINDOW, region, DEFAULT_SETTINGS, page, d),
+      /the page scrolled during the capture/,
+      JSON.stringify(scroll),
+    );
+  }
+});
+
+/**
+ * The real browser calls and the service worker's canvas, stubbed: what the
+ * crop hands to `convertToBlob` is the encoding of the saved tile.
+ */
+function stubServiceWorker() {
+  const encodings: unknown[] = [];
+  const draws: unknown[][] = [];
+  class Canvas {
+    getContext() {
+      return {
+        drawImage: (...args: unknown[]) => void draws.push(args.slice(1)),
+        imageSmoothingQuality: "low",
+      };
+    }
+    async convertToBlob(options: unknown) {
+      encodings.push(options);
+      return new Blob([]);
+    }
+  }
+  class Reader {
+    result: string | null = null;
+    onload: (() => void) | null = null;
+    readAsDataURL() {
+      this.result = "data:tile";
+      this.onload?.();
+    }
+  }
+  Object.assign(globalThis, {
+    browser: {
+      tabs: {
+        get: async () => selected,
+        getZoom: async () => 1.5,
+        captureVisibleTab: async () => "data:image/png;base64,AA==",
+      },
+      scripting: { executeScript: async () => [{ result: PAGE.scroll }] },
+    },
+    createImageBitmap: async () => ({ width: 3000, height: 2139, close() {} }),
+    OffscreenCanvas: Canvas,
+    FileReader: Reader,
+  });
+  return { encodings, draws };
+}
+
+const PAGE_META: PageMeta = {
+  ...PAGE,
+  url: "https://example.com/",
+  title: "Example",
+  lang: null,
+  textFragmentURL: null,
+  textFragmentStatus: "DISABLED",
+  capturedAt: "2026-10-01T12:00:00.000Z",
+  mode: "drag",
+  skippedFrames: 0,
+  skippedVertical: 0,
+};
+
+test("captureRegion (Chromium): the crop is drawn whole into its tile and encoded as JPEG at the set quality, or as PNG", async () => {
+  const { encodings, draws } = stubServiceWorker();
+  const region = { x: 100, y: 1200, width: 300, height: 200 };
+  const jpeg = await captureRegion(
+    TAB,
+    WINDOW,
+    region,
+    { ...DEFAULT_SETTINGS, format: "jpeg", jpegQuality: 0.8 },
+    PAGE_META,
+  );
+  const png = await captureRegion(TAB, WINDOW, region, { ...DEFAULT_SETTINGS, format: "png" }, PAGE_META);
+  assert.deepEqual(encodings, [{ type: "image/jpeg", quality: 0.8 }, { type: "image/png" }]);
+  // Source x, y, width, height in the 3000 × 2139 picture, then the whole tile.
+  assert.deepEqual(draws[0], [300, 600, 900, 600, 0, 0, 900, 600]);
+  assert.deepEqual([jpeg.tiles[0]?.dataURL, jpeg.tiles[0]?.format], ["data:tile", "jpeg"]);
+  assert.deepEqual([png.tiles[0]?.dataURL, png.tiles[0]?.format], ["data:tile", "png"]);
+});
+
+test("captureViewportPatches: a patch of a layout unit (1/64 px) is cut out, a thinner one is not", async () => {
+  const { d } = deps();
+  const patches = [
+    { x: 0, y: 0, width: 1 / 64, height: 50 },
+    { x: 10, y: 0, width: 50, height: 1 / 64 },
+    { x: 20, y: 0, width: 1 / 64.5, height: 50 },
+    { x: 30, y: 0, width: 50, height: 1 / 64.5 },
+  ];
+  const result = await captureViewportPatches(TAB, WINDOW, VREGION, patches, DEFAULT_SETTINGS, PAGE, d);
+  assert.equal(result.tiles.length, 2);
+  assert.deepEqual(
+    result.tiles.map(({ x }) => Math.floor(x)),
+    [0, 10],
+  );
 });

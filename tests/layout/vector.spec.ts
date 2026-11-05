@@ -74,7 +74,7 @@ interface Expect {
 
 const DIR = new URL("../fixtures/", import.meta.url);
 const OUT = new URL("../../test-results/vector/", import.meta.url);
-const NOT_FIXTURES = new Set(["smoke.html", "overlay.html", "overlay-csp.html"]);
+const NOT_FIXTURES = new Set(["smoke.html", "overlay.html", "overlay-csp.html", "rtl-scrolled.html"]);
 // Default fidelity gate for the vector fixtures (plan G2, calibrated at Gate B).
 const T = 0.02;
 
@@ -165,6 +165,35 @@ test("over the patch budget, patches merge before the text's visibility is decid
   expect(got.inPatch, "the merged patches cover text").toBeGreaterThan(0);
   expect(got.shownInPatch, "no run painted over pixels that already show it").toBe(0);
 });
+
+// 140 000 operations, under MAX_OPS (150 000): many boxes in one layer, then one box with as many
+// shadows. Spread into push(), V8 throws a RangeError between 120 000 and 140 000 (Chromium 153; Firefox
+// takes 500 000) and the region became one budget patch.
+for (const [label, boxes, shadows] of [
+  ["many boxes in one layer", 1400, 100],
+  ["the shadows of one box", 1, 140_000],
+] as const) {
+  test(`up to the operation budget, ${label} stay vector, not a budget patch`, async ({ page }) => {
+    await page.goto("/fixtures/smoke.html");
+    await page.addScriptTag({ path: "dist-test/harness.js" });
+    const got = await page.evaluate(
+      ({ boxes, shadows }) => {
+        const list = Array.from({ length: shadows }, (_, i) => `${i % 4}px 0 0 1px rgba(0,0,0,0.5)`).join(
+          ",",
+        );
+        const box = `<i style="width:4px;height:4px;margin:6px 8px;box-shadow:${list}"></i>`;
+        document.body.innerHTML = `<main id="cap" style="width:1000px;display:flex;flex-wrap:wrap">${box.repeat(boxes)}</main>`;
+        const h = window.__snapii;
+        const scene = h.buildScene(document, h.debug.captureRect("#cap"), { runs: [], sources: [] });
+        const count = (ops: typeof scene.ops): number =>
+          ops.reduce((n, op) => n + 1 + (op.op === "group" ? count(op.children) : 0), 0);
+        return { ops: count(scene.ops), patches: scene.patches.length, unsupported: scene.unsupported };
+      },
+      { boxes, shadows },
+    );
+    expect(got).toEqual({ ops: boxes * shadows, patches: 0, unsupported: {} });
+  });
+}
 
 test("the skipped subtree (the overlay) is not in the scene", async ({ page }) => {
   await page.goto("/fixtures/smoke.html");
@@ -1376,3 +1405,40 @@ for (const file of fixtures) {
       .toBeLessThanOrEqual(vec.tolerance ?? T);
   });
 }
+
+test("patches: a same-origin frame turned half round or mirrored is patched, its text left out", async ({
+  page,
+}) => {
+  await page.goto("/fixtures/smoke.html");
+  await page.evaluate(async () => {
+    document.body.innerHTML =
+      '<main id="cap" style="width:500px;padding:10px">' +
+      '<iframe style="display:block;width:400px;height:110px;border:0;transform:rotate(180deg)" src="/fixtures/iframe-child.html"></iframe>' +
+      '<div style="scale:-1 1"><iframe style="display:block;width:400px;height:110px;border:0" src="/fixtures/iframe-child.html"></iframe></div>' +
+      "</main>";
+    await Promise.all(
+      [...document.querySelectorAll("iframe")].map(
+        (f) =>
+          new Promise((done) =>
+            f.contentDocument?.readyState === "complete" ? done(0) : f.addEventListener("load", done),
+          ),
+      ),
+    );
+  });
+  await page.addScriptTag({ path: "dist-test/harness.js" });
+  const scene = await page.evaluate(async () => {
+    const h = window.__snapii;
+    const capture = h.debug.captureRect("#cap");
+    const { runs, sources } = await h.debug.collectTextRunsDetailed(document, capture, {});
+    return h.buildScene(document, capture, { runs, sources });
+  });
+  // The turned frame is patched as a frame; the mirrored wrapper keeps its own
+  // reason, the frame inside it is not patched again.
+  expect(scene.patches.map((p) => [p.reason, p.x, p.y, p.width, p.height])).toEqual([
+    ["frame", 10, 10, 400, 110],
+    ["transform", 10, 120, 500, 110],
+  ]);
+  expect(scene.unsupported).toEqual({ frame: 1, transform: 1 });
+  // No text of either frame: unturned, it would lie where the picture is turned.
+  expect(scene.text).toEqual([]);
+});

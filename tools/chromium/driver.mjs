@@ -41,6 +41,11 @@ export async function launchChromium({
     ...(executablePath ? { executablePath } : { channel: "chromium" }),
     headless,
     viewport: null,
+    // Chromium on Linux encodes file names in the locale's charset: under the
+    // POSIX locale it refuses a download into `ünï/`, which the extension's
+    // folder rules accept. A fixed UTF-8 locale makes the run independent of
+    // the shell's.
+    ...(process.platform === "linux" ? { env: { ...process.env, LC_ALL: "C.UTF-8" } } : {}),
     args: [
       `--disable-extensions-except=${extension}`,
       `--load-extension=${extension}`,

@@ -25,6 +25,18 @@ export class OutsideViewportError extends Error {
   }
 }
 
+/**
+ * The region lies at negative document coordinates: a page laid out right to
+ * left (or bottom to top) and scrolled towards its far end. Where
+ * captureVisibleTab's `rect` lands there is not measured (S1/S2 were left to
+ * right), so such a capture is refused instead of guessed.
+ */
+export class NegativeRectError extends Error {
+  constructor() {
+    super("the region lies at negative document coordinates, where the capture is not measured");
+  }
+}
+
 /** The options of one capture call; `quality` is 0–100 and only read for JPEG. */
 export function imageDetails(tile: PlannedTile, scale: number, settings: Settings) {
   return {
@@ -80,6 +92,7 @@ export async function captureTiles(
     const tab = await deps.getTab(target.tabId);
     if (!tab.active || tab.windowId !== target.windowId) throw new Error(TAB_CHANGED);
   };
+  if (plan.some(({ doc }) => doc.x < 0 || doc.y < 0)) throw new NegativeRectError();
   const tiles: RasterTile[] = [];
   // One call at a time: each holds a full image in memory until encoded.
   for (const tile of plan) {

@@ -12,6 +12,7 @@ import {
   isPreserved,
   keepsBreaks,
   normalizeLines,
+  wordTail,
 } from "../../shared/whitespace.ts";
 import { baselineY, fontMetrics } from "./baseline.ts";
 import { closestComposed, type FrameContext, flatParent, walkFlatTree } from "./flat-tree.ts";
@@ -432,7 +433,7 @@ export async function collectTextRunsDetailed(
      */
     const before = (start: number, box: DocRect): string => {
       if (!info.transform.includes("capitalize")) return "";
-      if (start > 0) return node.data.slice(Math.max(0, start - 2), start);
+      if (start > 0) return wordTail(node.data, start);
       const prev = raw[raw.length - 1];
       if (!prev || lastRun < 0 || prev.source.node.ownerDocument !== ctx.doc) return "";
       const parent = flatParent(prev.source.node);
@@ -465,6 +466,8 @@ export async function collectTextRunsDetailed(
         const d = layout.style(e).display;
         if (ATOMIC.has(e.localName) || d.startsWith("inline-") || INLINE_ATOMIC.has(d)) return "";
       }
+      // Not wordTail: across nodes the engines part after marks, joiners, emoji or a
+      // second apostrophe (x''<b>abc</b>: Chromium "Abc", Firefox "abc"; measured).
       return prev.source.node.data.slice(-2);
     };
 

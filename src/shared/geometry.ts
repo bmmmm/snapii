@@ -72,6 +72,34 @@ export function unionArea(rects: readonly DocRect[]): number {
   return area;
 }
 
+/**
+ * The document's scrollable area in document px (client rect + scroll
+ * position). The scroll origin is the start of the principal writing mode
+ * (the body's, else the root's; the body's wins where they differ): a page
+ * laid out right to left, vertical-rl or bottom to top scrolls into negative
+ * scrollX or scrollY, and its content lies there. Measured in Playwright's
+ * Firefox 155 and Chromium 153 for every writing mode and direction, on
+ * <html> and on <body>: both engines agree.
+ */
+export function documentArea(
+  principal: { writingMode: string; direction: string },
+  scroll: { width: number; height: number },
+  client: { width: number; height: number },
+): DocRect {
+  const { writingMode, direction } = principal;
+  const rtl = direction === "rtl";
+  const vertical = writingMode.startsWith("vertical") || writingMode.startsWith("sideways");
+  const flipX = (!vertical && rtl) || writingMode === "vertical-rl" || writingMode === "sideways-rl";
+  // sideways-lr runs its lines bottom to top, so there ltr is the flipped one.
+  const flipY = vertical && (writingMode === "sideways-lr" ? !rtl : rtl);
+  return {
+    x: flipX ? client.width - scroll.width : 0,
+    y: flipY ? client.height - scroll.height : 0,
+    width: scroll.width,
+    height: scroll.height,
+  };
+}
+
 export function translate(r: DocRect, dx: number, dy: number): DocRect {
   return { x: r.x + dx, y: r.y + dy, width: r.width, height: r.height };
 }

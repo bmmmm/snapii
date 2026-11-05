@@ -245,3 +245,32 @@ test("save: a tab that no longer listens does not fail the save", async () => {
   d.tellTab = () => Promise.reject(new Error("Could not establish connection"));
   assert.equal((await save(model(), TAB, d)).ok, true);
 });
+
+test("save: a tab without an id or without a window is refused before anything is captured", async () => {
+  // Both are selected tabs a window shows; captureRegion needs the id and the window.
+  for (const tab of [
+    { windowId: 3, active: true },
+    { id: 7, active: true },
+  ]) {
+    const { d, log } = deps();
+    const reply = await save(model(), tab, d);
+    assert.deepEqual(reply, {
+      ok: false,
+      error: "capture-failed",
+      detail: "only the selected tab of a window can be captured",
+    });
+    assert.deepEqual(log, []);
+  }
+});
+
+test("save: a renderer that throws ends the save as a failed capture, without a download", async () => {
+  for (const scene of [undefined, SCENE]) {
+    const { d, log } = deps();
+    d.render = d.renderVector = () => {
+      throw new Error("no room for the tiles");
+    };
+    const reply = await save({ ...model(), ...(scene ? { scene } : {}) }, TAB, d);
+    assert.deepEqual(reply, { ok: false, error: "capture-failed", detail: "render: no room for the tiles" });
+    assert.equal(log.includes("download"), false);
+  }
+});

@@ -108,6 +108,29 @@ test("a selection reaching beyond the viewport: Save says why and does nothing; 
   assert.ok(file.svg.tspans.join("").includes("Below the fold text."));
 });
 
+test("a right-to-left page scrolled to the left: the element's box at its negative x, cut from the viewport", async () => {
+  await g.open("/glue/fixtures/rtl.html");
+  const at = await g.content(`
+    const t = document.getElementById("target");
+    t.scrollIntoView({ block: "center", inline: "center" });
+    const r = t.getBoundingClientRect();
+    return { x: r.x, y: r.y, docX: r.x + scrollX, docY: r.y + scrollY, scrollX };
+  `);
+  await g.frames();
+  assert.ok(at.scrollX < 0, `scrollX ${at.scrollX}`);
+  const file = await saveElementAt(at.x + 150, at.y + 30);
+  const { capture, images, tspans } = file.svg;
+  assert.deepEqual(capture.selection, { mode: "element", x: at.docX, y: at.docY, width: 300, height: 60 });
+  assert.equal(capture.scroll.x, at.scrollX);
+  assert.equal(tspans.join("").trim(), "RTL target");
+  const tile = await decodeDataUrl(images[0].href);
+  assert.deepEqual([tile.width, tile.height], [600, 120]);
+  // The target's colour reaches every edge of the tile: these are its pixels.
+  for (const [x, y] of [[2, 2], [597, 2], [2, 117], [597, 117]]) {
+    assert.deepEqual(tile.at(x, y).slice(0, 3), [200, 100, 50], `pixel ${x},${y}`);
+  }
+});
+
 test("the folder and JPEG settings: the file lands in the sub-folder with a JPEG picture", async () => {
   await g.setSettings({ saveFolder: "Pages/snapii", format: "jpeg" });
   try {

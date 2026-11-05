@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>iframe-rotated</title>
+    <!--
+      A same-origin frame turned half round or mirrored keeps its size, but
+      its text is painted turned or mirrored while its own coordinates are
+      not: it is skipped like a scaled frame (counted, its text left to the
+      picture), whether the transform is on the frame, on an ancestor or in
+      the individual rotate and scale properties. A frame that is only moved
+      (translate) is read where it is painted.
+    -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; }
+      iframe { display: block; width: 400px; height: 110px; border: 3px solid #888; padding: 7px; }
+      .moved { transform: translate(30px, 5px); }
+      .half { transform: rotate(180deg); }
+      .mirror { transform: scaleX(-1); }
+      .wrap { transform: rotate(180deg); }
+      .prop-scale { scale: 1 -1; }
+      .prop-rotate { rotate: 180deg; }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Parent before.", "Child heading", "Child text with a link.", "Parent after."],
+        "links": [{ "text": "a link", "href": "/child-target" }],
+        "stats": { "skippedFrames": 5 }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <p>Parent before.</p>
+      <iframe class="moved" src="iframe-child.html" title="moved"></iframe>
+      <iframe class="half" src="iframe-child.html" title="half turn"></iframe>
+      <iframe class="mirror" src="iframe-child.html" title="mirrored"></iframe>
+      <div class="wrap"><iframe src="iframe-child.html" title="in a turned wrapper"></iframe></div>
+      <iframe class="prop-scale" src="iframe-child.html" title="mirrored by the scale property"></iframe>
+      <iframe class="prop-rotate" src="iframe-child.html" title="turned by the rotate property"></iframe>
+      <p>Parent after.</p>
+    </main>
+  </body>
+</html>

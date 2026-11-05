@@ -241,9 +241,10 @@ transparent; how these viewers handle it has not been checked yet.
 - HTML pages in the selected tab only, one region per capture.
 - **Cross-origin iframes:** their pixels are in the image, their text is not
   in the text layer (sandboxed frames likewise). Same-origin iframes are read,
-  unless they are shown scaled (a CSS `transform: scale()` or `zoom` on the
-  frame or on an ancestor): their text would not line up with the picture, so
-  they are skipped like the others. The metadata counts the skipped frames.
+  unless they are shown scaled, turned or mirrored (a CSS transform that does
+  more than move, the `rotate` or `scale` property, or `zoom`, on the frame
+  or on an ancestor): their text would not line up with the picture, so they
+  are skipped like the others. The metadata counts the skipped frames.
 - **Vertical writing modes** are skipped (counted in the metadata).
 - **Shadow DOM:** text inside open shadow roots is extracted (tested).
   Closed roots are read through Firefox's content-script accessor and
@@ -270,6 +271,11 @@ transparent; how these viewers handle it has not been checked yet.
   between the pick and the capture show up as they are.
 - A region too large for the browser's capture limits is refused with a toast
   ("This area is too large to capture").
+- **Right-to-left pages scrolled sideways** (and pages laid out bottom to
+  top): a selection there lies at negative document coordinates. Copy text
+  and Chromium's Save handle it; Firefox's Save refuses it ("capture
+  failed"), because where Firefox's capture places a rect below zero has not
+  been measured.
 
 ## File size
 
