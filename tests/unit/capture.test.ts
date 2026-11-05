@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   type CaptureDeps,
+  capturePatches,
+  captureRegion,
   captureTiles,
+  imageDetails,
   NegativeRectError,
   TAB_CHANGED,
 } from "../../src/background/capture.ts";
@@ -104,4 +107,114 @@ test("captureTiles: a tile at a negative document position (a right-to-left page
     await assert.rejects(captureTiles(target, plan, 1, DEFAULT_SETTINGS, d), NegativeRectError);
     assert.deepEqual(log, []);
   }
+});
+
+/**
+ * The real `browser` and window globals, stubbed: a screen of devicePixelRatio
+ * 2 and the page at 150 % zoom, so the planner works in 3 device px per CSS px
+ * while captureVisibleTab is asked for scale 2 (it applies the zoom itself, S6).
+ */
+function stubBrowser() {
+  const calls: { rect: { x: number; y: number; width: number; height: number }; scale: number }[] = [];
+  Object.assign(globalThis, {
+    devicePixelRatio: 2,
+    browser: {
+      tabs: {
+        getZoom: async () => 1.5,
+        get: async () => selected,
+        captureVisibleTab: async (_windowId: number, details: (typeof calls)[number]) => {
+          calls.push({ rect: details.rect, scale: details.scale });
+          return "data:image/png;base64,AA==";
+        },
+      },
+    },
+    createImageBitmap: async () => ({ width: 1, height: 1, close() {} }),
+  });
+  return calls;
+}
+
+// 300 device px wide at 3 device px per CSS px: a band of 90 000 px is 100 CSS px high.
+const ZOOM_SETTINGS = { ...DEFAULT_SETTINGS, maxTilePixels: 90_000 };
+
+test("captureRegion: at a page zoom the plan has scale × zoom device px per CSS px, the call gets scale", async () => {
+  const calls = stubBrowser();
+  const result = await captureRegion(TAB, WINDOW, { x: 0, y: 0, width: 100, height: 200 }, ZOOM_SETTINGS);
+  assert.deepEqual(calls, [
+    { rect: { x: 0, y: 0, width: 100, height: 100 }, scale: 2 },
+    { rect: { x: 0, y: 100, width: 100, height: 100 }, scale: 2 },
+  ]);
+  assert.equal(result.scale, 2);
+  assert.equal(result.zoom, 1.5);
+});
+
+test("capturePatches: at a page zoom each patch is planned in scale × zoom device px per CSS px", async () => {
+  const calls = stubBrowser();
+  const region = { x: 50, y: 400, width: 300, height: 300 };
+  const result = await capturePatches(
+    TAB,
+    WINDOW,
+    region,
+    [{ x: 10, y: 20, width: 100, height: 200 }],
+    ZOOM_SETTINGS,
+  );
+  assert.deepEqual(calls, [
+    { rect: { x: 60, y: 420, width: 100, height: 100 }, scale: 2 },
+    { rect: { x: 60, y: 520, width: 100, height: 100 }, scale: 2 },
+  ]);
+  assert.deepEqual(
+    result.tiles.map((t) => [t.x, t.y, t.width, t.height]),
+    [
+      [10, 20, 100, 100],
+      [10, 120, 100, 100],
+    ],
+  );
+  assert.equal(result.scale, 2);
+});
+
+test("imageDetails: JPEG asks for the set quality in percent, PNG for none", () => {
+  const [tile] = PLAN as [PlannedTile];
+  assert.deepEqual(imageDetails(tile, 2, { ...DEFAULT_SETTINGS, format: "jpeg", jpegQuality: 0.856 }), {
+    rect: tile.doc,
+    scale: 2,
+    format: "jpeg",
+    quality: 86,
+  });
+  assert.deepEqual(imageDetails(tile, 2, { ...DEFAULT_SETTINGS, format: "png" }), {
+    rect: tile.doc,
+    scale: 2,
+    format: "png",
+  });
+  assert.equal(imageDetails(tile, 1, { ...DEFAULT_SETTINGS, format: "jpeg", jpegQuality: 0.8 }).quality, 80);
+});
+
+test("captureRegion: a region of no CSS pixel is refused, nothing is captured", async () => {
+  const calls = stubBrowser();
+  await assert.rejects(
+    captureRegion(TAB, WINDOW, { x: 5, y: 5, width: 0, height: 0 }, ZOOM_SETTINGS),
+    /the selected region is empty/,
+  );
+  assert.deepEqual(calls, []);
+});
+
+test("capturePatches: no patches, no capture, and still the region's scale and zoom", async () => {
+  const calls = stubBrowser();
+  const result = await capturePatches(
+    TAB,
+    WINDOW,
+    { x: 0, y: 0, width: 100, height: 100 },
+    [],
+    ZOOM_SETTINGS,
+  );
+  assert.deepEqual(calls, []);
+  assert.deepEqual(result, { tiles: [], scale: 2, zoom: 1.5 });
+  // One patch of one tile is captured too.
+  const one = await capturePatches(
+    TAB,
+    WINDOW,
+    { x: 0, y: 0, width: 100, height: 100 },
+    [{ x: 1, y: 2, width: 3, height: 4 }],
+    ZOOM_SETTINGS,
+  );
+  assert.deepEqual(calls, [{ rect: { x: 1, y: 2, width: 3, height: 4 }, scale: 2 }]);
+  assert.equal(one.tiles.length, 1);
 });

@@ -85,3 +85,50 @@ test("makeFilename: noncharacters and lone surrogates from the title are removed
   assert.doesNotMatch(name, /[\p{Cn}\p{Cs}]/u);
   assert.doesNotMatch(name, /[\ud800-\udfff]/u, "lone surrogate");
 });
+
+test("makeFilename: the title is cut by its UTF-8 bytes, 1, 2, 3 or 4 per code point", () => {
+  // 120 bytes less "snapii ", " 2026-10-01 14-03-04" and ".svg" leave 89 for the title.
+  const fits = (cp: number): number => {
+    const unit = String.fromCodePoint(cp);
+    const name = makeFilename(page({ title: unit.repeat(100) }));
+    return [...name.slice("snapii ".length, -" 2026-10-01 14-03-04.svg".length)].length;
+  };
+  // At each end of a width: the first code point a title keeps (U+0000-U+00A0 are
+  // control characters or whitespace) and the last before the next width.
+  for (const [cp, count] of [
+    [0x21, 89],
+    [0x7e, 89],
+    [0xa1, 44],
+    [0x7ff, 44],
+    [0x800, 29],
+    [0xfffd, 29],
+    [0x10000, 22],
+    [0x10fffd, 22],
+  ] as [number, number][]) {
+    assert.equal(fits(cp), count, `U+${cp.toString(16)}`);
+  }
+});
+
+test("makeFilename: without a time the title gets its bytes", () => {
+  const name = makeFilename(page({ title: "x".repeat(200), capturedAt: "not a date" }));
+  assert.equal(name, `snapii ${"x".repeat(109)}.svg`);
+  assert.equal(name.length, MAX_FILENAME_LENGTH);
+});
+
+test("makeFilename: an IPv6 host without a title is named without brackets, its colons as dashes", () => {
+  // The dashed form of Windows' ipv6-literal.net names; ":" is no file name character.
+  const at = { title: "", capturedAt: "2026-10-01T00:00:00.000Z" };
+  assert.equal(
+    makeFilename(page({ ...at, url: "https://[::1]:8080/" })),
+    "snapii --1 2026-10-01 02-00-00.svg",
+  );
+  assert.equal(
+    makeFilename(page({ ...at, url: "http://[2001:db8::a:1]/x" })),
+    "snapii 2001-db8--a-1 2026-10-01 02-00-00.svg",
+  );
+  // IPv4 and names stay as they are.
+  assert.equal(
+    makeFilename(page({ ...at, url: "http://192.0.2.1:81/" })),
+    "snapii 192.0.2.1 2026-10-01 02-00-00.svg",
+  );
+});
