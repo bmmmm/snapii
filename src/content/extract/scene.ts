@@ -357,6 +357,8 @@ class Builder {
   readonly #contentClips = new Map<Box, SceneClip | null>();
   readonly #opacities = new Map<Box, number>();
   readonly #rects = new Map<Box, DocRect>();
+  readonly #sideCache = new Map<Box, ReturnType<typeof sides>>();
+  readonly #radiusCache = new Map<Box, string[]>();
   /** The drawn part of each <img> and <canvas> that shows one; opaque ones hide text as fills do. */
   readonly #pictures = new Map<Box, { op: Extract<SceneOp, { op: "image" }>; opaque: boolean }>();
   /** Background gradients that are drawn, over each box's origin box. */
@@ -442,6 +444,30 @@ class Builder {
     if (!r) {
       r = this.#layout.toDoc(b.el.getBoundingClientRect(), b.ctx);
       this.#rects.set(b, r);
+    }
+    return r;
+  }
+
+  /**
+   * b's border sides, read once: the checks and the painting ask for them
+   * up to eight times a box, twelve style reads each time, which was a
+   * sixth of the whole walk (profiled in Chromium on a page of 9 000 boxes).
+   */
+  #sides(b: Box): ReturnType<typeof sides> {
+    let s = this.#sideCache.get(b);
+    if (!s) {
+      s = sides(b.cs);
+      this.#sideCache.set(b, s);
+    }
+    return s;
+  }
+
+  /** b's computed corner radii as the browser gives them, read once. */
+  #cornerRadii(b: Box): string[] {
+    let r = this.#radiusCache.get(b);
+    if (!r) {
+      r = CORNERS.map((c) => b.cs.getPropertyValue(`border-${c}-radius`));
+      this.#radiusCache.set(b, r);
     }
     return r;
   }
@@ -576,7 +602,7 @@ class Builder {
     if (this.#decorationOf(b) === undefined) return "text-effect";
     // A radius of mixed units stays calc()/min()/max()/clamp() in the computed
     // value, which parseFloat reads as 0: the box would come out square.
-    if (CORNERS.some((c) => cs.getPropertyValue(`border-${c}-radius`).includes("("))) return "border";
+    if (this.#cornerRadii(b).some((r) => r.includes("("))) return "border";
     if (!this.#bordersDrawable(b)) return "border";
     if (name === "fieldset" && this.#legendShown(b)) return "border";
     if (!this.#coloursParse(b, text)) return "color";
@@ -611,7 +637,7 @@ class Builder {
     );
     if (!legend || !this.#layout.isRendered(legend.el)) return false;
     const bg = parseColor(cs.backgroundColor);
-    return sides(cs).some(shown) || (bg !== null && bg.a > 0) || cs.backgroundImage !== "none";
+    return this.#sides(b).some(shown) || (bg !== null && bg.a > 0) || cs.backgroundImage !== "none";
   }
 
   /**
@@ -664,7 +690,7 @@ class Builder {
     // A canvas of no width or height: nothing to draw.
     if (natural.width === 0 || natural.height === 0) return null;
     const border = this.#rect(b);
-    const [bt, br, bb, bl] = sides(cs).map((s) => (shown(s) ? s.width : 0)) as Quad;
+    const [bt, br, bb, bl] = this.#sides(b).map((s) => (shown(s) ? s.width : 0)) as Quad;
     const [pt, pr, pb, pl] = [cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft].map(
       px,
     ) as Quad;
@@ -707,7 +733,7 @@ class Builder {
         fitRadii(box.width, box.height, r).map(([x, y]) => ({ x: x * kx, y: y * ky })),
       );
     };
-    const radii = this.#radii(cs, border);
+    const radii = this.#radii(b, border);
     if (radii) {
       // Its own corners cut the picture along the content box's curve (css-backgrounds-3 § 5.3).
       rounded(content, insetRadii(radii, [bt + pt, br + pr, bb + pb, bl + pl]));
@@ -791,14 +817,14 @@ class Builder {
       /text/.test(cs.backgroundClip)
     )
       return null;
-    const border = sides(cs).map((s) => (shown(s) ? s.width : 0)) as Quad;
+    const border = this.#sides(b).map((s) => (shown(s) ? s.width : 0)) as Quad;
     const padding = [cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft].map(px) as Quad;
     const origin = this.#backgroundArea(cs, frag, border, padding, cs.backgroundOrigin);
     const area = this.#backgroundArea(cs, frag, border, padding);
     // Beyond its origin box CSS repeats the gradient and SVG pads it: alike
     // only under borders that hide it, which a dashed, dotted or double one
     // does not whatever its colour.
-    const opaqueBorders = sides(cs).every(
+    const opaqueBorders = this.#sides(b).every(
       (s) => !shown(s) || (s.style === "solid" && parseColor(s.color)?.a === 1),
     );
     if (!within(area, origin) && !(same(origin, inset(frag, ...border)) && opaqueBorders)) return null;
@@ -817,7 +843,7 @@ class Builder {
 
   #bordersDrawable(b: Box): boolean {
     const { cs } = b;
-    const visible = sides(cs).filter(shown);
+    const visible = this.#sides(b).filter(shown);
     if (visible.some((s) => !DRAWN_STYLES.has(s.style))) return false;
     const outline = cs.outlineStyle !== "none" && px(cs.outlineWidth) > 0;
     if (outline && cs.outlineStyle !== "solid") return false;
@@ -826,7 +852,7 @@ class Builder {
     // Two adjacent sides of different colours meet diagonally at their
     // corner, which the bars below paint square: on a box with no padding
     // box (the CSS triangle, Bootstrap's .caret) the whole shape is corners.
-    const all = sides(cs);
+    const all = this.#sides(b);
     const meet = all.some((s, i) => {
       const next = all[(i + 1) % 4] as (typeof all)[number];
       return shown(s) && shown(next) && s.color !== next.color;
@@ -836,7 +862,7 @@ class Builder {
       const frag = this.#fragments(b)[0] as DocRect;
       if (frag.width - l - r <= 0 || frag.height - t - bt <= 0) return false;
     }
-    const square = CORNERS.every((c) => px(cs.getPropertyValue(`border-${c}-radius`)) === 0);
+    const square = this.#cornerRadii(b).every((r) => px(r) === 0);
     // Dashes, dots and double lines are laid out along straight sides only,
     // and per box: collapsed table cells share their edges. border-collapse
     // is inherited, so a box inside a cell carries it without collapsing.
@@ -850,7 +876,7 @@ class Builder {
     const { cs } = b;
     const colours = [
       cs.backgroundColor,
-      ...sides(cs)
+      ...this.#sides(b)
         .filter(shown)
         .map((s) => s.color),
     ];
@@ -1126,11 +1152,11 @@ class Builder {
     return out;
   }
 
-  #radii(cs: CSSStyleDeclaration, box: DocRect): Radii | undefined {
+  #radii(b: Box, box: DocRect): Radii | undefined {
     const len = (v: string | undefined, basis: number) =>
       v === undefined ? undefined : v.endsWith("%") ? (px(v) / 100) * basis : px(v);
-    const radii = CORNERS.map((c) => {
-      const [h, v] = cs.getPropertyValue(`border-${c}-radius`).trim().split(/\s+/);
+    const radii = this.#cornerRadii(b).map((r) => {
+      const [h, v] = r.trim().split(/\s+/);
       const x = len(h, box.width) ?? 0;
       return [x, len(v, box.height) ?? (h?.endsWith("%") ? (len(h, box.height) ?? 0) : x)];
     }) as Radii;
@@ -1168,9 +1194,9 @@ class Builder {
   /** b's padding box with the inner radii, where b has rounded corners. */
   #paddingClip(b: Box): SceneClip | null {
     const border = this.#layout.toDoc(b.el.getBoundingClientRect(), b.ctx);
-    const radii = this.#radii(b.cs, border);
+    const radii = this.#radii(b, border);
     if (!radii) return null;
-    const [t, r, bt, l] = sides(b.cs).map((s) => s.width) as Quad;
+    const [t, r, bt, l] = this.#sides(b).map((s) => s.width) as Quad;
     return { ...inset(border, t, r, bt, l), radii: insetRadii(radii, [t, r, bt, l]) };
   }
 
@@ -1210,7 +1236,7 @@ class Builder {
     if (shadows) {
       // Below the background, the last one lowest; only on a box of one fragment (#shadow).
       const frag = frags[0] as DocRect;
-      const all = this.#radii(cs, frag);
+      const all = this.#radii(b, frag);
       const radii = all && fitRadii(frag.width, frag.height, all);
       for (const s of [...shadows].reverse()) {
         const box = {
@@ -1244,7 +1270,7 @@ class Builder {
     }
     const single = frags.length === 1;
     const rtl = cs.direction === "rtl";
-    const borders = sides(cs);
+    const borders = this.#sides(b);
     const [bt, br, bb, bl] = borders.map((s) => (shown(s) ? s.width : 0)) as [number, number, number, number];
     const bg = b.propagated ? null : parseColor(cs.backgroundColor);
     const gradient = this.#gradients.get(b);
@@ -1257,7 +1283,7 @@ class Builder {
       const endEdge = single || last;
       const leftEdge = rtl ? endEdge : startEdge;
       const rightEdge = rtl ? startEdge : endEdge;
-      const all = this.#radii(cs, frag);
+      const all = this.#radii(b, frag);
       const radii = all && (single ? all : this.#sliceRadii(all, leftEdge, rightEdge));
       if ((bg && bg.a > 0) || gradient) {
         const edges: Quad = [bt, rightEdge ? br : 0, bb, leftEdge ? bl : 0];
@@ -1487,7 +1513,7 @@ class Builder {
     const shape = cs.listStyleImage === "none" && /^(disc|circle|square)$/.test(cs.listStyleType);
     const w = (shape ? 1.5 : 2.5) * fs;
     const rtl = cs.direction === "rtl";
-    const [t, r, , l] = sides(cs).map((s) => s.width) as [number, number, number, number];
+    const [t, r, , l] = this.#sides(b).map((s) => s.width) as [number, number, number, number];
     const top = box.y + t + px(cs.paddingTop);
     const outside = cs.listStylePosition === "outside";
     const start = rtl ? box.x + box.width - r - px(cs.paddingRight) : box.x + l + px(cs.paddingLeft);

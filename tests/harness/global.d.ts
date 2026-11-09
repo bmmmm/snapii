@@ -7,4 +7,6 @@ interface Window {
   beforeCollect?: () => unknown;
   /** A spec's own step after its page content is in place and loaded (vector.spec.ts, sceneOf). */
   prepare?: () => void;
+  /** How often each computed style was asked for a property (vector.spec.ts, the read-once test). */
+  styleReads?: (name: string) => number[];
 }
