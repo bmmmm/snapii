@@ -579,6 +579,30 @@ test("boxes: a box's border sides and corner radii are read from its style once,
   }
 });
 
+test("boxes: the line boxes of an inline box out of the region's reach are not read", async ({ page }) => {
+  await page.addInitScript(() => {
+    const reads = new Map<Element, number>();
+    const read = Element.prototype.getClientRects;
+    Element.prototype.getClientRects = function () {
+      reads.set(this, (reads.get(this) ?? 0) + 1);
+      return read.call(this);
+    };
+    window.rectReads = (selector) => [...document.querySelectorAll(selector)].map((e) => reads.get(e) ?? 0);
+  });
+  await sceneOf(
+    page,
+    `<p>out of reach: <span class="out">one</span>, <a class="out" href="#x">two</a>, <b class="out">three</b></p>
+    <div style="height:300px"></div>
+    <main id="cap" style="width:300px"><p>in reach: <span class="in">four</span></p></main>`,
+  );
+  const reads = await page.evaluate(() => ({
+    out: window.rectReads?.(".out") ?? [],
+    in: window.rectReads?.(".in") ?? [],
+  }));
+  expect(reads.in, "the premise: an inline box in the region has its line boxes read").toEqual([1]);
+  expect(reads.out).toEqual([0, 0, 0]);
+});
+
 test("pictures: an ancestor's rounded clip leaves an opaque one opaque: it hides the text under it, and JPEG applies", async ({
   page,
 }) => {

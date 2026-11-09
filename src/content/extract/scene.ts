@@ -1224,10 +1224,6 @@ class Builder {
   #own(b: Box, out: SceneOp[]): void {
     const { el, cs } = b;
     if (!this.#layout.isRendered(el)) return;
-    const clip = this.#ownClip(b);
-    if (!clip) return;
-    if (el === el.ownerDocument.documentElement && b.ctx.frame) this.#frameCanvas(b, out);
-    const frags = this.#fragments(b);
     // A shadow or an outline reaches beyond the box: a box outside the region can paint one into it.
     const shadows = this.#shadows.get(b);
     const ink = shadows ? inkMargin(cs) : outlineMargin(cs);
@@ -1237,6 +1233,14 @@ class Builder {
       width: f.width + 2 * ink,
       height: f.height + 2 * ink,
     });
+    const frameRoot = el === el.ownerDocument.documentElement && b.ctx.frame;
+    // Every fragment lies in the box: out of reach with it, the box paints
+    // nothing, and its clip and line boxes need not be read.
+    if (!frameRoot && !intersect(inked(this.#rect(b)), this.region)) return;
+    const clip = this.#ownClip(b);
+    if (!clip) return;
+    if (frameRoot) this.#frameCanvas(b, out);
+    const frags = this.#fragments(b);
     if (!frags.some((f) => intersect(inked(f), this.region) && intersect(inked(f), clip))) return;
     const ops: SceneOp[] = [];
     if (shadows) {
