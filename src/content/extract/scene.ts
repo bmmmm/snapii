@@ -266,8 +266,10 @@ function hasPaintedBox(cs: CSSStyleDeclaration): boolean {
 
 /** How far an element's outline paints beyond its box: a negative offset grows nothing (#outlineOp). */
 function outlineMargin(cs: CSSStyleDeclaration): number {
+  // The style first: most boxes have none, and this is asked for every box of the page.
+  if (cs.outlineStyle === "none") return 0;
   const w = px(cs.outlineWidth);
-  return cs.outlineStyle !== "none" && w > 0 ? w + Math.max(0, px(cs.outlineOffset)) : 0;
+  return w > 0 ? w + Math.max(0, px(cs.outlineOffset)) : 0;
 }
 
 /**
