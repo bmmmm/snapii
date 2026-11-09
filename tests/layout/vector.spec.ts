@@ -794,6 +794,64 @@ test("outlines: a negative offset shrinks the box down to its centre at most, as
   );
 });
 
+test("outlines: one that reaches into the region from a box outside it is drawn, or a patch where it cannot be", async ({
+  page,
+}) => {
+  // The box ends 10 px above the region, 30 px right of its left edge.
+  const around = (outline: string) =>
+    sceneOf(
+      page,
+      `<div style="width:200px;height:100px;margin:0 30px 10px;${outline}"></div>` +
+        '<main id="cap" style="width:300px;height:100px"></main>',
+    );
+  const strokes = (ops: Scene["ops"]): number[][] =>
+    ops.flatMap((op) =>
+      op.op === "group"
+        ? strokes(op.children)
+        : op.op === "rect" && op.stroke
+          ? [[op.x, op.y, op.width, op.height, op.stroke.width]]
+          : [],
+    );
+  // 20 px wide, or 4 px at an offset of 16: 10 px of either lies in the region.
+  for (const outline of [
+    "outline:20px solid rgb(255,0,0)",
+    "outline:4px solid rgb(255,0,0);outline-offset:16px",
+  ]) {
+    const scene = await around(outline);
+    expect(strokes(scene.ops), outline).toEqual([[10, -130, 240, 140, outline.includes("offset") ? 4 : 20]]);
+    expect(scene.patches, outline).toEqual([]);
+  }
+  const dashed = await around("outline:20px dashed rgb(255,0,0)");
+  expect(strokes(dashed.ops)).toEqual([]);
+  expect(dashed.patches).toEqual([{ x: 10, y: 0, width: 240, height: 10, reason: "border" }]);
+  expect(dashed.unsupported).toEqual({ border: 1 });
+  // 8 px, and a negative offset grows nothing: neither reaches the region.
+  for (const outline of [
+    "outline:8px dashed rgb(255,0,0)",
+    "outline:8px solid rgb(255,0,0);outline-offset:-4px",
+  ]) {
+    const scene = await around(outline);
+    expect(strokes(scene.ops), outline).toEqual([]);
+    expect(scene.patches, outline).toEqual([]);
+  }
+});
+
+test("outlines: a patch of a box whose outline it cannot draw covers the outline too", async ({ page }) => {
+  // 200 x 100 at (40, 40) of the region; the outline 10 px, or 4 px at an offset of 16.
+  for (const [outline, m] of [
+    ["outline:10px dashed rgb(255,0,0)", 10],
+    ["outline:4px dotted rgb(255,0,0);outline-offset:16px", 20],
+  ] as const) {
+    const scene = await sceneOf(
+      page,
+      `<main id="cap" style="display:flow-root;width:300px;height:200px"><div style="margin:40px;width:200px;height:100px;${outline}"></div></main>`,
+    );
+    expect(scene.patches, outline).toEqual([
+      { x: 40 - m, y: 40 - m, width: 200 + 2 * m, height: 100 + 2 * m, reason: "border" },
+    ]);
+  }
+});
+
 test("shadows: the box moved and grown by the spread, corners grown as CSS grows them, cut out at the box", async ({
   page,
 }) => {

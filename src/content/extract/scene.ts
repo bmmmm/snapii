@@ -264,15 +264,21 @@ function hasPaintedBox(cs: CSSStyleDeclaration): boolean {
   );
 }
 
+/** How far an element's outline paints beyond its box: a negative offset grows nothing (#outlineOp). */
+function outlineMargin(cs: CSSStyleDeclaration): number {
+  const w = px(cs.outlineWidth);
+  return cs.outlineStyle !== "none" && w > 0 ? w + Math.max(0, px(cs.outlineOffset)) : 0;
+}
+
 /**
- * How far an element's shadows and filters paint beyond its box: an upper
- * bound from the lengths they are made of (a blur's reach is about three
- * times its radius).
+ * How far an element's shadows, filters and outline paint beyond its box: an
+ * upper bound from the lengths they are made of (a blur's reach is about
+ * three times its radius).
  */
 function inkMargin(cs: CSSStyleDeclaration): number {
   const lengths = (v: string) =>
     [...v.matchAll(/(-?\d*\.?\d+)px/g)].reduce((s, m) => s + Math.abs(Number(m[1])), 0);
-  let m = 0;
+  let m = outlineMargin(cs);
   if (cs.boxShadow !== "none") m = Math.max(m, lengths(cs.boxShadow));
   if (cs.textShadow !== "none") m = Math.max(m, lengths(cs.textShadow));
   if (cs.filter !== "none") m = Math.max(m, 3 * lengths(cs.filter));
@@ -1072,7 +1078,7 @@ class Builder {
     return [this.#rect(b)];
   }
 
-  /** What a patch of b must cover of b itself: its box, grown by what shadows and filters paint beyond it. */
+  /** What a patch of b must cover of b itself: its box, grown by what shadows, filters and its outline paint beyond it. */
   #extent(b: Box): DocRect[] {
     const m = inkMargin(b.cs);
     return this.#fragments(b).map((r) => ({
@@ -1222,9 +1228,9 @@ class Builder {
     if (!clip) return;
     if (el === el.ownerDocument.documentElement && b.ctx.frame) this.#frameCanvas(b, out);
     const frags = this.#fragments(b);
-    // A shadow reaches beyond the box: a box outside the region can cast one into it.
+    // A shadow or an outline reaches beyond the box: a box outside the region can paint one into it.
     const shadows = this.#shadows.get(b);
-    const ink = shadows ? inkMargin(cs) : 0;
+    const ink = shadows ? inkMargin(cs) : outlineMargin(cs);
     const inked = (f: DocRect): DocRect => ({
       x: f.x - ink,
       y: f.y - ink,
