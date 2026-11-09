@@ -32,6 +32,9 @@ the binary for the glue tests and `pnpm drive`, and run
 `pnpm exec web-ext run --source-dir dist` instead of `pnpm start`. Ports, the
 other environment variables and the interactive driver are in
 [docs/development.md](docs/development.md).
+The glue/drive launcher enables system access with
+`MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1` for Firefox 159+ and retains
+`--remote-allow-system-access` for older releases.
 
 ## Where things live
 
