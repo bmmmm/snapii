@@ -33,6 +33,8 @@ pnpm start        # fresh Firefox profile with dist/ loaded (add --start-url <ur
   2960–2969 (Marionette); `SNAPII_GLUE_PORT_OFFSET=<n>` shifts both, and
   `SNAPII_GLUE_OUT=<dir>` keeps profiles, logs and the downloaded files.
   Set `SNAPII_FIREFOX=/path/to/firefox` for the glue suite and `pnpm drive`.
+  Their launcher sets `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1` for Firefox 159+ and
+  keeps `--remote-allow-system-access` for older releases.
   `pnpm start` has a fixed macOS path; elsewhere use
   `pnpm exec web-ext run --source-dir dist --firefox=/path/to/firefox`.
 - What the automated run cannot check (real keyboard, real display, other
