@@ -28,10 +28,8 @@ allowed (`tsconfig.json`).
 
 `pnpm test:glue`, `pnpm drive` and `pnpm start` need a release Firefox 157 or
 newer. They look for it at the macOS path; elsewhere set `SNAPII_FIREFOX` to
-the binary for the glue tests and `pnpm drive`, and run
-`pnpm exec web-ext run --source-dir dist` instead of `pnpm start`. Ports, the
-other environment variables and the interactive driver are in
-[docs/development.md](docs/development.md).
+the binary. Ports, the other environment variables and the interactive driver
+are in [docs/development.md](docs/development.md).
 
 ## Where things live
 
