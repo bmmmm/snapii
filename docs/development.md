@@ -32,9 +32,8 @@ pnpm start        # fresh Firefox profile with dist/ loaded (add --start-url <ur
   device-pixel ratio 2 and bind local ports 8460–8469 (server) and
   2960–2969 (Marionette); `SNAPII_GLUE_PORT_OFFSET=<n>` shifts both, and
   `SNAPII_GLUE_OUT=<dir>` keeps profiles, logs and the downloaded files.
-  Set `SNAPII_FIREFOX=/path/to/firefox` for the glue suite and `pnpm drive`.
-  `pnpm start` has a fixed macOS path; elsewhere use
-  `pnpm exec web-ext run --source-dir dist --firefox=/path/to/firefox`.
+  Set `SNAPII_FIREFOX=/path/to/firefox` for the glue suite, `pnpm drive` and
+  `pnpm start`.
 - What the automated run cannot check (real keyboard, real display, other
   apps' clipboards, other viewers) is in
   [tests/MANUAL-CHECKLIST.md](../tests/MANUAL-CHECKLIST.md).
