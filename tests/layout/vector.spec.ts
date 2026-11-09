@@ -564,6 +564,50 @@ test("boxes: a radius the engine keeps as calc() (mixed units) makes the box a p
   expect(scene.unsupported).toEqual({ border: 1 });
 });
 
+test("boxes: a box's border sides and corner radii are read from its style once, however often the walk asks", async ({
+  page,
+}) => {
+  // Every reason to ask: sides to draw and to check, a gradient laid out
+  // inside them, rounded corners, a picture cut to its content box, a marker.
+  await page.addInitScript(() => {
+    const reads = new Map<string, Map<CSSStyleDeclaration, number>>();
+    const read = CSSStyleDeclaration.prototype.getPropertyValue;
+    CSSStyleDeclaration.prototype.getPropertyValue = function (name: string) {
+      const per = reads.get(name) ?? new Map<CSSStyleDeclaration, number>();
+      reads.set(name, per.set(this, (per.get(this) ?? 0) + 1));
+      return read.call(this, name);
+    };
+    window.styleReads = (name) => [...(reads.get(name)?.values() ?? [])];
+    // A canvas that reads back empty would be a patch.
+    window.prepare = () => {
+      const canvas = document.querySelector("canvas") as HTMLCanvasElement;
+      (canvas.getContext("2d") as CanvasRenderingContext2D).fillRect(0, 0, 40, 20);
+    };
+  });
+  const scene = await sceneOf(
+    page,
+    `<main id="cap" style="width:300px">
+      <div style="width:120px;height:40px;border:2px solid rgb(0,0,200);border-radius:6px;overflow:hidden;background:linear-gradient(rgb(255,0,0),rgb(0,0,255))">text</div>
+      <ul><li style="border:1px dashed rgb(0,0,0)">item</li></ul>
+      <canvas width="40" height="20" style="border:3px solid rgb(0,128,0);border-radius:4px;background:rgb(255,255,255)"></canvas>
+    </main>`,
+  );
+  expect(scene.unsupported, "the premise: all of it is drawn but the marker").toEqual({ marker: 1 });
+  const reads = await page.evaluate(() => {
+    const of = (name: string) => window.styleReads?.(name) ?? [];
+    return {
+      width: of("border-top-width"),
+      style: of("border-left-style"),
+      colour: of("border-bottom-color"),
+      radius: of("border-top-left-radius"),
+    };
+  });
+  for (const [what, counts] of Object.entries(reads)) {
+    expect(counts.length, `${what}: the walk reads it`).toBeGreaterThanOrEqual(3);
+    expect(Math.max(...counts), `${what}: reads of one box's style`).toBe(1);
+  }
+});
+
 test("pictures: an ancestor's rounded clip leaves an opaque one opaque: it hides the text under it, and JPEG applies", async ({
   page,
 }) => {

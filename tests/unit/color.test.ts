@@ -78,3 +78,19 @@ test("parseColor: anything else is null, never a string passed through", () => {
     assert.equal(parseColor(s), null, JSON.stringify(s));
   }
 });
+
+test("parseColor: a colour asked for again is parsed alike, into an object of the caller's own", () => {
+  const first = parseColor("rgba(1, 2, 3, 0.5)");
+  assert.ok(first);
+  // The scene keeps what it gets: changing it must not reach the next caller.
+  first.r = 99;
+  assert.deepEqual(parseColor("rgba(1, 2, 3, 0.5)"), { r: 1, g: 2, b: 3, a: 0.5 });
+  assert.equal(parseColor("rgb(1, 2,"), null);
+  assert.equal(parseColor("rgb(1, 2,"), null);
+  // More colours than are remembered: each still parses, before and after.
+  for (let i = 0; i < 3000; i++) {
+    const want = { r: i % 256, g: i >> 8, b: 7, a: 1 };
+    assert.deepEqual(parseColor(`rgb(${want.r}, ${want.g}, 7)`), want);
+  }
+  assert.deepEqual(parseColor("rgba(1, 2, 3, 0.5)"), { r: 1, g: 2, b: 3, a: 0.5 });
+});
