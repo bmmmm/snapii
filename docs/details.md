@@ -116,7 +116,10 @@ Limits:
 - **Not drawn**, and outside patches not in the file at all, among others:
   the colour of visited links (the browser hides it from extensions, so
   they come out in the link colour), a decoration of `::first-line`, the
-  `…` of `text-overflow: ellipsis`, scrollbars and column rules.
+  `…` of `text-overflow: ellipsis`, scrollbars, column rules, and an
+  absolutely positioned `::before` or `::after` where it lies outside its
+  element's box (the `pseudo` patch covers the box only; with the box
+  outside the selection the record does not count it either).
 - A decoration takes the viewer's own way of skipping descenders
   (`text-decoration-skip-ink` is not carried over), and breaks between the
   glyphs where the viewer spaces them out to the run's width (a narrower
