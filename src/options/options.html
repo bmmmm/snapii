@@ -1,97 +1,86 @@
 <!doctype html>
-<html lang="en">
+<html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>snapii settings</title>
+    <title data-i18n="optionsTitle"></title>
     <link rel="stylesheet" href="options.css" />
   </head>
   <body>
     <main>
       <form id="settings" autocomplete="off">
         <fieldset>
-          <legend>Image format</legend>
-          <label><input type="radio" name="format" value="png" /> PNG (lossless)</label>
-          <label><input type="radio" name="format" value="jpeg" /> JPEG (smaller files)</label>
+          <legend data-i18n="optionsImageFormat"></legend>
+          <label><input type="radio" name="format" value="png" /> <span data-i18n="optionsPng"></span></label>
+          <label><input type="radio" name="format" value="jpeg" /> <span data-i18n="optionsJpeg"></span></label>
           <div class="quality">
-            <label for="quality">JPEG quality</label>
+            <label for="quality" data-i18n="optionsJpegQuality"></label>
             <input id="quality" type="range" min="0" max="100" step="1" />
             <output for="quality" id="quality-value"></output>
           </div>
         </fieldset>
 
         <fieldset>
-          <legend>Output</legend>
-          <label><input type="radio" name="output" value="raster" /> Picture of the page with selectable text</label>
+          <legend data-i18n="optionsOutput"></legend>
+          <label><input type="radio" name="output" value="raster" /> <span data-i18n="optionsOutputRaster"></span></label>
           <label
-            ><input type="radio" name="output" value="vector" aria-describedby="output-hint" /> Shapes and
-            text (beta)</label
-          >
-          <p id="output-hint" class="hint">
-            Boxes and text become SVG shapes, so the file stays sharp at any zoom and can be edited. What
-            cannot be drawn as shapes (images, inner shadows, effects) is kept as pixels. Text recognition is off
-            in this mode.
-          </p>
+            ><input type="radio" name="output" value="vector" aria-describedby="output-hint" />
+            <span data-i18n="optionsOutputVector"></span
+          ></label>
+          <p id="output-hint" class="hint" data-i18n="optionsOutputHint"></p>
         </fieldset>
 
         <fieldset>
-          <legend>Behavior</legend>
-          <label><input type="checkbox" name="saveAs" /> Ask where to save each file</label>
+          <legend data-i18n="optionsBehavior"></legend>
+          <label><input type="checkbox" name="saveAs" /> <span data-i18n="settingSaveAs"></span></label>
           <label
-            ><input type="checkbox" name="occlusionCheck" /> Skip text covered by other elements</label
-          >
+            ><input type="checkbox" name="occlusionCheck" /> <span data-i18n="optionsOcclusion"></span
+          ></label>
           <label
-            ><input type="checkbox" name="textFragment" /> Add a link to the selected text (text
-            fragment)</label
-          >
+            ><input type="checkbox" name="textFragment" /> <span data-i18n="optionsTextFragment"></span
+          ></label>
           <label
-            ><input type="checkbox" name="removeTrackers" aria-describedby="trackers-hint" /> Remove trackers
-            from copied links</label
-          >
-          <p id="trackers-hint" class="hint">
-            Copy element link and Copy page link leave out tracking parameters (utm_*, fbclid, gclid and
-            similar).
-          </p>
+            ><input type="checkbox" name="removeTrackers" aria-describedby="trackers-hint" />
+            <span data-i18n="settingRemoveTrackers"></span
+          ></label>
+          <p id="trackers-hint" class="hint" data-i18n="optionsTrackersHint"></p>
           <label
-            ><input type="checkbox" name="ocr" aria-describedby="ocr-hint output-hint" /> Recognize text in images
-            (OCR)</label
-          >
-          <p id="ocr-hint" class="hint">Runs locally; adds a few seconds to saving.</p>
+            ><input type="checkbox" name="ocr" aria-describedby="ocr-hint output-hint" />
+            <span data-i18n="settingOcr"></span
+          ></label>
+          <p id="ocr-hint" class="hint" data-i18n="optionsOcrHint"></p>
         </fieldset>
 
         <fieldset>
-          <legend>Save location</legend>
+          <legend data-i18n="optionsSaveLocation"></legend>
           <div class="folder-row">
-            <label for="folder">Folder inside Downloads</label>
+            <label for="folder" data-i18n="optionsFolder"></label>
             <input
               id="folder"
               name="saveFolder"
               type="text"
               autocomplete="off"
               spellcheck="false"
-              placeholder="Downloads folder itself"
+              data-i18n-placeholder="folderPlaceholder"
               aria-describedby="folder-hint folder-error"
             />
           </div>
-          <p id="folder-hint" class="hint">
-            Firefox lets add-ons save only inside its Downloads folder, so this is a sub-folder name such
-            as snapii or Pages/snapii; it is created when needed. Leave it empty for the Downloads folder
-            itself.
-          </p>
+          <!-- Filled by options.ts: the rule names the browser the build is for. -->
+          <p id="folder-hint" class="hint"></p>
           <p id="folder-error" class="hint" role="alert" hidden></p>
         </fieldset>
 
         <div class="actions">
-          <button type="button" id="reset">Reset to defaults</button>
+          <button type="button" id="reset" data-i18n="optionsReset"></button>
           <p id="status" role="status" aria-live="polite"></p>
         </div>
       </form>
 
       <!-- Not part of the form: the browser stores the shortcut itself (commands.update), not storage.sync. -->
       <fieldset id="shortcut">
-        <legend>Keyboard shortcut</legend>
+        <legend data-i18n="optionsShortcut"></legend>
         <div class="shortcut-row">
-          <label for="shortcut-input">Capture a region</label>
+          <label for="shortcut-input" data-i18n="commandCapture"></label>
           <input
             id="shortcut-input"
             type="text"
@@ -99,16 +88,13 @@
             disabled
             autocomplete="off"
             spellcheck="false"
-            placeholder="None"
+            data-i18n-placeholder="optionsShortcutNone"
             aria-describedby="shortcut-hint"
           />
-          <button type="button" id="shortcut-reset">Reset shortcut</button>
-          <button type="button" id="shortcut-settings" hidden>Change in browser settings</button>
+          <button type="button" id="shortcut-reset" data-i18n="optionsShortcutReset"></button>
+          <button type="button" id="shortcut-settings" hidden data-i18n="optionsShortcutSettings"></button>
         </div>
-        <p id="shortcut-hint" class="hint">
-          Click the field and press the new combination. Escape cancels; Backspace or Delete removes the
-          shortcut.
-        </p>
+        <p id="shortcut-hint" class="hint" data-i18n="optionsShortcutHint"></p>
         <p id="shortcut-status" role="status" aria-live="polite"></p>
       </fieldset>
 

@@ -2,16 +2,17 @@
   "manifest_version": 3,
   "name": "snapii",
   "version": "0.0.0",
-  "description": "Save a page region as SVG with real, selectable text and clickable links.",
+  "description": "__MSG_extensionDescription__",
+  "default_locale": "en",
   "icons": { "48": "icons/icon.svg", "96": "icons/icon.svg" },
   "action": {
-    "default_title": "snapii: capture region as SVG",
+    "default_title": "__MSG_actionTitle__",
     "default_icon": "icons/icon.svg",
     "default_popup": "popup.html"
   },
   "commands": {
-    "start-capture": { "suggested_key": { "default": "Ctrl+Alt+S", "mac": "Command+Shift+E" }, "description": "Capture a region" },
-    "_execute_action": { "description": "Open the snapii menu" }
+    "start-capture": { "suggested_key": { "default": "Ctrl+Alt+S", "mac": "Command+Shift+E" }, "description": "__MSG_commandCapture__" },
+    "_execute_action": { "description": "__MSG_commandMenu__" }
   },
   "background": { "scripts": ["background.js"] },
   "content_security_policy": { "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; upgrade-insecure-requests" },

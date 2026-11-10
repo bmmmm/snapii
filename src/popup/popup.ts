@@ -9,11 +9,14 @@ import { isValidSetting, loadSettings } from "../background/settings.ts";
 import { cannotRun } from "../background/start.ts";
 import { showAbout } from "../shared/about.ts";
 import { checkFolder, describeFolderProblem } from "../shared/folder.ts";
+import { localizePage, msg } from "../shared/i18n.ts";
 import { ariaShortcut, CAPTURE_COMMAND, formatShortcut } from "../shared/shortcut.ts";
 import type { FromPopup, StartResult } from "../shared/types.ts";
 
 type ToggleKey = "ocr" | "textFragment" | "removeTrackers" | "saveAs";
 const TOGGLES: ToggleKey[] = ["ocr", "textFragment", "removeTrackers", "saveAs"];
+
+localizePage(document);
 
 function byId<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -54,7 +57,7 @@ const tabId: Promise<number | undefined> = browser.tabs
 function refuse(reason: string): void {
   const hadFocus = document.activeElement === capture;
   capture.disabled = true;
-  status.textContent = `snapii cannot capture this page: ${reason}`;
+  status.textContent = msg("cannotCapture", reason);
   // A disabled button drops the focus; keyboard users keep a place to be.
   if (hadFocus) focusFirst();
 }
@@ -74,12 +77,12 @@ capture.addEventListener("click", async () => {
     // A refused folder would be left out of this capture, and the popup closes before it can be read.
     if (folder.hasAttribute("aria-invalid")) return void folder.focus();
     const id = await tabId;
-    if (id === undefined) return refuse("no active tab");
+    if (id === undefined) return refuse(msg("noActiveTab"));
     // The background does the work: this popup is gone as soon as it closes.
     const message: FromPopup = { type: "start-capture", tabId: id };
     const reply = (await browser.runtime.sendMessage(message)) as StartResult | undefined;
     if (reply?.ok) window.close();
-    else refuse(reply?.reason ?? "no answer from snapii's background page");
+    else refuse(reply?.reason ?? msg("noBackgroundAnswer"));
   } catch (e) {
     refuse(errorText(e));
   } finally {
@@ -91,7 +94,7 @@ capture.addEventListener("click", async () => {
 async function probe(): Promise<void> {
   try {
     const id = await tabId;
-    if (id === undefined) return refuse("no active tab");
+    if (id === undefined) return refuse(msg("noActiveTab"));
     const reason = await cannotRun(id);
     if (reason !== null) refuse(reason);
   } catch (e) {
@@ -129,7 +132,7 @@ async function showToggles(): Promise<void> {
   // Vector output has no OCR (the options page says why).
   const vector = settings.output === "vector";
   checkbox("ocr").disabled = vector;
-  checkbox("ocr").title = vector ? "Off for the Shapes and text output (see All settings)" : "";
+  checkbox("ocr").title = vector ? msg("popupOcrOffVector") : "";
   storedFolder = settings.saveFolder;
   folder.value = storedFolder;
   toggles.disabled = false;
@@ -145,7 +148,7 @@ function folderProblem(text: string | null): void {
 /** Stores the typed folder when it passes the same check the background applies; the field then shows the normalised path. */
 async function commitFolder(): Promise<void> {
   const check = checkFolder(folder.value);
-  if (!check.ok) return folderProblem(`Not saved: ${describeFolderProblem(check.reason)}`);
+  if (!check.ok) return folderProblem(msg("notSaved", describeFolderProblem(check.reason)));
   folderProblem(null);
   folder.value = check.folder;
   const { folder: value } = check;
@@ -155,7 +158,7 @@ async function commitFolder(): Promise<void> {
       storedFolder = value;
     } catch {
       folder.value = storedFolder;
-      folderProblem("Could not save the setting");
+      folderProblem(msg("couldNotSaveSetting"));
     }
   });
   pendingWrite = write;
@@ -176,7 +179,7 @@ toggles.addEventListener("change", async (event) => {
     } catch {
       // The checkbox shows what the next capture uses: the stored value.
       el.checked = !value;
-      status.textContent = "Could not save the setting";
+      status.textContent = msg("couldNotSaveSetting");
     }
   });
   pendingWrite = write;
@@ -188,7 +191,7 @@ options.addEventListener("click", async () => {
     await browser.runtime.openOptionsPage();
     window.close();
   } catch (e) {
-    status.textContent = `Could not open the settings: ${errorText(e)}`;
+    status.textContent = msg("couldNotOpenSettings", errorText(e));
   }
 });
 

@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // One capture session in the page: overlay → selection → extraction → save
-// request or clipboard write → toast. Free of `browser.*` so the layout
-// harness can run it in page context with stubbed sendSave/writeClipboard;
-// main.ts wires the real messaging and clipboard.
+// request or clipboard write → toast. Free of `browser.*` (its messages fall
+// back to English without it) so the layout harness can run it in page
+// context with stubbed sendSave/writeClipboard; main.ts wires the real
+// messaging and clipboard.
 import { cleanPageUrl } from "../shared/cleanurl.ts";
 import { linksRelativeTo, runsRelativeTo } from "../shared/geometry.ts";
+import { msg } from "../shared/i18n.ts";
 import { runsToPlainText } from "../shared/plaintext.ts";
 import { fragmentToCleanHtml, type SNode, toSNodes } from "../shared/sanitize.ts";
 import type {
@@ -30,29 +32,27 @@ import { createHtml, styleHost } from "./overlay/styles.ts";
 import { showToast } from "./overlay/toolbar.ts";
 
 /** Why Save is unavailable for a selection that is not wholly visible, where only the viewport can be captured. */
-export const VIEWPORT_ONLY_NOTICE =
-  "Only what is visible can be saved in this browser. Scroll the selection fully into view or select a smaller area";
+export const VIEWPORT_ONLY_NOTICE = msg("noticeViewportOnly");
 
 const ERROR_TOAST: Record<SaveError, string> = {
-  "needs-host-permission": "snapii has no permission to capture this page",
-  "capture-failed": "Capture failed. Try again or select another area",
-  "too-large": "This area is too large to capture. Select a smaller one",
+  "needs-host-permission": msg("toastNoPermission"),
+  "capture-failed": msg("toastCaptureFailed"),
+  "too-large": msg("toastTooLarge"),
   "outside-viewport": VIEWPORT_ONLY_NOTICE,
-  "download-failed": "The SVG was not saved (download failed or was cancelled)",
+  "download-failed": msg("toastDownloadFailed"),
 };
 
 /**
  * Vector output can save beyond the viewport there, except the parts it
  * takes as pixels: those have to be on screen.
  */
-export const VECTOR_OUTSIDE_NOTICE =
-  "Parts of this selection that are saved as pixels are outside the visible area. Scroll them into view or select a smaller area";
+export const VECTOR_OUTSIDE_NOTICE = msg("noticeVectorOutside");
 
 /** Shown when extraction or messaging throws before the background could answer. */
-const UNEXPECTED_TOAST = "Capture failed unexpectedly. Try again";
+const UNEXPECTED_TOAST = msg("toastUnexpected");
 
 /** Between `captured` and the reply, while Tesseract reads the images. */
-const RECOGNIZING_TOAST = "Saving… (recognizing text)";
+const RECOGNIZING_TOAST = msg("toastRecognizing");
 /** Long enough for the OCR budget (20 s) and the download; the reply's toast replaces it. */
 const RECOGNIZING_TOAST_MS = 30_000;
 
@@ -60,22 +60,22 @@ const RECOGNIZING_TOAST_MS = 30_000;
  * A failure after `captured`: the overlay is already gone, so the toast says
  * the selection was taken and that a retry starts over.
  */
-const LATE_ERROR_TOAST = "The selection was captured, but no SVG came of it. Start snapii again to retry";
+const LATE_ERROR_TOAST = msg("toastLateError");
 
-const COPY_FAILED_TOAST = "Copy failed. Try again";
-const NO_TEXT_TOAST = "No text in the selection";
-const COPIED_TEXT_TOAST = "Copied text";
-const COPIED_PAGE_LINK_TOAST = "Copied page link";
-const COPIED_CLEAN_LINK_TOAST = "Copied page link, tracking removed";
+const COPY_FAILED_TOAST = msg("toastCopyFailed");
+const NO_TEXT_TOAST = msg("toastNoText");
+const COPIED_TEXT_TOAST = msg("toastCopiedText");
+const COPIED_PAGE_LINK_TOAST = msg("toastCopiedPageLink");
+const COPIED_CLEAN_LINK_TOAST = msg("toastCopiedCleanLink");
 
 /** Copy link's toast per fragment status: a page link says less than a text link, so the toast says why. */
 const LINK_TOAST: Record<FragmentStatus, string> = {
-  SUCCESS: "Copied link",
-  DISABLED: "Copied page link",
-  AMBIGUOUS: "Copied page link (no unique text match)",
-  INVALID_SELECTION: "Copied page link (no text selected)",
-  TIMEOUT: "Copied page link (page too large to link the exact text)",
-  EXECUTION_FAILED: "Copied page link (no text link possible)",
+  SUCCESS: msg("toastCopiedLink"),
+  DISABLED: COPIED_PAGE_LINK_TOAST,
+  AMBIGUOUS: msg("toastLinkAmbiguous"),
+  INVALID_SELECTION: msg("toastLinkNoSelection"),
+  TIMEOUT: msg("toastLinkTimeout"),
+  EXECUTION_FAILED: msg("toastLinkFailed"),
 };
 
 export interface SessionDeps {
@@ -377,7 +377,7 @@ export function startSession(deps: SessionDeps): SessionHandle {
     }
 
     if (reply.ok) {
-      notify(`Saved ${reply.filename}`);
+      notify(msg("toastSaved", reply.filename));
       close();
       return;
     }
