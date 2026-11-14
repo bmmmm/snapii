@@ -327,9 +327,9 @@ address carries a token.
 A file saved with vector output holds more of the page than its pixels:
 
 - the colours of the region's boxes, and their gradients and shadows;
-- the boxes, gradients and shadows that reach into the selection, at their
-  full size (beyond the selection's edge, hidden by the SVG's frame), also
-  where something else covers them on the page;
+- the boxes, gradients, shadows and outlines that reach into the selection,
+  at their full size (beyond the selection's edge, hidden by the SVG's
+  frame), also where something else covers them on the page;
 - the pictures of the region's images and canvases, cut to the part inside
   their box, their clips and the selection, but not to what covers them: a
   picture under another element, or sharp under a blurring overlay, is in the
