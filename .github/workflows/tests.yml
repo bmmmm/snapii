@@ -1,5 +1,4 @@
-# Unit + Playwright layout suites, extension build, web-ext lint and the
-# Chromium glue suite.
+# Static checks, unit tests and builds alongside independent browser suites.
 name: tests
 
 on:
@@ -11,9 +10,16 @@ on:
 permissions:
   contents: read
 
+# A push to a pull request makes the run of the commit before it pointless.
+# Runs on main are never cancelled: each one is that commit's record.
+concurrency:
+  group: tests-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  check:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -23,11 +29,39 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
-      # Playwright's own Firefox and Chromium builds. The Marionette glue
-      # suite needs a release Firefox and stays a local gate (pnpm test:glue).
-      - run: pnpm exec playwright install --with-deps firefox chromium
-      - run: pnpm test
+      - run: node --test 'tests/unit/**/*.test.ts'
       - run: pnpm build
       - run: pnpm lint:ext
+
+  layout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [firefox, chromium]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Playwright's own Firefox and Chromium builds. The Marionette glue
+      # suite needs a release Firefox and stays a local gate (pnpm test:glue).
+      - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+      - run: pnpm exec playwright test --project=${{ matrix.browser }}
+      # The HTML report and the first-retry traces (playwright.config.ts) are
+      # the only way to see why a spec failed or passed on retry only.
+      - if: ${{ !cancelled() && (failure() || hashFiles('test-results/**/trace.zip') != '') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-${{ matrix.browser }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
       # The real extension in that same Chromium, headless; builds dist-chromium/ itself.
-      - run: pnpm test:glue:chromium
+      - if: matrix.browser == 'chromium'
+        run: pnpm test:glue:chromium

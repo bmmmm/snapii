@@ -32,9 +32,10 @@ pnpm start        # fresh Firefox profile with dist/ loaded (add --start-url <ur
   device-pixel ratio 2 and bind local ports 8460–8469 (server) and
   2960–2969 (Marionette); `SNAPII_GLUE_PORT_OFFSET=<n>` shifts both, and
   `SNAPII_GLUE_OUT=<dir>` keeps profiles, logs and the downloaded files.
-  Set `SNAPII_FIREFOX=/path/to/firefox` for the glue suite and `pnpm drive`.
-  `pnpm start` has a fixed macOS path; elsewhere use
-  `pnpm exec web-ext run --source-dir dist --firefox=/path/to/firefox`.
+  Set `SNAPII_FIREFOX=/path/to/firefox` for the glue suite, `pnpm drive` and
+  `pnpm start`.
+  Their launcher sets `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1` for Firefox 159+ and
+  keeps `--remote-allow-system-access` for older releases.
 - What the automated run cannot check (real keyboard, real display, other
   apps' clipboards, other viewers) is in
   [tests/MANUAL-CHECKLIST.md](../tests/MANUAL-CHECKLIST.md).
@@ -168,10 +169,17 @@ default, the others only report it),
 checks the text layer, the links, hostile values and that the save message
 passes the background's validator.
 
-CI runs `pnpm check`, `pnpm test`, `pnpm build`, `pnpm lint:ext` and
-`pnpm test:glue:chromium` (`.github/workflows/tests.yml`). Firefox glue
-remains a local gate. Playwright retries twice in CI; a pass only on retry
-still needs investigation.
+CI runs `pnpm check`, unit tests, `pnpm build` and `pnpm lint:ext` in the
+`check` job (`.github/workflows/tests.yml`). Two independent `layout` jobs
+install and test only their browser, Firefox or Chromium; the Chromium job
+then runs `pnpm test:glue:chromium`. A failure in one browser leaves the
+other running. Firefox glue remains a local gate.
+Playwright retries twice in CI; a pass only on retry
+still needs investigation. When a spec failed or was retried, the run keeps
+Playwright's HTML report and the traces as a `playwright-report-firefox` or
+`playwright-report-chromium` artifact
+for seven days. A newer push to a pull request cancels the run of the one
+before it.
 
 Before a release, run both glue suites as well as the CI checks, then record
 the human checks in `tests/MANUAL-CHECKLIST.md` with the browser version, OS
