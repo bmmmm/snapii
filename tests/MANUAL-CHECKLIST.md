@@ -40,7 +40,7 @@ the same time; 10 would collide with the Chromium suite's 8470–8479 and
 | 5 | Below-the-fold selection behaves per D1 (captured, not clipped) | auto (tests/glue/offscreen.test.mjs: item 5a, item 5b) + human 5h |
 | 6 | Permission granted path | obsolete (D1) |
 | 7 | Zoom 150 % / 80 % | auto (tests/glue/offscreen.test.mjs: item 7 ×2) |
-| 8 | Copy text into a rich and a plain editor | auto for what lands on Firefox's clipboard, on a secure and a non-secure origin (tests/glue/copy.test.mjs: item 8 ×2) + human 8h (pasting into other apps) |
+| 8 | Copy text into a rich and a plain editor | auto for what lands on Firefox's clipboard, on a secure and a non-secure origin (tests/glue/copy.test.mjs: item 8 ×2), and a region that cuts a word at each edge (item 8 ×1) + human 8h (pasting into other apps) |
 | 9 | Copy link → new tab highlights the passage | auto (tests/glue/copy.test.mjs: item 9) + human 9h |
 | 10 | `about:addons` and AMO → the popup says why (button disabled), the shortcut puts a badge; no console error | auto for `about:addons` and `view-source:` with the shortcut (tests/glue/overlay.test.mjs: item 10 ×2), `about:addons` and an SVG document with the popup (tests/glue/popup.test.mjs: popup on …) + human 10h (AMO, PDF viewer) |
 | 11 | Strict-CSP page → overlay styled | auto with a local page served with `Content-Security-Policy: style-src 'none'; script-src 'none'` as an HTTP header (tests/glue/overlay.test.mjs: item 11) + human 11h (github.com) |
@@ -133,7 +133,10 @@ window): heading, bold/italic, the list and the "real link" link arrive;
 TextEdit in plain-text mode (or Terminal): the six lines with empty lines
 between them. Repeat once on a non-secure origin (e.g. any `http://` site
 that is not localhost) to see the background fallback reach the system
-clipboard.
+clipboard. Then drag a rectangle on one line of the first paragraph that
+starts in the middle of one word and ends in the middle of another, **Copy
+text**: both words arrive whole in both editors, and no word from beside the
+rectangle.
 
 **9h — real click and display.** On
 `http://127.0.0.1:8438/glue/fixtures/article.html` scroll to the last

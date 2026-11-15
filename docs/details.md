@@ -263,6 +263,20 @@ transparent; how these viewers handle it has not been checked yet.
   by other elements" is on. Text hidden with `display`, `visibility`,
   `opacity`, clipping or `font-size: 0` is left out. Text with
   `user-select: none` is included on purpose.
+- **Copy text takes whole words.** A word the selection's left or right edge
+  runs through is copied whole — part of one letter inside is enough — also
+  where markup divides it (`foo<b>bar</b>`); a word wholly beside the
+  selection is not copied. The HTML holds the same words as the plain text,
+  with their links and emphasis. A word is what stands between two spaces, so
+  `(well-known,`, `3,5` and a URL stay in one piece; in scripts written
+  without spaces (Chinese, Japanese, Thai and others) it is what the browser's
+  word segmentation gives. What does not change: a line with less than half
+  its height in the selection is left out, and text the page itself cuts off
+  (an `overflow` box) stays cut — nothing is copied that the page does not
+  show. Each line stands for itself: of a word broken across two lines at its
+  hyphen, only the part on a line the selection reaches is copied. The saved
+  SVG's text layer is not affected; it holds the letters that lie wholly
+  inside the picture.
 - The vertical position of the invisible text is estimated from the font's
   metrics; for lines set in a fallback font (e.g. Hebrew, Arabic or CJK
   text under a Latin font stack) it can be off by a small amount. The

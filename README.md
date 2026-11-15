@@ -23,7 +23,7 @@ Status: **beta** (0.2.0) — see [Install](#install).
 - **Save SVG** — picture + invisible text layer + links + metadata (source URL,
   time) in one file.
 - **Copy text** — the selection as clean text and simple HTML, without hidden
-  text or scripts.
+  text or scripts. A word the selection's edge runs through is copied whole.
 - **Copy element link** — a link that opens the page, jumps to the start of
   the selection and highlights it (`#:~:text=`).
 - **Copy page link** — the page's own address, without a text-fragment link.

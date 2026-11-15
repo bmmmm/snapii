@@ -62,7 +62,7 @@ other environment variables and the interactive driver are in
 | `src/shared/types.ts` | Data contracts between content script, background and renderer, `Settings` |
 | `src/shared/messages.ts` | Runtime validation of every message the background receives |
 | `src/shared/settings.ts` | `DEFAULT_SETTINGS` |
-| `src/shared/*.ts` (rest) | Pure helpers: geometry, tiling, capture strategy, pick heuristic, toolbar placement, links, tracker removal from copied links (`cleanurl.ts`), whitespace and plain text, HTML sanitising for Copy text, text directives, OCR geometry, file name, save-folder rules, shortcut syntax, CSS colours as numbers (`color.ts`), the version line (`about.ts`) |
+| `src/shared/*.ts` (rest) | Pure helpers: geometry, tiling, capture strategy, pick heuristic, toolbar placement, links, tracker removal from copied links (`cleanurl.ts`), whitespace and plain text, word boundaries for Copy text (`words.ts`), HTML sanitising for Copy text, text directives, OCR geometry, file name, save-folder rules, shortcut syntax, CSS colours as numbers (`color.ts`), the version line (`about.ts`) |
 | `src/shared/spike.ts` | Platform facts measured on Firefox 157 and on Chromium 151/153 (the headers say how); never edit by hand without a new measurement |
 | `src/shared/manifest.ts`, `target.ts` | The manifest each browser gets; which browser a bundle was built for (`TARGET`, set by the build) |
 | `src/shared/viewport.ts` | Chromium only: whether a region fits the viewport and where it lies in the captured picture |
@@ -86,8 +86,10 @@ builds name Chromium instead).
 
 - **Text in the SVG is missing, wrong or misplaced** — *does Copy text on the
   same selection get it right?* Copy text reads the page the same way the
-  text layer does: if it is wrong too, extraction is at fault
-  (`src/content/extract/`); if it is right, the renderer or the viewer is. The
+  text layer does (but takes a word at the selection's edge whole, where the
+  text layer keeps the letters inside): if it is wrong too, extraction is at
+  fault (`src/content/extract/`); if it is right, the renderer or the viewer
+  is. The
   form also asks which program opened the SVG — only browsers select the
   invisible text — and whether the text was page text or inside an image
   (OCR).
