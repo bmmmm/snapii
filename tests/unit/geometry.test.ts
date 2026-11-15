@@ -9,8 +9,10 @@ import {
   lineIndexOf,
   linksRelativeTo,
   minus,
+  reachesInto,
   runsRelativeTo,
   union,
+  wordInRegion,
 } from "../../src/shared/geometry.ts";
 import type { DocRect, LinkArea, TextRun } from "../../src/shared/types.ts";
 
@@ -39,6 +41,45 @@ test("minus: the bands of a rect around a hole, none where the hole reaches the 
   // No overlap: the whole rect; a hole over all of it: nothing.
   assert.deepEqual(minus(R(0, 0, 10, 10), R(20, 0, 5, 5)), [R(0, 0, 10, 10)]);
   assert.deepEqual(minus(R(0, 0, 10, 10), R(-1, -1, 12, 12)), []);
+});
+
+test("reachesInto: more than the tolerance of the box's width inside, however little of the box that is", () => {
+  const region = R(100, 0, 100, 20);
+  // A glyph the left edge runs through, and one the right edge does.
+  assert.equal(reachesInto(R(95, 0, 10, 20), region), true);
+  assert.equal(reachesInto(R(198, 0, 10, 20), region), true);
+  // Inside, and wider than the region.
+  assert.equal(reachesInto(R(120, 0, 10, 20), region), true);
+  assert.equal(reachesInto(R(0, 0, 500, 20), region), true);
+  // Ending where the region starts, or half a pixel in: outside.
+  assert.equal(reachesInto(R(90, 0, 10, 20), region), false);
+  assert.equal(reachesInto(R(90, 0, 10.5, 20), region), false);
+  assert.equal(reachesInto(R(90, 0, 10.6, 20), region), true);
+  assert.equal(reachesInto(R(199.5, 0, 10, 20), region), false);
+  assert.equal(reachesInto(R(300, 0, 10, 20), region), false);
+  // Sideways only: the rows are the caller's.
+  assert.equal(reachesInto(R(120, 500, 10, 20), region), true);
+});
+
+test("wordInRegion: a word the region cuts sideways counts, one with less than half its height in it does not", () => {
+  const region = R(100, 100, 100, 40);
+  assert.equal(wordInRegion(R(120, 110, 40, 20), region), true);
+  // Cut by the left edge, by the right edge, wider than the region.
+  assert.equal(wordInRegion(R(60, 110, 45, 20), region), true);
+  assert.equal(wordInRegion(R(195, 110, 60, 20), region), true);
+  assert.equal(wordInRegion(R(0, 110, 400, 20), region), true);
+  // Wholly beside it, or only touching its edge.
+  assert.equal(wordInRegion(R(20, 110, 60, 20), region), false);
+  assert.equal(wordInRegion(R(60, 110, 40, 20), region), false);
+  assert.equal(wordInRegion(R(200, 110, 40, 20), region), false);
+  // In by less than the tolerance: a rounding step, not a glyph.
+  assert.equal(wordInRegion(R(60, 110, 40.3, 20), region), false);
+  // Half the height shown counts, less does not; above and below alike.
+  assert.equal(wordInRegion(R(120, 90, 40, 20), region), true);
+  assert.equal(wordInRegion(R(120, 89, 40, 20), region), false);
+  assert.equal(wordInRegion(R(120, 130, 40, 20), region), true);
+  assert.equal(wordInRegion(R(120, 131, 40, 20), region), false);
+  assert.equal(wordInRegion(R(120, 0, 40, 20), region), false);
 });
 
 test("groupIntoLines: bidi fragments of one line merge, lines stay apart", () => {
