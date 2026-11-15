@@ -283,14 +283,15 @@ export function startSession(deps: SessionDeps): SessionHandle {
     if (!cancelled) toast(message, ms);
   };
 
-  /** The selection's text runs plus the characters each came from. */
-  function collect(selection: Selection): ReturnType<typeof collectTextRunsDetailed> {
+  /** The selection's text runs plus the characters each came from; `wholeWords` as the collector has it. */
+  function collect(selection: Selection, wholeWords = false): ReturnType<typeof collectTextRunsDetailed> {
     // A toast still on screen (e.g. from a copy button) is page DOM: it would
     // end up in the text and, on save, in the raster.
     for (const t of document.querySelectorAll("snapii-toast")) t.remove();
     return collectTextRunsDetailed(document, selection.rect, {
       skip: overlay.host,
       occlusionCheck: deps.settings.occlusionCheck,
+      wholeWords,
     });
   }
 
@@ -391,9 +392,13 @@ export function startSession(deps: SessionDeps): SessionHandle {
     notify(vectorOutside ? VECTOR_OUTSIDE_NOTICE : (ERROR_TOAST[reply.error] ?? UNEXPECTED_TOAST));
   }
 
-  /** text/plain as the capture shows it; text/html from the visible part of the selected DOM. */
+  /**
+   * text/plain as the capture shows it, a word the selection's edge runs
+   * through taken whole; text/html from the visible part of the selected
+   * DOM, the same characters.
+   */
   async function copyText(selection: Selection): Promise<void> {
-    const { runs, sources } = await collect(selection);
+    const { runs, sources } = await collect(selection, true);
     // Cancelled while collection waited for the fonts: the user is done, so
     // the clipboard keeps what they had there.
     if (!open) return;
@@ -413,9 +418,7 @@ export function startSession(deps: SessionDeps): SessionHandle {
     const ownLines = new Set(runs.filter((_, i) => own(i)).map((r) => r.line));
     const outside = runs.some((r, i) => !own(i) && !ownLines.has(r.line));
     const range = outside ? null : selectionRange(selection, sources);
-    const cloned = range
-      ? fragmentToCleanHtml(toSNodes(cloneVisibleRange(range, new Set(sources.map((s) => s.node)))), ctx)
-      : "";
+    const cloned = range ? fragmentToCleanHtml(toSNodes(cloneVisibleRange(range, sources)), ctx) : "";
     const html = cloned.trim() !== "" ? cloned : fragmentToCleanHtml(plainParagraphs(plain), ctx);
     await deps.writeClipboard({ plain, html });
     notify(COPIED_TEXT_TOAST);

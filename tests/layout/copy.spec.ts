@@ -22,7 +22,7 @@ function copyText(page: Page, captureSel: string) {
     );
     const range = document.createRange();
     range.selectNodeContents(cap);
-    const fragment = h.cloneVisibleRange(range, new Set(sources.map((s) => s.node)));
+    const fragment = h.cloneVisibleRange(range, sources);
     const html = h.fragmentToCleanHtml(h.toSNodes(fragment), {
       baseURL: document.baseURI,
       pageURL: location.href,
