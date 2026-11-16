@@ -21,6 +21,8 @@ pnpm drive help                  # one persistent headless Firefox, one command 
 `SNAPII_FIREFOX` overrides the macOS default path); `pnpm test:glue:chromium`
 starts Playwright's pinned Chromium (`SNAPII_CHROMIUM` names another binary;
 branded Chrome no longer loads unpacked extensions from the command line).
+The Firefox launcher sets `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1` (required since
+Firefox 159) and keeps `--remote-allow-system-access` for older releases.
 **Both browsers must run outside a sandbox** — inside one the glue suites and
 `pnpm drive` fail like real bugs (ports, sockets, process launch). Glue ports:
 Firefox 8460–8469 and 2960–2969, Chromium 8470–8479 and 2970–2979; a second

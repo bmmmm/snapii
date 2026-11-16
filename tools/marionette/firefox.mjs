@@ -72,19 +72,21 @@ export async function launchFirefox({
   const logFile = join(profileRoot, `firefox-${port}.log`);
   const args = ["--marionette", "--remote-allow-system-access", ...(headless ? ["-headless"] : [])];
   args.push("-no-remote", "-profile", profile);
+  // Firefox 159 removed the flag; keep it for older releases and enable both launch modes.
+  const firefoxEnv = { ...process.env, ...env, MOZ_REMOTE_ALLOW_SYSTEM_ACCESS: "1" };
   let proc;
   if (detached) {
     const fd = openSync(logFile, "a");
     proc = spawn(firefox, args, {
       stdio: ["ignore", fd, fd],
-      env: { ...process.env, ...env },
+      env: firefoxEnv,
       detached: true,
     });
     closeSync(fd);
     proc.unref();
   } else {
     const log = createWriteStream(logFile);
-    proc = spawn(firefox, args, { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, ...env } });
+    proc = spawn(firefox, args, { stdio: ["ignore", "pipe", "pipe"], env: firefoxEnv });
     proc.stdout.pipe(log);
     proc.stderr.pipe(log);
   }

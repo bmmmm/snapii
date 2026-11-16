@@ -113,11 +113,25 @@ const polar = (C: number, H: number): [number, number] => [
   C * Math.sin((H * Math.PI) / 180),
 ];
 
+// A page paints thousands of boxes in a handful of colours, and the scene
+// builder asks for each box's several times: parsing was a tenth of its walk
+// (profiled in Chromium on a page of 9 000 boxes). Bounded, since a page can
+// name any number of colours.
+const MAX_PARSED = 1024;
+const parsed = new Map<string, Paint | null>();
+
 /** The colour as sRGB numbers (channels 0–255, alpha 0–1), or null if it is not one this parser knows. */
 export function parseColor(css: string): Paint | null {
-  const p = convert(css);
-  // Huge components overflow the matrices into Infinity - Infinity.
-  return p && [p.r, p.g, p.b, p.a].every(Number.isFinite) ? p : null;
+  let p = parsed.get(css);
+  if (p === undefined) {
+    const c = convert(css);
+    // Huge components overflow the matrices into Infinity - Infinity.
+    p = c && [c.r, c.g, c.b, c.a].every(Number.isFinite) ? c : null;
+    if (parsed.size >= MAX_PARSED) parsed.clear();
+    parsed.set(css, p);
+  }
+  // A copy: the caller's object ends up in the scene and is its own.
+  return p && { ...p };
 }
 
 function convert(css: string): Paint | null {

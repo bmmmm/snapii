@@ -57,6 +57,9 @@ export async function startGlue(slot, { prefs = {} } = {}) {
       env: HEADLESS_ENV,
       prefs: {
         "layout.css.devPixelsPerPx": "2",
+        // Firefox 159 otherwise reserves 15 px for scrollbars on this Mac;
+        // the suite's geometry assertions assume a 1280 px content viewport.
+        "ui.useOverlayScrollbars": 1,
         "browser.download.folderList": 2,
         "browser.download.dir": downloads,
         "browser.download.useDownloadDir": true,
