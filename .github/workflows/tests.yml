@@ -1,4 +1,6 @@
-# Static checks, unit tests and builds alongside independent browser suites.
+# Three jobs side by side: static checks, unit tests, build and web-ext lint;
+# then the Playwright layout suite once per browser, the Chromium one followed
+# by the Chromium glue suite.
 name: tests
 
 on:
@@ -19,6 +21,8 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    # Well under a minute when healthy; a step that hangs would hold the
+    # runner for the default six hours.
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
@@ -29,12 +33,14 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
-      - run: node --test 'tests/unit/**/*.test.ts'
+      - run: pnpm test:unit
       - run: pnpm build
       - run: pnpm lint:ext
 
   layout:
     runs-on: ubuntu-latest
+    # A browser's job takes about three minutes; a browser that hangs would
+    # hold the runner for the default six hours.
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -48,8 +54,9 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Playwright's own Firefox and Chromium builds. The Marionette glue
-      # suite needs a release Firefox and stays a local gate (pnpm test:glue).
+      # Playwright's own build of this job's browser, nothing else. The
+      # Marionette glue suite needs a release Firefox and stays a local gate
+      # (pnpm test:glue).
       - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
       - run: pnpm exec playwright test --project=${{ matrix.browser }}
       # The HTML report and the first-retry traces (playwright.config.ts) are
