@@ -49,7 +49,7 @@ the same time; 10 would collide with the Chromium suite's 8470–8479 and
 | 14 | Revoke host permission in `about:addons` → hint | obsolete (D1) |
 | 15 | Informative: open the SVG in Chrome and Inkscape | human 15h |
 | 16 | Vector output: Output "Shapes and text" in the settings page → the save has shapes, visible text, pictures and patches; the record says `output: "vector"`; OCR is off | auto (tests/glue/options.test.mjs: output Vector …, vector output with pictures …; tests/glue-chromium/save.test.mjs: vector output …; tests/layout/vector.spec.ts) + human 16h |
-| 17 | German interface: with Firefox's UI in German, popup, settings page, overlay hint, toolbar, toasts, the toolbar tooltip and the shortcut's description in `about:addons` are German, nothing is cut off; the saved file is unchanged | auto for the catalogues and the German path with a stand-in API (tests/unit/i18n.test.ts, tests/unit/i18n-de.test.ts) and the overlay's German labels in both browsers' layout runs (tests/layout/german.spec.ts) + human 17h |
+| 17 | German interface: with Firefox's UI in German, popup, settings page, overlay hint, toolbar, toasts, the toolbar tooltip and the shortcut's description in `about:addons` are German, nothing is cut off; the saved file is unchanged | auto for the catalogues and the German path with a stand-in API (tests/unit/i18n.test.ts, tests/unit/i18n-de.test.ts), the overlay's German labels in both browsers' layout runs (tests/layout/german.spec.ts), and in Firefox started in German the popup, the settings page, the tooltip, the commands, hint, toolbar, toast and the saved file (tests/glue/german.test.mjs; skipped by a Firefox that has no German) + human 17h (nothing cut off, `about:addons`) |
 
 ### Chromium
 
@@ -65,7 +65,12 @@ cancelled Save-as dialog (headless Chromium has no file dialog, so every
 "Ask where to save" download ends as a cancelled one), and vector output
 (shapes and visible text, pictures and patches, a selection beyond the
 viewport without patches that saves, and one with a patch there that is
-refused).
+refused), and, started in German, the popup, the settings page, the tooltip,
+the commands, hint, toolbar, toast and the saved file
+(tests/glue-chromium/german.test.mjs).
+
+Both glue suites start their browser in English whatever the system's
+language is; the German tests start their own in German.
 
 Human steps there (load `dist-chromium/` via `chrome://extensions` → Developer
 mode → Load unpacked):
@@ -91,7 +96,8 @@ mode → Load unpacked):
   Language & Region) and go through 17h there: popup, settings page with the
   read-only shortcut section, overlay and toast in German, the extension's
   description on `chrome://extensions` and the command on
-  `chrome://extensions/shortcuts` too.
+  `chrome://extensions/shortcuts` too. The glue run reads the texts; what is
+  left for a person is that nothing is cut off and the browser's two pages.
 
 ### What the automated run cannot stand in for
 
