@@ -31,7 +31,8 @@ Status: **beta** (0.2.0) — see [Install](#install).
   `fbclid`, `gclid` and similar); can be switched off.
 - **Text in images (OCR)** — optional: words inside pictures, banners and
   canvases become selectable too, recognised offline (German + English).
-  Real page text always wins.
+  Real page text always wins. With it on, Copy text copies those words as
+  well.
 - **Your shortcut** — Ctrl+Alt+S by default (⇧⌘E on macOS) starts a capture
   at once, changeable right in snapii's settings. Chromium does not load an
   extension with the Ctrl+Alt default, so there it is Alt+Shift+S (⇧⌘E on
@@ -85,7 +86,8 @@ What differs from Firefox:
 - **Save SVG takes what is visible.** Chromium lets an extension capture the
   viewport only, so a selection that reaches beyond it cannot be saved: the
   overlay says so, and scrolling the selection fully into view makes Save
-  available again. Copy text and both links work for any selection. With
+  available again. Copy text and both links work for any selection; with OCR
+  on, Copy text reads the selection's images as far as they are visible. With
   Shapes and text output only the parts saved as pixels must be visible.
 - **The shortcut is changed in the browser**, at `chrome://extensions/shortcuts`
   (the settings page shows the current one and links there).

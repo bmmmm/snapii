@@ -217,7 +217,46 @@ models ship in the add-on (8.3 MB of the unpacked add-on), nothing is downloaded
 - Photos are harder than graphics: on a Wikipedia photo of a road sign it
   read "Auf 1200" of "Auf 1200 m"; small, slanted or non-German/English text
   is often missed.
-- **Copy text** and **Copy element link** stay DOM-only.
+- **Copy text reads the images too.** With the setting on, Copy text copies
+  the words recognised in the images the selection touches together with the
+  page's text, whatever the output setting (in Shapes and text output the
+  switch is disabled; the stored value counts). The same pass as for a save:
+  the same engine, at most 24 image areas, 20 seconds, DOM text wins, noise
+  dropped.
+  - **Whole words, as for page text:** a word in an image that the
+    selection's edge runs through is copied whole, one beside the selection
+    is not, and a line with less than half its height in the selection is
+    left out. For that the image is read beyond the selection: sideways as
+    far as it is visible, up and down by the selection's height (not the
+    whole of a page-high background picture for one line picked on it).
+  - **Where the words go:** in the plain text an image's words are a block of
+    their own, its lines kept, after the last line of page text that stands
+    above the image or left of it; a picture a paragraph flows around follows
+    that paragraph instead of splitting it. In the HTML they follow the
+    page's HTML, one paragraph per image.
+  - **What you see:** snapii's overlay and your text selection leave the
+    screen while the images are captured and come back as soon as the
+    background has the pixels; a toast says "Copying… (recognizing text)"
+    while Tesseract reads, then "Copied text". The clipboard is written only
+    then. The overlay works meanwhile: Escape, Cancel or a second start end
+    the copy and nothing is written; a copy started meanwhile wins over the
+    one still reading; Save SVG can be started and the text is copied all the
+    same.
+  - **If the images cannot be read** (the capture failed, the 20 seconds ran
+    out, the engine failed), the page's text is copied all the same and the
+    toast says "Copied text. Text in images was not recognized"; with no page
+    text in the selection, "Nothing copied. Text in images was not
+    recognized".
+  - With the setting off, or with no image in the selection, nothing is
+    captured and Copy text is what it is without OCR.
+  - **Chromium** captures the visible part of the page only, so there the
+    images are read as far as the viewport shows them; the page text of a
+    selection that reaches beyond the viewport is still copied whole.
+  - On a page laid out right to left the place of an image's words among the
+    lines is still decided as for left to right; on a page with several
+    columns it goes by height, so a picture in one column can land between
+    paragraphs of another.
+- **Copy element link** stays DOM-only.
 
 ## Viewers
 
@@ -353,7 +392,7 @@ Permissions, and why each one is declared:
 
 | Permission | Used for |
 |---|---|
-| `activeTab` | Access to the current tab, granted only when you click the button (opening its menu) or press the shortcut: injecting the overlay and capturing the visible tab; the menu also uses it to check whether snapii can run on the page. There are **no host permissions** (no "access your data for all websites"), so snapii cannot touch a tab you did not click. |
+| `activeTab` | Access to the current tab, granted only when you click the button (opening its menu) or press the shortcut: injecting the overlay and capturing the visible tab (for Save SVG, and for Copy text with OCR on); the menu also uses it to check whether snapii can run on the page. There are **no host permissions** (no "access your data for all websites"), so snapii cannot touch a tab you did not click. |
 | `scripting` | Injecting the content script on demand (the manifest has no `content_scripts`, nothing runs on a page until you start snapii there). |
 | `downloads` | Saving the SVG. |
 | `clipboardWrite` | Copy text, Copy element link and Copy page link, also on pages without a secure origin. |

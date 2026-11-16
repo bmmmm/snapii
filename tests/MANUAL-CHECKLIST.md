@@ -1,6 +1,6 @@
 # Manual checklist (Firefox)
 
-Items 1–16, followed by the Chromium checks. Each Firefox item is marked
+Items 1–17, followed by the Chromium checks. Each Firefox item is marked
 
 - `auto (tests/glue/<file>: <test>)` — `pnpm test:glue` drives the installed
   Firefox headless at DPR 2 through Marionette and checks it; the human only
@@ -49,6 +49,7 @@ the same time; 10 would collide with the Chromium suite's 8470–8479 and
 | 14 | Revoke host permission in `about:addons` → hint | obsolete (D1) |
 | 15 | Informative: open the SVG in Chrome and Inkscape | human 15h |
 | 16 | Vector output: Output "Shapes and text" in the settings page → the save has shapes, visible text, pictures and patches; the record says `output: "vector"`; OCR is off | auto (tests/glue/options.test.mjs: output Vector …, vector output with pictures …; tests/glue-chromium/save.test.mjs: vector output …; tests/layout/vector.spec.ts) + human 16h |
+| 17 | Copy text with "Recognize text in images" on: the words in the selection's images are on the clipboard with the page's text, a word in an image that the selection's edge cuts whole; the overlay is back while the images are read; with the setting off nothing is captured | auto (tests/glue/ocr.test.mjs: OCR on: Copy text … ×2, OCR off: Copy text …; tests/layout/copy-ocr.spec.ts for the order of events, failures and every way out) + human 17h |
 
 ### Chromium
 
@@ -57,7 +58,9 @@ scale factor 2: popup → overlay → save (file name, sub-folder, picture pixel
 text layer, record), zoom 150 %, the refusal of a selection beyond the
 viewport and the save after scrolling, JPEG, closed shadow trees, Copy text on
 a secure and a non-secure origin and Copy link (read back from the
-clipboard), OCR through the offscreen document, the popup on a browser page,
+clipboard), OCR through the offscreen document, Copy text with OCR on (the
+images' words with the page's text, and a cut word on a non-secure origin),
+the popup on a browser page,
 the read-only shortcut section, the folder rules against the real download
 API, a save across a service-worker restart, the toolbar notice, a
 cancelled Save-as dialog (headless Chromium has no file dialog, so every
@@ -85,6 +88,12 @@ mode → Load unpacked):
   be captured, the button is disabled.
 - **C6h: another Chromium browser.** Repeat C1h and one save in Edge or
   Brave.
+- **C7h: Copy text with OCR on, a picture the viewport cuts.** With
+  "Recognize text in images" on, scroll a picture with text half out of the
+  window, pick an element around it that reaches beyond the window, **Copy
+  text**: the overlay blinks away and back, "Copying… (recognizing text)",
+  then "Copied text". Pasted: the page's text of the whole element, and the
+  picture's words from its visible part only.
 
 ### What the automated run cannot stand in for
 
@@ -170,3 +179,17 @@ clickable, zooming in keeps edges sharp (patches excepted). Open the files in
 Inkscape and macOS Preview: the shapes show and can be selected and moved in
 Inkscape; note fonts the viewer replaces. Record the record's `scene` counts
 and what differs from the page.
+
+**17h — Copy text with OCR on, real clipboard.** Switch "Recognize text in
+images" on. On `http://127.0.0.1:8438/glue/fixtures/ocr.html` drag across
+everything, click **Copy text**: the overlay leaves the screen for a moment
+and is back, a toast says "Copying… (recognizing text)", then "Copied text".
+Paste into TextEdit (plain-text mode): the lines of the three pictures, the
+caption "Photo taken near Hallstatt" once, and the paragraph. Paste into a
+rich editor: the same words. Drag a rectangle on the first picture's first
+line from the middle of "Willkommen" to the middle of "Köln", **Copy text**:
+"Willkommen in Köln" and no word of the lines below. Click **Copy text**
+again and press Escape while the toast says "Copying…": the toast goes, and
+pasting still gives the earlier text. Repeat the first step on a non-secure
+origin. Switch the setting off: **Copy text** answers at once with the
+caption and the paragraph, and the overlay never leaves the screen.
