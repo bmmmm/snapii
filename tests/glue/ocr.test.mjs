@@ -3,7 +3,8 @@
 // options page, the fixture's images (an <img>, a CSS background, a photo
 // under a DOM caption) are saved through the toolbar/overlay path, and the
 // file shows what Tesseract added. Copy text takes the same words to the
-// clipboard. Timings are logged, not asserted.
+// clipboard, after the click's user activation has lapsed: the browser runs
+// with a short one. Other timings are logged, not asserted.
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { pathToFileURL } from "node:url";
@@ -16,11 +17,13 @@ const CAP = { x: 40, y: 40, width: 900, height: 560 };
 const IMG = { x: 40, y: 40, width: 420, height: 150 };
 // A save with OCR waits for the engine as well.
 const SAVE_MS = 60_000;
+// Firefox's default is 5 s, more than the pass takes on this page.
+const ACTIVATION_MS = 100;
 
 let g;
 let optionsUrl;
 before(async () => {
-  g = await startGlue(4);
+  g = await startGlue(4, { prefs: { "dom.user_activation.transient.timeout": ACTIVATION_MS } });
   const host = await g.s.chrome(
     "return WebExtensionPolicy.getByID(arguments[0]).mozExtensionHostname;",
     ADDON_ID,
@@ -179,11 +182,37 @@ test("OCR on: one image alone (latency of one area)", async () => {
   assert.ok(wordsOf(layerRuns(file.text, "ocr")).includes("Köln"));
 });
 
+/**
+ * Page-side clock for a copy: the last pointer event (the toolbar click) and
+ * whether the page had a user activation then. When the shield goes (the
+ * background has the pixels and starts reading) the page keeps its thread
+ * until that activation is over: the reply cannot reach the content script
+ * meanwhile, so the clipboard is written without one.
+ */
+const COPY_PROBE = `
+  const p = (window.__copy = { click: null, activeAtClick: null, shieldUp: false, free: null, activeWhenFree: null });
+  for (const type of ["pointerdown", "pointerup", "click"]) {
+    addEventListener(type, () => {
+      p.click = performance.now();
+      p.activeAtClick = navigator.userActivation.isActive;
+    }, true);
+  }
+  new MutationObserver(() => {
+    const up = document.querySelector("snapii-shield") !== null;
+    if (up) p.shieldUp = true;
+    if (up || !p.shieldUp || p.free !== null) return;
+    while (performance.now() - p.click <= ${ACTIVATION_MS} + 50) {}
+    p.free = performance.now();
+    p.activeWhenFree = navigator.userActivation.isActive;
+  }).observe(document.documentElement, { childList: true });
+`;
+
 /** Drags over `rect`, clicks Copy text and returns the clipboard once the copy's last toast is up. */
 async function copyRegion(rect) {
   await g.open(PAGE);
   await g.until(async () => (await g.content("return document.documentElement.dataset.ready;")) === "1", "images");
   await clearClipboard(g.s);
+  await g.content(COPY_PROBE);
   await g.startOverlay();
   await g.drag(rect.x, rect.y, rect.x + rect.width, rect.y + rect.height);
   const t0 = Date.now();
@@ -199,7 +228,8 @@ async function copyRegion(rect) {
     SAVE_MS,
   );
   const clip = await readClipboard(g.s);
-  return { clip, toasts: [...toasts], wallMs: Date.now() - t0 };
+  const probe = await g.content("return window.__copy;");
+  return { clip, toasts: [...toasts], wallMs: Date.now() - t0, probe };
 }
 
 /** Left edge and width (document px) of `word` after `lead` in #img's first line: 16 px into the picture, baseline at y 80. */
@@ -213,8 +243,8 @@ function inFirstLine(lead, word) {
   );
 }
 
-test("OCR on: Copy text puts the images' words on the clipboard with the DOM text, seconds after the click, and the overlay is back", async () => {
-  const { clip, toasts, wallMs } = await copyRegion(CAP);
+test("OCR on: Copy text puts the images' words on the clipboard with the DOM text once the click's user activation has lapsed, and the overlay is back", async () => {
+  const { clip, toasts, wallMs, probe } = await copyRegion(CAP);
   const plain = clip["text/plain"] ?? "";
   const known = await g.content("return window.OCR_WORDS;");
   const expected = wordsOf([...known.img, ...known.banner, ...known.photo]);
@@ -222,9 +252,13 @@ test("OCR on: Copy text puts the images' words on the clipboard with the DOM tex
   const hits = expected.filter((w) => got.includes(w));
   console.log(
     `copy with ocr: ${hits.length}/${expected.length} known words; toasts ${JSON.stringify(toasts)}; ` +
-      `wall time ${wallMs} ms; text ${JSON.stringify(plain)}`,
+      `wall time ${wallMs} ms; probe ${JSON.stringify(probe)}; text ${JSON.stringify(plain)}`,
   );
-  // The write happens long after the click: no user activation is left by then.
+  // The write came after the page was free again, and by then the click's activation was over.
+  assert.equal(probe.activeAtClick, true, "guard: the click gave the page a user activation");
+  assert.ok(probe.shieldUp && probe.free !== null, "guard: the shield came and went");
+  assert.ok(probe.free - probe.click > ACTIVATION_MS, `page free ${probe.free - probe.click} ms after the click`);
+  assert.equal(probe.activeWhenFree, false, "no user activation was left before the reply could arrive");
   assert.equal(toasts.at(-1), "Copied text");
   assert.ok(hits.length >= 0.8 * expected.length, `recognised ${hits.length} of ${expected.length}`);
   // The DOM text is there, the caption over the photo once (DOM text wins).

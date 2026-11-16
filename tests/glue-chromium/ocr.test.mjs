@@ -79,7 +79,13 @@ test("OCR on: the image words are selectable text in <g id=ocr>, recognised in t
   await g.until(async () => !(await g.offscreenOpen()), "the offscreen document to be closed");
 });
 
-/** Drags over `rect` on the fixture at `origin`, clicks Copy text and returns the clipboard once the copy's last toast is up. */
+/**
+ * Drags over `rect` on the fixture at `origin`, clicks Copy text and returns
+ * the clipboard once the copy's last toast is up. Not a check that the write
+ * needs no user activation: the click's (five seconds here, and no switch
+ * shortens it) outlasts the pass on this page, and the grant the clipboard
+ * helpers give the reader's origin covers the fixture on `g.base` too.
+ */
 async function copyRegion(rect, origin = g.base) {
   await g.writeClipboard(reader, "before the copy");
   await g.open(`${origin}${PAGE}`);
