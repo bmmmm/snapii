@@ -1,0 +1,436 @@
+{
+  "htmlLang": {
+    "message": "en",
+    "description": "Language tag of this catalogue, set as the lang attribute of the popup and the settings page. Not shown."
+  },
+  "extensionDescription": {
+    "message": "Save a page region as SVG with real, selectable text and clickable links.",
+    "description": "Add-on description in the browser's add-on manager and store."
+  },
+  "actionTitle": {
+    "message": "snapii: capture region as SVG",
+    "description": "Tooltip of the toolbar button."
+  },
+  "commandCapture": {
+    "message": "Capture a region",
+    "description": "Keyboard shortcut command, listed in the browser's shortcut settings and on the settings page."
+  },
+  "commandMenu": {
+    "message": "Open the snapii menu",
+    "description": "Keyboard shortcut command that opens the toolbar button's popup, listed in the browser's shortcut settings."
+  },
+  "cannotCapture": {
+    "message": "snapii cannot capture this page: $REASON$",
+    "description": "Shown in the popup and as the toolbar button's tooltip. The reason is one of the messages below or an error text of the browser (English or the browser's language).",
+    "placeholders": { "reason": { "content": "$1", "example": "snapii works on HTML pages only" } }
+  },
+  "noAccessFirefox": {
+    "message": "Firefox does not let extensions run on this page",
+    "description": "Reason after \"snapii cannot capture this page:\" (Firefox build), e.g. on about: pages or addons.mozilla.org."
+  },
+  "noAccessChromium": {
+    "message": "The browser does not let extensions run on this page",
+    "description": "Reason after \"snapii cannot capture this page:\" (Chromium build)."
+  },
+  "htmlOnly": {
+    "message": "snapii works on HTML pages only",
+    "description": "Reason after \"snapii cannot capture this page:\", e.g. for an SVG or XML document."
+  },
+  "noActiveTab": {
+    "message": "no active tab",
+    "description": "Reason after \"snapii cannot capture this page:\"."
+  },
+  "noBackgroundAnswer": {
+    "message": "no answer from snapii's background page",
+    "description": "Reason after \"snapii cannot capture this page:\" when the extension's background did not reply."
+  },
+  "popupCapture": {
+    "message": "Capture region",
+    "description": "Main button of the popup: opens the selection overlay on the page."
+  },
+  "popupQuickSettings": {
+    "message": "Quick settings",
+    "description": "Heading of the popup's switches."
+  },
+  "popupTextFragment": {
+    "message": "Add a link to the selected text",
+    "description": "Popup switch: the saved file links back to the selected passage (a text fragment URL)."
+  },
+  "popupFolder": {
+    "message": "Save in a folder inside Downloads",
+    "description": "Popup field label: a sub-folder of the browser's download folder."
+  },
+  "popupOcrOffVector": {
+    "message": "Off for the Shapes and text output (see All settings)",
+    "description": "Tooltip of the disabled OCR switch. \"Shapes and text\" is optionsOutputVector, \"All settings\" is popupAllSettings."
+  },
+  "popupAllSettings": {
+    "message": "All settings…",
+    "description": "Popup button that opens the settings page."
+  },
+  "couldNotSaveSetting": {
+    "message": "Could not save the setting"
+  },
+  "couldNotOpenSettings": {
+    "message": "Could not open the settings: $ERROR$",
+    "description": "The error is the browser's own text.",
+    "placeholders": { "error": { "content": "$1" } }
+  },
+  "notSaved": {
+    "message": "Not saved: $PROBLEM$",
+    "description": "Status when a typed folder or shortcut is refused; the problem is one of the folder or shortcut messages, or the browser's own text.",
+    "placeholders": { "problem": { "content": "$1", "example": "A folder name cannot start or end with a dot." } }
+  },
+  "settingSaveAs": {
+    "message": "Ask where to save each file"
+  },
+  "settingRemoveTrackers": {
+    "message": "Remove trackers from copied links",
+    "description": "Switch: Copy element link and Copy page link drop tracking parameters from the URL."
+  },
+  "settingOcr": {
+    "message": "Recognize text in images (OCR)"
+  },
+  "folderPlaceholder": {
+    "message": "Downloads folder itself",
+    "description": "Placeholder of the empty folder field: files go straight into the download folder."
+  },
+  "optionsTitle": {
+    "message": "snapii settings",
+    "description": "Title of the settings page."
+  },
+  "optionsImageFormat": {
+    "message": "Image format",
+    "description": "Section heading: the format of the picture inside the SVG."
+  },
+  "optionsPng": {
+    "message": "PNG (lossless)"
+  },
+  "optionsJpeg": {
+    "message": "JPEG (smaller files)"
+  },
+  "optionsJpegQuality": {
+    "message": "JPEG quality"
+  },
+  "optionsOutput": {
+    "message": "Output",
+    "description": "Section heading: what the SVG is made of."
+  },
+  "optionsOutputRaster": {
+    "message": "Picture of the page with selectable text"
+  },
+  "optionsOutputVector": {
+    "message": "Shapes and text (beta)",
+    "description": "Output where boxes and text become SVG shapes instead of a picture."
+  },
+  "optionsOutputHint": {
+    "message": "Boxes and text become SVG shapes, so the file stays sharp at any zoom and can be edited. What cannot be drawn as shapes (images, inner shadows, effects) is kept as pixels. Text recognition is off in this mode."
+  },
+  "optionsBehavior": {
+    "message": "Behavior",
+    "description": "Section heading."
+  },
+  "optionsOcclusion": {
+    "message": "Skip text covered by other elements"
+  },
+  "optionsTextFragment": {
+    "message": "Add a link to the selected text (text fragment)",
+    "description": "\"text fragment\" is the web feature behind links to a passage (#:~:text=)."
+  },
+  "optionsTrackersHint": {
+    "message": "Copy element link and Copy page link leave out tracking parameters (utm_*, fbclid, gclid and similar).",
+    "description": "\"Copy element link\" and \"Copy page link\" are the toolbar buttons (toolbarCopyLink, toolbarCopyPageLink)."
+  },
+  "optionsOcrHint": {
+    "message": "Runs locally; adds a few seconds to saving."
+  },
+  "optionsSaveLocation": {
+    "message": "Save location",
+    "description": "Section heading."
+  },
+  "optionsFolder": {
+    "message": "Folder inside Downloads",
+    "description": "Field label: a sub-folder of the browser's download folder."
+  },
+  "optionsFolderHint": {
+    "message": "$RULE$, so this is a sub-folder name such as snapii or Pages/snapii; it is created when needed. Leave it empty for the Downloads folder itself.",
+    "description": "The rule is insideDownloadsFirefox or insideDownloadsChromium.",
+    "placeholders": { "rule": { "content": "$1", "example": "Firefox lets add-ons save only inside its Downloads folder" } }
+  },
+  "insideDownloadsFirefox": {
+    "message": "Firefox lets add-ons save only inside its Downloads folder",
+    "description": "First half of a sentence (optionsFolderHint, folderAbsolute); Firefox build."
+  },
+  "insideDownloadsChromium": {
+    "message": "The browser lets extensions save only inside its Downloads folder",
+    "description": "First half of a sentence (optionsFolderHint, folderAbsolute); Chromium build."
+  },
+  "optionsReset": {
+    "message": "Reset to defaults"
+  },
+  "optionsSaved": {
+    "message": "Saved",
+    "description": "Status on the settings page after a change was stored."
+  },
+  "optionsInvalidValue": {
+    "message": "Not saved: invalid value"
+  },
+  "optionsCouldNotSave": {
+    "message": "Could not save"
+  },
+  "optionsDefaultsRestored": {
+    "message": "Defaults restored"
+  },
+  "optionsCouldNotReset": {
+    "message": "Could not reset"
+  },
+  "optionsShortcut": {
+    "message": "Keyboard shortcut",
+    "description": "Section heading."
+  },
+  "optionsShortcutNone": {
+    "message": "None",
+    "description": "Placeholder of the shortcut field when no key is set."
+  },
+  "optionsShortcutReset": {
+    "message": "Reset shortcut"
+  },
+  "optionsShortcutSettings": {
+    "message": "Change in browser settings",
+    "description": "Chromium build: button that opens the browser's own shortcut settings page."
+  },
+  "optionsShortcutHint": {
+    "message": "Click the field and press the new combination. Escape cancels; Backspace or Delete removes the shortcut.",
+    "description": "Escape, Backspace and Delete are keys; use the names your keyboard and browser use."
+  },
+  "optionsShortcutHintReadOnly": {
+    "message": "The browser keeps this shortcut. Change it on its shortcut settings page, then reopen this page.",
+    "description": "Chromium build, replaces optionsShortcutHint."
+  },
+  "shortcutRemoved": {
+    "message": "Shortcut removed"
+  },
+  "shortcutKeyUnusable": {
+    "message": "This key cannot be used in a shortcut."
+  },
+  "shortcutRefused": {
+    "message": "$SHORTCUT$: $PROBLEM$",
+    "description": "A refused combination and why.",
+    "placeholders": {
+      "shortcut": { "content": "$1", "example": "Shift+S" },
+      "problem": { "content": "$2", "example": "Use each modifier key only once." }
+    }
+  },
+  "shortcutSaved": {
+    "message": "Shortcut saved: $SHORTCUT$",
+    "placeholders": { "shortcut": { "content": "$1", "example": "Ctrl+Alt+S" } }
+  },
+  "shortcutDefaultRestored": {
+    "message": "Default restored: $SHORTCUT$",
+    "placeholders": { "shortcut": { "content": "$1", "example": "Ctrl+Alt+S" } }
+  },
+  "couldNotOpenShortcutSettings": {
+    "message": "Could not open the browser's shortcut settings: $ERROR$",
+    "description": "The error is the browser's own text.",
+    "placeholders": { "error": { "content": "$1" } }
+  },
+  "couldNotReadShortcut": {
+    "message": "Could not read the shortcut: $ERROR$",
+    "description": "The error is the browser's own text.",
+    "placeholders": { "error": { "content": "$1" } }
+  },
+  "shortcutUnknownModifier": {
+    "message": "Unknown modifier key."
+  },
+  "shortcutModifierRequiredMac": {
+    "message": "Add Command, Option or Control (Shift alone is not enough); only function keys work without a modifier.",
+    "description": "macOS key names."
+  },
+  "shortcutModifierRequiredOther": {
+    "message": "Add Ctrl or Alt (Shift alone is not enough); only function keys work without a modifier.",
+    "description": "Windows and Linux key names."
+  },
+  "shortcutDuplicateModifier": {
+    "message": "Use each modifier key only once."
+  },
+  "shortcutTooManyModifiers": {
+    "message": "Use at most two modifier keys."
+  },
+  "shortcutInvalidKey": {
+    "message": "This key cannot be used. Use a letter, digit, F1-F19, arrow, Home, End, Page Up/Down, Insert, Delete, Space, comma or period."
+  },
+  "keyCtrl": {
+    "message": "Ctrl",
+    "description": "Key name in a displayed shortcut (Windows, Linux), as the browser names the key."
+  },
+  "keyShift": {
+    "message": "Shift",
+    "description": "Key name in a displayed shortcut (Windows, Linux)."
+  },
+  "keySpace": {
+    "message": "Space",
+    "description": "Key name in a displayed shortcut (Windows, Linux)."
+  },
+  "keyComma": {
+    "message": "Comma",
+    "description": "Key name in a displayed shortcut (Windows, Linux)."
+  },
+  "keyPeriod": {
+    "message": "Period",
+    "description": "Key name in a displayed shortcut (Windows, Linux)."
+  },
+  "keyHome": {
+    "message": "Home",
+    "description": "Key name in a displayed shortcut (Windows, Linux)."
+  },
+  "keyEnd": {
+    "message": "End",
+    "description": "Key name in a displayed shortcut (Windows, Linux)."
+  },
+  "keyPageUp": {
+    "message": "PageUp",
+    "description": "Key name in a displayed shortcut (Windows, Linux)."
+  },
+  "keyPageDown": {
+    "message": "PageDown",
+    "description": "Key name in a displayed shortcut (Windows, Linux)."
+  },
+  "keyInsert": {
+    "message": "Insert",
+    "description": "Key name in a displayed shortcut (Windows, Linux)."
+  },
+  "keyDelete": {
+    "message": "Delete",
+    "description": "Key name in a displayed shortcut (Windows, Linux)."
+  },
+  "keyUp": {
+    "message": "Up",
+    "description": "Arrow key name in a displayed shortcut (Windows, Linux)."
+  },
+  "keyDown": {
+    "message": "Down",
+    "description": "Arrow key name in a displayed shortcut (Windows, Linux)."
+  },
+  "keyLeft": {
+    "message": "Left",
+    "description": "Arrow key name in a displayed shortcut (Windows, Linux)."
+  },
+  "keyRight": {
+    "message": "Right",
+    "description": "Arrow key name in a displayed shortcut (Windows, Linux)."
+  },
+  "folderAbsolute": {
+    "message": "$RULE$, so no full path. Use a name like snapii or Pages/snapii.",
+    "description": "Why a typed folder is refused. The rule is insideDownloadsFirefox or insideDownloadsChromium.",
+    "placeholders": { "rule": { "content": "$1", "example": "Firefox lets add-ons save only inside its Downloads folder" } }
+  },
+  "folderParent": {
+    "message": "A folder cannot contain \"..\" (it would leave the Downloads folder)."
+  },
+  "folderDot": {
+    "message": "A folder name cannot start or end with a dot."
+  },
+  "folderUnsafe": {
+    "message": "A folder name cannot contain : * ? \" < > | % , control characters or spaces other than the plain one."
+  },
+  "folderReserved": {
+    "message": "This folder name is reserved by the browser (a name such as CON, one that starts or ends with ~, or one that ends in .lnk).",
+    "description": "Chromium build only."
+  },
+  "folderTooLong": {
+    "message": "Use at most $MAX$ characters.",
+    "placeholders": { "max": { "content": "$1", "example": "80" } }
+  },
+  "toolbarSave": {
+    "message": "Save SVG",
+    "description": "Toolbar button next to the selection on the page. Keep the toolbar buttons short: all five sit in one row."
+  },
+  "toolbarCopyText": {
+    "message": "Copy text",
+    "description": "Toolbar button next to the selection."
+  },
+  "toolbarCopyLink": {
+    "message": "Copy element link",
+    "description": "Toolbar button: copies a link to the selected passage of the page."
+  },
+  "toolbarCopyPageLink": {
+    "message": "Copy page link",
+    "description": "Toolbar button: copies the page's address."
+  },
+  "toolbarCancel": {
+    "message": "Cancel",
+    "description": "Toolbar button: closes the selection overlay."
+  },
+  "overlayHint": {
+    "message": "Click an element or drag an area · ↑ ↓ parent/child · Q W E R act on it · Esc cancels",
+    "description": "Hint at the top of the selection overlay. ↑ ↓ select the enclosing or the inner element; Q W E R are the toolbar keys (letters, not translated); Esc is the key."
+  },
+  "noticeViewportOnly": {
+    "message": "Only what is visible can be saved in this browser. Scroll the selection fully into view or select a smaller area",
+    "description": "Chromium build: shown when a selection reaches beyond the visible part of the page."
+  },
+  "noticeVectorOutside": {
+    "message": "Parts of this selection that are saved as pixels are outside the visible area. Scroll them into view or select a smaller area",
+    "description": "Chromium build, \"Shapes and text\" output."
+  },
+  "toastNoPermission": {
+    "message": "snapii has no permission to capture this page"
+  },
+  "toastCaptureFailed": {
+    "message": "Capture failed. Try again or select another area"
+  },
+  "toastTooLarge": {
+    "message": "This area is too large to capture. Select a smaller one"
+  },
+  "toastDownloadFailed": {
+    "message": "The SVG was not saved (download failed or was cancelled)"
+  },
+  "toastUnexpected": {
+    "message": "Capture failed unexpectedly. Try again"
+  },
+  "toastRecognizing": {
+    "message": "Saving… (recognizing text)",
+    "description": "Shown while OCR reads the images of the selection."
+  },
+  "toastLateError": {
+    "message": "The selection was captured, but no SVG came of it. Start snapii again to retry"
+  },
+  "toastSaved": {
+    "message": "Saved $FILENAME$",
+    "description": "After a save. The file name comes from the page title.",
+    "placeholders": { "filename": { "content": "$1", "example": "Example Domain.svg" } }
+  },
+  "toastCopyFailed": {
+    "message": "Copy failed. Try again"
+  },
+  "toastNoText": {
+    "message": "No text in the selection"
+  },
+  "toastCopiedText": {
+    "message": "Copied text"
+  },
+  "toastCopiedLink": {
+    "message": "Copied link",
+    "description": "Copy element link worked: the link points at the selected text."
+  },
+  "toastCopiedPageLink": {
+    "message": "Copied page link",
+    "description": "A link to the page only (no link to the selected text, or the page link button)."
+  },
+  "toastCopiedCleanLink": {
+    "message": "Copied page link, tracking removed"
+  },
+  "toastLinkAmbiguous": {
+    "message": "Copied page link (no unique text match)",
+    "description": "Copy element link fell back to the page link: the selected text occurs more than once."
+  },
+  "toastLinkNoSelection": {
+    "message": "Copied page link (no text selected)"
+  },
+  "toastLinkTimeout": {
+    "message": "Copied page link (page too large to link the exact text)"
+  },
+  "toastLinkFailed": {
+    "message": "Copied page link (no text link possible)"
+  }
+}

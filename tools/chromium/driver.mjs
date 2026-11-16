@@ -10,17 +10,50 @@
 //   - the content script's world, the only place that sees the overlay's
 //     closed shadow tree (browser.dom.openOrClosedShadowRoot).
 // There is no way to press a command's key: the shortcut stays manual.
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { chmodSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { chromium } from "@playwright/test";
 import { decodePng, parseSvg } from "../marionette/svg.mjs";
 
 export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
+ * macOS: a stand-in executable in `dir` that starts `executable` with the UI
+ * language `lang`. Chromium takes that language from Cocoa there and from
+ * nothing else (--lang and LANGUAGE change nothing, measured on Chromium
+ * 153), and Cocoa takes it from the two arguments `-AppleLanguages (xx)`.
+ * Playwright hands on switches only, hence the script. Chromium opens the
+ * second argument as its start page, and headless takes one page only: it
+ * replaces Playwright's about:blank and is an empty file in the directory the
+ * browser starts in, which Chromium opens instead of looking up a host of
+ * that name.
+ */
+function inLanguage(executable, lang, dir) {
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, `(${lang})`), "");
+  const script = join(dir, "chromium.sh");
+  const quoted = `'${executable.replaceAll("'", "'\\''")}'`;
+  writeFileSync(
+    script,
+    `#!/bin/sh
+cd "$(dirname "$0")" || exit 1
+n=$#
+while [ "$n" -gt 0 ]; do
+  a=$1; shift; n=$((n - 1))
+  [ "$a" = "about:blank" ] || set -- "$@" "$a"
+done
+exec ${quoted} "$@" -AppleLanguages '(${lang})'
+`,
+  );
+  chmodSync(script, 0o755);
+  return script;
+}
+
+/**
  * Starts Chromium with the unpacked extension. `SNAPII_CHROMIUM` names another
  * binary than Playwright's pinned Chromium (branded Chrome no longer takes
- * --load-extension).
+ * --load-extension). `lang` is the browser's UI language, which the
+ * extension's texts follow: fixed, so a run does not depend on the system's.
  */
 export async function launchChromium({
   extension,
@@ -30,8 +63,16 @@ export async function launchChromium({
   dpr = 2,
   headless = true,
   hostRules = "",
+  lang = "en-US",
 }) {
-  const executablePath = process.env.SNAPII_CHROMIUM;
+  if (!/^[a-z]{2,3}(-[A-Z]{2})?$/.test(lang)) throw new Error(`not a UI language: ${lang}`);
+  // The stand-in changes directory: no relative path may reach the browser.
+  extension = resolve(extension);
+  profile = resolve(profile);
+  const executablePath =
+    process.platform === "darwin"
+      ? inLanguage(process.env.SNAPII_CHROMIUM ?? chromium.executablePath(), lang, `${profile}.lang`)
+      : process.env.SNAPII_CHROMIUM;
   mkdirSync(join(profile, "Default"), { recursive: true });
   writeFileSync(
     join(profile, "Default", "Preferences"),
@@ -44,9 +85,12 @@ export async function launchChromium({
     // Chromium on Linux encodes file names in the locale's charset: under the
     // POSIX locale it refuses a download into `ünï/`, which the extension's
     // folder rules accept. A fixed UTF-8 locale makes the run independent of
-    // the shell's.
-    ...(process.platform === "linux" ? { env: { ...process.env, LC_ALL: "C.UTF-8" } } : {}),
+    // the shell's. LANGUAGE is where GLib reads the UI language.
+    ...(process.platform === "linux"
+      ? { env: { ...process.env, LC_ALL: "C.UTF-8", LANGUAGE: lang.replace("-", "_") } }
+      : {}),
     args: [
+      `--lang=${lang}`,
       `--disable-extensions-except=${extension}`,
       `--load-extension=${extension}`,
       `--force-device-scale-factor=${dpr}`,
@@ -304,6 +348,11 @@ export class Driver {
         shortcut: document.getElementById("capture-shortcut").textContent,
         aria: document.getElementById("capture").getAttribute("aria-keyshortcuts"),
         about: document.getElementById("about")?.textContent ?? null,
+        lang: document.documentElement.lang,
+        // Every text the page takes from the catalogue, by message key.
+        texts: Object.fromEntries(
+          [...document.querySelectorAll("[data-i18n]")].map((el) => [el.dataset.i18n, el.textContent]),
+        ),
         ocrDisabled: document.querySelector('input[name="ocr"]').disabled,
         // Per picture: null while loading, else whether it has pixels.
         images: [...document.images].map((i) => (i.complete ? i.naturalWidth > 0 : null)),

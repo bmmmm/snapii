@@ -9,6 +9,8 @@
 // before the badge appears. The other order lost that race twice on
 // 2026-10-02 (badge "×" seen with the default title).
 
+import { msg } from "../shared/i18n.ts";
+
 /** The action-API calls flagTab needs; parameters so unit tests run without `browser`. */
 export interface FlagDeps {
   setBadgeText(details: { tabId: number; text: string | null }): Promise<void>;
@@ -26,7 +28,7 @@ export async function flagTab(
   reason: string,
   badgeMs = ERROR_BADGE_MS,
 ): Promise<void> {
-  await action.setTitle({ tabId, title: `snapii cannot capture this page: ${reason}` });
+  await action.setTitle({ tabId, title: msg("cannotCapture", reason) });
   await action.setBadgeText({ tabId, text: "×" });
   clearTimeout(timers.get(tabId));
   timers.set(

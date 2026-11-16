@@ -36,6 +36,14 @@ pnpm start        # fresh Firefox profile with dist/ loaded (add --start-url <ur
   `pnpm start`.
   Their launcher sets `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1` for Firefox 159+ and
   keeps `--remote-allow-system-access` for older releases.
+- Every text snapii shows is a message in `src/_locales/en/messages.json`
+  and `src/_locales/de/messages.json`, read with `msg("key", …values)` from
+  `src/shared/i18n.ts` (the popup and the settings page name theirs in
+  `data-i18n` attributes, the manifest as `__MSG_key__`). The browser picks
+  the catalogue by its UI language; without the i18n API (unit tests, the
+  layout harness) the English one is read from the same file.
+  `tests/unit/i18n.test.ts` finds the keys in the code and fails on a key
+  missing in a language, an unused one and placeholders that differ.
 - What the automated run cannot check (real keyboard, real display, other
   apps' clipboards, other viewers) is in
   [tests/MANUAL-CHECKLIST.md](../tests/MANUAL-CHECKLIST.md).

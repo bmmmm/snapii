@@ -3,6 +3,7 @@
 // Chromium platform. The worker keeps no state of its own between events;
 // what it cannot do itself (C1 in src/shared/spike.ts) the offscreen document does.
 
+import { msg } from "../../shared/i18n.ts";
 import { startBackground } from "../background.ts";
 import { chromiumAction } from "./action.ts";
 import { capturePatches, captureRegion } from "./capture.ts";
@@ -19,5 +20,7 @@ startBackground({
     await offscreen.ask({ to: "offscreen", type: "copy", plain, html });
     return true;
   },
-  action: chromiumAction(browser.action, browser.runtime.getManifest().action?.default_title ?? ""),
+  // The manifest's title from the catalogue: whether getManifest() hands it back
+  // resolved rather than as __MSG_actionTitle__ is not measured.
+  action: chromiumAction(browser.action, msg("actionTitle")),
 });

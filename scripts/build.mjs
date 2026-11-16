@@ -4,7 +4,7 @@
 // unminified so store reviewers can read it.
 import { execFileSync } from "node:child_process";
 import { realpathSync } from "node:fs";
-import { copyFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
@@ -103,6 +103,8 @@ async function buildExtension(target, info) {
   for (const f of ["options.html", "options.css"])
     await copyFile(join(root, "src/options", f), join(outdir, f));
   for (const f of ["popup.html", "popup.css"]) await copyFile(join(root, "src/popup", f), join(outdir, f));
+  // The manifest's __MSG_…__ strings and i18n.getMessage read these; both builds ship the same catalogues.
+  await cp(join(root, "src/_locales"), join(outdir, "_locales"), { recursive: true });
   if (target === "chromium") {
     await copyFile(join(root, "src/offscreen/offscreen.html"), join(outdir, "offscreen.html"));
   }

@@ -65,6 +65,9 @@ export async function startGlue(slot, { prefs = {} } = {}) {
         "browser.download.useDownloadDir": true,
         // Keeps the downloads panel from opening over the page after each save.
         "browser.download.alwaysOpenPanel": false,
+        // The extension's texts follow the UI language; a Firefox in another
+        // language carries en-US as well (measured on a German Firefox 159).
+        "intl.locale.requested": "en-US",
         ...prefs,
       },
     });

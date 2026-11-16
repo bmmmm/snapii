@@ -46,7 +46,7 @@ test("manifest: the toolbar button opens popup.html; the shortcut is its own com
   // belongs to start-capture, which the background handles in commands.onCommand.
   assert.deepEqual(manifest.commands["start-capture"], {
     suggested_key: { default: "Ctrl+Alt+S", mac: "Command+Shift+E" },
-    description: "Capture a region",
+    description: "__MSG_commandCapture__",
   });
   // Command+Shift+E on a Mac (free there; Ctrl+Shift+E elsewhere is Firefox's
   // Network Monitor, and a built-in key wins), Ctrl+Alt+S elsewhere; both are
@@ -58,7 +58,7 @@ test("manifest: the toolbar button opens popup.html; the shortcut is its own com
     assert.deepEqual(validateShortcut(suggestedKeyFor(key, platform)), { ok: true });
   }
   // Declared without a key, so a user can bind "open the popup" in about:addons.
-  assert.deepEqual(manifest.commands._execute_action, { description: "Open the snapii menu" });
+  assert.deepEqual(manifest.commands._execute_action, { description: "__MSG_commandMenu__" });
   assert.deepEqual(Object.keys(manifest.commands).sort(), ["_execute_action", "start-capture"]);
 });
 
@@ -106,7 +106,7 @@ test("manifest for Chromium: the capture command keeps Alt+Shift+S, which Chromi
   const commands = chromium.commands as Record<string, unknown>;
   assert.deepEqual(commands["start-capture"], {
     suggested_key: { default: "Alt+Shift+S", mac: "Command+Shift+E" },
-    description: "Capture a region",
+    description: "__MSG_commandCapture__",
   });
   assert.deepEqual(commands._execute_action, manifest.commands._execute_action);
   assert.deepEqual(Object.keys(commands).sort(), ["_execute_action", "start-capture"]);
@@ -114,7 +114,14 @@ test("manifest for Chromium: the capture command keeps Alt+Shift+S, which Chromi
 
 test("manifest for Chromium: popup, options page and CSP are the Firefox ones", () => {
   const chromium = manifestFor("chromium", manifest, "1.2.3");
-  for (const key of ["manifest_version", "name", "description", "options_ui", "content_security_policy"]) {
+  for (const key of [
+    "manifest_version",
+    "name",
+    "description",
+    "default_locale",
+    "options_ui",
+    "content_security_policy",
+  ]) {
     assert.deepEqual(chromium[key], manifest[key], key);
   }
 });

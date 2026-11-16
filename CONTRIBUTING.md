@@ -64,6 +64,7 @@ The glue/drive launcher enables system access with
 | `src/shared/messages.ts` | Runtime validation of every message the background receives |
 | `src/shared/settings.ts` | `DEFAULT_SETTINGS` |
 | `src/shared/*.ts` (rest) | Pure helpers: geometry, tiling, capture strategy, pick heuristic, toolbar placement, links, tracker removal from copied links (`cleanurl.ts`), whitespace and plain text, HTML sanitising for Copy text, text directives, OCR geometry, file name, save-folder rules, shortcut syntax, CSS colours as numbers (`color.ts`), the version line (`about.ts`) |
+| `src/shared/i18n.ts`, `src/_locales/` | Every user-visible string: `msg()` asks the browser's i18n API, the English catalogue stands in where there is none; `localizePage()` fills the popup's and the settings page's `data-i18n` elements |
 | `src/shared/spike.ts` | Platform facts measured on Firefox 157 and on Chromium 151/153 (the headers say how); never edit by hand without a new measurement |
 | `src/shared/manifest.ts`, `target.ts` | The manifest each browser gets; which browser a bundle was built for (`TARGET`, set by the build) |
 | `src/shared/viewport.ts` | Chromium only: whether a region fits the viewport and where it lies in the captured picture |

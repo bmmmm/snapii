@@ -7,6 +7,7 @@
 import { isValidSetting, loadSettings } from "../background/settings.ts";
 import { showAbout } from "../shared/about.ts";
 import { checkFolder, describeFolderProblem, insideDownloads } from "../shared/folder.ts";
+import { localizePage, msg } from "../shared/i18n.ts";
 import {
   CAPTURE_COMMAND,
   describeProblem,
@@ -40,6 +41,8 @@ const FORM_KEYS: FormKey[] = [
   "ocr",
   "output",
 ];
+
+localizePage(document);
 
 function byId<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -114,16 +117,16 @@ function render(s: Settings): void {
 /** Writes only values the background would accept. */
 async function save<K extends FormKey>(key: K, value: Settings[K]): Promise<void> {
   if (!isValidSetting(key, value)) {
-    say("Not saved: invalid value", 0);
+    say(msg("optionsInvalidValue"), 0);
     return;
   }
   try {
     await browser.storage.sync.set({ [key]: value });
-    say("Saved");
+    say(msg("optionsSaved"));
   } catch {
     // The form shows what the next capture uses: the stored values.
     render(await loadSettings());
-    say("Could not save", 0);
+    say(msg("optionsCouldNotSave"), 0);
   }
 }
 
@@ -142,7 +145,7 @@ form.addEventListener("change", (event) => {
   } else if (el === folder) {
     const check = checkFolder(folder.value);
     if (!check.ok) {
-      folderProblem(`Not saved: ${describeFolderProblem(check.reason)}`);
+      folderProblem(msg("notSaved", describeFolderProblem(check.reason)));
       return;
     }
     // The storage change re-renders the field: the normalised path ("a\b/ c" -> "a/b/c"), no refusal.
@@ -171,9 +174,9 @@ byId("reset").addEventListener("click", async () => {
     // Removing (not writing the defaults) lets the defaults follow future versions.
     await browser.storage.sync.remove(FORM_KEYS);
     render(await loadSettings());
-    say("Defaults restored");
+    say(msg("optionsDefaultsRestored"));
   } catch {
-    say("Could not reset", 0);
+    say(msg("optionsCouldNotReset"), 0);
   }
 });
 
@@ -208,7 +211,7 @@ async function changeShortcut(change: () => Promise<void>, done: () => string): 
     sayShortcut(done());
   } catch (e) {
     // The browser's own message says why it refused (or what went wrong).
-    sayShortcut(`Not saved: ${errorText(e)}`);
+    sayShortcut(msg("notSaved", errorText(e)));
   } finally {
     shortcutBusy = false;
   }
@@ -231,23 +234,25 @@ shortcutInput.addEventListener("keydown", (e) => {
   if ((e.key === "Backspace" || e.key === "Delete") && noModifier(e)) {
     void changeShortcut(
       () => browser.commands.update({ name: CAPTURE_COMMAND, shortcut: "" }),
-      () => "Shortcut removed",
+      () => msg("shortcutRemoved"),
     );
     return;
   }
   const next = keyEventToShortcut(e, platform);
   if (next === null) {
-    sayShortcut("This key cannot be used in a shortcut.");
+    sayShortcut(msg("shortcutKeyUnusable"));
     return;
   }
   const check = validateShortcut(next);
   if (!check.ok) {
-    sayShortcut(`${formatShortcut(next, platform)}: ${describeProblem(check.reason, platform)}`);
+    sayShortcut(
+      msg("shortcutRefused", formatShortcut(next, platform), describeProblem(check.reason, platform)),
+    );
     return;
   }
   void changeShortcut(
     () => browser.commands.update({ name: CAPTURE_COMMAND, shortcut: next }),
-    () => `Shortcut saved: ${formatShortcut(shortcut, platform)}`,
+    () => msg("shortcutSaved", formatShortcut(shortcut, platform)),
   );
 });
 
@@ -255,7 +260,7 @@ byId("shortcut-reset").addEventListener("click", () => {
   if (shortcutBusy) return;
   void changeShortcut(
     () => browser.commands.reset(CAPTURE_COMMAND),
-    () => `Default restored: ${formatShortcut(shortcut, platform)}`,
+    () => msg("shortcutDefaultRestored", formatShortcut(shortcut, platform)),
   );
 });
 
@@ -265,14 +270,13 @@ byId("shortcut-reset").addEventListener("click", () => {
  */
 function showShortcutReadOnly(): void {
   byId("shortcut-reset").hidden = true;
-  byId("shortcut-hint").textContent =
-    "The browser keeps this shortcut. Change it on its shortcut settings page, then reopen this page.";
+  byId("shortcut-hint").textContent = msg("optionsShortcutHintReadOnly");
   const settings = byId("shortcut-settings");
   settings.hidden = false;
   settings.addEventListener("click", () => {
     browser.tabs
       .create({ url: SHORTCUT_SETTINGS_URL })
-      .catch((e) => sayShortcut(`Could not open the browser's shortcut settings: ${errorText(e)}`));
+      .catch((e) => sayShortcut(msg("couldNotOpenShortcutSettings", errorText(e))));
   });
 }
 
@@ -283,7 +287,7 @@ async function initShortcut(): Promise<void> {
     if (TARGET === "chromium") showShortcutReadOnly();
     else shortcutInput.disabled = false;
   } catch (e) {
-    sayShortcut(`Could not read the shortcut: ${errorText(e)}`);
+    sayShortcut(msg("couldNotReadShortcut", errorText(e)));
   }
 }
 
@@ -294,10 +298,7 @@ browser.storage.onChanged.addListener((_changes, area) => {
   if (area === "sync") void loadSettings().then(render);
 });
 void initShortcut();
-if (TARGET !== "firefox") {
-  byId("folder-hint").textContent =
-    `${insideDownloads()}, so this is a sub-folder name such as snapii or Pages/snapii; ` +
-    "it is created when needed. Leave it empty for the Downloads folder itself.";
-}
+// The rule names the browser this build is for.
+byId("folder-hint").textContent = msg("optionsFolderHint", insideDownloads());
 const about = document.getElementById("about");
 if (about) void showAbout(about);
