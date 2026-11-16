@@ -240,10 +240,12 @@ models ship in the add-on (8.3 MB of the unpacked add-on), nothing is downloaded
     screen while the images are captured and come back as soon as the
     background has the pixels; a toast says "Copying… (recognizing text)"
     while Tesseract reads, then "Copied text". The clipboard is written only
-    then. The overlay works meanwhile: Escape, Cancel or a second start end
-    the copy and nothing is written; a copy started meanwhile wins over the
-    one still reading; Save SVG can be started and the text is copied all the
-    same.
+    then, with the page's text as it was at the click. The overlay works
+    meanwhile: Escape, Cancel or a second start end the copy and nothing is
+    written; a copy started meanwhile wins over the one still reading; Save
+    SVG can be started and the text is copied all the same. Each Copy text
+    with images starts a recognition pass of its own: clicking again while
+    one is running starts another, and the later copy wins.
   - **If the images cannot be read** (the capture failed, the 20 seconds ran
     out, the engine failed), the page's text is copied all the same and the
     toast says "Copied text. Text in images was not recognized"; with no page

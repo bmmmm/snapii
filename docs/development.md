@@ -43,6 +43,12 @@ pnpm start        # fresh Firefox profile with dist/ loaded (add --start-url <ur
   the one capture path; D2 the scale asked for per capture; D3 the per-call
   pixel limits that cut a region into tiles; D4 the download from a blob URL
   in the background.
+- Accepted: the reply to `recognize` (Copy text with OCR on) hands text read
+  from the tab's pixels to the content script of that tab, where a save
+  answers with a file name only. Its gates: the `ocr` setting, read in the
+  background for each request; `activeTab`, without which nothing is
+  captured; a request from the top frame only; the selected tab of its window
+  only.
 
 ## Chromium
 
