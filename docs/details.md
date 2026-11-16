@@ -220,7 +220,59 @@ models ship in the add-on (8.3 MB of the unpacked add-on), nothing is downloaded
 - Photos are harder than graphics: on a Wikipedia photo of a road sign it
   read "Auf 1200" of "Auf 1200 m"; small, slanted or non-German/English text
   is often missed.
-- **Copy text** and **Copy element link** stay DOM-only.
+- **Copy text reads the images too.** With the setting on, Copy text copies
+  the words recognised in the images the selection touches together with the
+  page's text, whatever the output setting (in Shapes and text output the
+  switch is disabled; the stored value counts). The same pass as for a save:
+  the same engine, at most 24 image areas, 20 seconds, DOM text wins, noise
+  dropped.
+  - **Whole words, as for page text:** a word in an image that the
+    selection's edge runs through is copied whole, one beside the selection
+    is not, and a line with less than half its height in the selection is
+    left out. For that the image is read beyond the selection: all that is
+    visible of it, so that moving the selection by a pixel or two never
+    decides whether a line is found (a picture cut through a line of text is
+    read badly, the lines beside the cut included). Only an image too large
+    to be read at full resolution, more than 6 megapixels of the crop the
+    engine gets, is read in a band instead: sideways as far as it is visible,
+    up and down by the selection's height (not the whole of a page-high
+    background picture for one line picked on it). An image of which the
+    selection shows a strip lower than 4 px is not read: that is half the
+    height of the smallest text the engine reads.
+  - **Where the words go:** in the plain text an image's words are a block of
+    their own, its lines kept, after the last line of page text that stands
+    above the image or left of it. Where the image stands decides, not where
+    in it the words are: a paragraph beside a picture is never split, the
+    picture's words follow it (or come before it, with the picture on its
+    left and no line of it above the picture). Only a picture that stands
+    between two lines of one block, one above it and the next below, has its
+    words between them. In the HTML they follow the page's HTML, one
+    paragraph per image.
+  - **What you see:** snapii's overlay and your text selection leave the
+    screen while the images are captured and come back as soon as the
+    background has the pixels; a toast says "Copying… (recognizing text)"
+    while Tesseract reads, then "Copied text". The clipboard is written only
+    then, with the page's text as it was at the click. The overlay works
+    meanwhile: Escape, Cancel or a second start end the copy and nothing is
+    written; a copy started meanwhile wins over the one still reading; Save
+    SVG can be started and the text is copied all the same. Each Copy text
+    with images starts a recognition pass of its own: clicking again while
+    one is running starts another, and the later copy wins.
+  - **If the images cannot be read** (the capture failed, the 20 seconds ran
+    out, the engine failed), the page's text is copied all the same and the
+    toast says "Copied text. Text in images was not recognized"; with no page
+    text in the selection, "Nothing copied. Text in images was not
+    recognized".
+  - With the setting off, or with no image in the selection, nothing is
+    captured and Copy text is what it is without OCR.
+  - **Chromium** captures the visible part of the page only, so there the
+    images are read as far as the viewport shows them; the page text of a
+    selection that reaches beyond the viewport is still copied whole.
+  - On a page laid out right to left the place of an image's words among the
+    lines is still decided as for left to right; on a page with several
+    columns it goes by height, so a picture in one column can land between
+    paragraphs of another.
+- **Copy element link** stays DOM-only.
 
 ## Viewers
 
@@ -266,6 +318,28 @@ transparent; how these viewers handle it has not been checked yet.
   by other elements" is on. Text hidden with `display`, `visibility`,
   `opacity`, clipping or `font-size: 0` is left out. Text with
   `user-select: none` is included on purpose.
+- **Copy text takes whole words.** A word the selection's left or right edge
+  runs through is copied whole — part of one letter inside is enough — also
+  where markup divides it (`foo<b>bar</b>`); a word wholly beside the
+  selection is not copied. The HTML holds the same words as the plain text,
+  with their links and emphasis; where whole lines of the selection exist only
+  in a shadow tree or a frame, it is the plain text's paragraphs instead. A
+  word is what stands between two spaces, so `(well-known,`, `3,5` and a URL
+  stay in one piece; in scripts written without spaces (Chinese, Japanese,
+  Thai and others) it is what the browser's word segmentation gives. A gap the
+  eye sees ends a word as well (links side by side with padding are separate
+  words; `letter-spacing` is no gap), the items of a flex or grid row are
+  words apart, and a ruby annotation is not part of its base's word. Text
+  hidden with `visibility` or `opacity` is never copied and ends the word
+  beside it. With "Skip text covered by other elements" on, a word counts by
+  its part inside the selection: covered there, it is left out; showing there,
+  it is copied whole. What does not change: a line with less than half
+  its height in the selection is left out, and text the page itself cuts off
+  (an `overflow` box) stays cut — nothing is copied that the page does not
+  show. Each line stands for itself: of a word broken across two lines at its
+  hyphen, only the part on a line the selection reaches is copied. The saved
+  SVG's text layer is not affected; it holds the letters that lie wholly
+  inside the picture.
 - The vertical position of the invisible text is estimated from the font's
   metrics; for lines set in a fallback font (e.g. Hebrew, Arabic or CJK
   text under a Latin font stack) it can be off by a small amount. The
@@ -342,7 +416,7 @@ Permissions, and why each one is declared:
 
 | Permission | Used for |
 |---|---|
-| `activeTab` | Access to the current tab, granted only when you click the button (opening its menu) or press the shortcut: injecting the overlay and capturing the visible tab; the menu also uses it to check whether snapii can run on the page. There are **no host permissions** (no "access your data for all websites"), so snapii cannot touch a tab you did not click. |
+| `activeTab` | Access to the current tab, granted only when you click the button (opening its menu) or press the shortcut: injecting the overlay and capturing the visible tab (for Save SVG, and for Copy text with OCR on); the menu also uses it to check whether snapii can run on the page. There are **no host permissions** (no "access your data for all websites"), so snapii cannot touch a tab you did not click. |
 | `scripting` | Injecting the content script on demand (the manifest has no `content_scripts`, nothing runs on a page until you start snapii there). |
 | `downloads` | Saving the SVG. |
 | `clipboardWrite` | Copy text, Copy element link and Copy page link, also on pages without a secure origin. |

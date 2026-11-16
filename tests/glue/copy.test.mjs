@@ -81,6 +81,49 @@ for (const [name, host, secure] of [
   });
 }
 
+/** The middle of the glyph after the "|" in `at`, a text found in `selector`, and the glyph's top and bottom. */
+function glyph(selector, at) {
+  return g.content(
+    `const el = document.querySelector(arguments[0]);
+     let index = el.textContent.indexOf(arguments[1].replace("|", "")) + arguments[1].indexOf("|");
+     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+       if (index < n.data.length) {
+         const range = document.createRange();
+         range.setStart(n, index);
+         range.setEnd(n, index + 1);
+         const r = range.getBoundingClientRect();
+         return { x: r.x + r.width / 2, top: r.top, bottom: r.bottom };
+       }
+       index -= n.data.length;
+     }
+     return null;`,
+    selector,
+    at,
+  );
+}
+
+test("item 8: Copy text of a region that cuts a word at each edge -> both words whole, in both flavours", async () => {
+  await g.open("/glue/fixtures/page.html");
+  await clearClipboard(g.s);
+  await g.startOverlay();
+  // "First glue paragraph with a first link inside.": from the middle of
+  // glue's u to the middle of link's n.
+  const from = await glyph("#para", "gl|ue");
+  const to = await glyph("#para", "li|nk");
+  await g.drag(from.x, from.top + 2, to.x, to.bottom - 2);
+  await g.clickToolbar("copy-text");
+  const clip = await clipboard();
+  assert.equal(clip["text/plain"], "glue paragraph with a first link");
+  // The words left of glue and right of link are in neither flavour.
+  assert.equal(
+    body(clip["text/html"]).replace(/\s+/g, " ").trim(),
+    `glue paragraph with a <a href="${g.base}/glue/target/one">first link</a>`,
+  );
+  assert.equal(await g.until(() => g.toast(), "the toast"), "Copied text");
+  await g.key("Escape");
+});
+
 /** Pixels of rect (CSS px, viewport) painted in the ::target-text colour, and the rect's total, at DPR 2. */
 async function highlighted(rect) {
   const shot = await g.screenshot();

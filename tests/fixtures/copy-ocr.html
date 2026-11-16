@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>copy-ocr</title>
+    <style>
+      body {
+        margin: 0;
+        font: 16px/1.4 sans-serif;
+      }
+      .abs {
+        position: absolute;
+        margin: 0;
+      }
+      #all {
+        left: 80px;
+        top: 40px;
+        width: 600px;
+        height: 320px;
+      }
+      #intro {
+        left: 20px;
+        top: 20px;
+        width: 400px;
+        height: 30px;
+      }
+      /* Document (100, 140): the spec places the words it "recognises" in this box. */
+      #pic {
+        left: 20px;
+        top: 100px;
+        width: 400px;
+        height: 100px;
+      }
+      /* DOM text on the picture, at document (400, 200). */
+      #caption {
+        left: 320px;
+        top: 160px;
+        width: 90px;
+        height: 24px;
+      }
+      #outro {
+        left: 20px;
+        top: 250px;
+        width: 400px;
+        height: 30px;
+      }
+      /* Right of the picture and level with it; its two lines stand above and below the top of the picture's first word (y 160). */
+      #beside {
+        left: 720px;
+        top: 138px;
+        width: 300px;
+      }
+      /* 600 × 2600 CSS px: more than a crop at full resolution holds (1 500 000 CSS px² at 2 px per CSS px). */
+      #tall {
+        left: 80px;
+        top: 400px;
+        width: 600px;
+        height: 2600px;
+      }
+      #spacer {
+        height: 3000px;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="all" class="abs">
+      <p id="intro" class="abs">Text above the picture.</p>
+      <img id="pic" class="abs" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='100'%3E%3Crect width='400' height='100' fill='%23dde'/%3E%3C/svg%3E" />
+      <p id="caption" class="abs">On it.</p>
+      <p id="outro" class="abs">Text below the picture.</p>
+    </main>
+    <p id="beside" class="abs">Beside the<br />picture.</p>
+    <img id="tall" class="abs" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='2600'%3E%3Crect width='600' height='2600' fill='%23ded'/%3E%3C/svg%3E" />
+    <div id="spacer"></div>
+  </body>
+</html>

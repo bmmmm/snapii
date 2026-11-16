@@ -5,7 +5,7 @@
 // the format from the settings. A region that is not wholly visible is refused.
 
 import { SPIKE_CHROMIUM } from "../../shared/spike.ts";
-import type { DocRect, PageMeta, Settings } from "../../shared/types.ts";
+import type { DocRect, PageMeta, PageView, Settings } from "../../shared/types.ts";
 import {
   fitsViewport,
   planViewportCrop,
@@ -209,7 +209,7 @@ export function captureRegion(
   windowId: number,
   region: DocRect,
   settings: Settings,
-  page: PageMeta,
+  page: PageView,
 ): Promise<CaptureResult> {
   return captureViewportRegion(tabId, windowId, region, settings, page, browserDeps());
 }

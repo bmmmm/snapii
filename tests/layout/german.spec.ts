@@ -44,6 +44,7 @@ async function load(page: Page): Promise<void> {
         now: () => new Date("2026-10-01T12:00:00.000Z"),
         sendSave: async () => ({ ok: true, filename: "Überblick & <b>.svg" }),
         writeClipboard: async () => {},
+        sendRecognize: async () => ({ ok: false, error: "disabled" }),
       });
   });
 }

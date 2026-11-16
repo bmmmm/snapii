@@ -3,13 +3,16 @@
 // looks at: <img> (also inside <picture>), <canvas>, SVG <image>, and boxes
 // painted with a CSS background image. Only the visible part counts, clipped
 // like text; tiny images (icons, bullets) are left out.
-import { intersect } from "../../shared/geometry.ts";
+import { EPS, intersect } from "../../shared/geometry.ts";
 import { MIN_AREA } from "../../shared/ocr.ts";
 import type { DocRect, ImageArea } from "../../shared/types.ts";
 import { walkFlatTree } from "./flat-tree.ts";
 import { Layout } from "./visibility.ts";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
+
+/** Copy text reads an image only with this much of its height (CSS px) in the selection: half of the smallest text the engine reads. */
+const MIN_HEIGHT_INSIDE = 4;
 
 function kindOf(el: Element, layout: Layout): ImageArea["kind"] | null {
   if (el.localName === "img") return "img";
@@ -19,11 +22,18 @@ function kindOf(el: Element, layout: Layout): ImageArea["kind"] | null {
   return layout.style(el).backgroundImage.includes("url(") ? "background" : null;
 }
 
-/** Image areas in document CSS px, in flat-tree order. */
+/**
+ * Image areas in document CSS px, in flat-tree order: of each image that
+ * shows in `captureRect`, the part inside it. With `extent`, the part that
+ * gives for what the page shows of the image instead (Copy text reads an
+ * image beyond the selection's edge, for the words the edge cuts); an image
+ * the rect merely borders is none of its, nor one it shows too low a strip
+ * of for any word to count.
+ */
 export function collectImageAreas(
   root: Document | Element,
   captureRect: DocRect,
-  opts: { skip?: Element | null } = {},
+  opts: { skip?: Element | null; extent?: (shown: DocRect) => DocRect | null } = {},
 ): ImageArea[] {
   const layout = new Layout();
   const out: ImageArea[] = [];
@@ -40,8 +50,12 @@ export function collectImageAreas(
     const clip = layout.clip(el, ctx);
     const shown = clip && intersect(box, clip);
     const inside = shown && intersect(shown, captureRect);
-    if (inside && inside.width >= MIN_AREA.width && inside.height >= MIN_AREA.height) {
-      out.push({ ...inside, kind });
+    if (!inside) continue;
+    const area = opts.extent
+      ? inside.width > EPS && inside.height >= MIN_HEIGHT_INSIDE && opts.extent(shown)
+      : inside;
+    if (area && area.width >= MIN_AREA.width && area.height >= MIN_AREA.height) {
+      out.push({ ...area, kind });
     }
   }
   return out;

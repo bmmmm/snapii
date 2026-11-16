@@ -47,6 +47,7 @@ The glue/drive launcher enables system access with
 | `src/background/start.ts` | Whether snapii can run in a tab, injecting the content script |
 | `src/background/flag.ts` | The shortcut's "cannot capture this page" notice on the toolbar button, title before badge |
 | `src/background/save.ts` | One save end to end: capture, hand the page back, OCR, render, download |
+| `src/background/recognize.ts` | Copy text with OCR on: capture the selection's images, OCR, the words back to the content script |
 | `src/background/capture.ts` | Region → raster tiles with `captureVisibleTab` |
 | `src/background/ocr.ts` | Tesseract in a worker over the image areas of one save |
 | `src/background/download.ts` | The SVG download from a blob URL |
@@ -63,7 +64,7 @@ The glue/drive launcher enables system access with
 | `src/shared/types.ts` | Data contracts between content script, background and renderer, `Settings` |
 | `src/shared/messages.ts` | Runtime validation of every message the background receives |
 | `src/shared/settings.ts` | `DEFAULT_SETTINGS` |
-| `src/shared/*.ts` (rest) | Pure helpers: geometry, tiling, capture strategy, pick heuristic, toolbar placement, links, tracker removal from copied links (`cleanurl.ts`), whitespace and plain text, HTML sanitising for Copy text, text directives, OCR geometry, file name, save-folder rules, shortcut syntax, CSS colours as numbers (`color.ts`), the version line (`about.ts`) |
+| `src/shared/*.ts` (rest) | Pure helpers: geometry, tiling, capture strategy, pick heuristic, toolbar placement, links, tracker removal from copied links (`cleanurl.ts`), whitespace and plain text, word boundaries for Copy text (`words.ts`), the recognised words Copy text takes and their place among the lines (`recognized.ts`), HTML sanitising for Copy text, text directives, OCR geometry, file name, save-folder rules, shortcut syntax, CSS colours as numbers (`color.ts`), the version line (`about.ts`) |
 | `src/shared/i18n.ts`, `src/_locales/` | Every user-visible string: `msg()` asks the browser's i18n API, the English catalogue stands in where there is none; `localizePage()` fills the popup's and the settings page's `data-i18n` elements |
 | `src/shared/spike.ts` | Platform facts measured on Firefox 157 and on Chromium 151/153 (the headers say how); never edit by hand without a new measurement |
 | `src/shared/manifest.ts`, `target.ts` | The manifest each browser gets; which browser a bundle was built for (`TARGET`, set by the build) |
@@ -88,10 +89,11 @@ builds name Chromium instead).
 
 - **Text in the SVG is missing, wrong or misplaced** — *does Copy text on the
   same selection get it right?* Copy text reads the page the same way the
-  text layer does: if it is wrong too, extraction is at fault
-  (`src/content/extract/`); if it is right, the renderer or the viewer is. The
-  form also asks which program opened the SVG — only browsers select the
-  invisible text — and whether the text was page text or inside an image
+  text layer does (but takes a word at the selection's edge whole, where the
+  text layer keeps the letters inside): if it is wrong too, extraction is at
+  fault (`src/content/extract/`); if it is right, the renderer or the viewer
+  is. The form also asks which program opened the SVG — only browsers select
+  the invisible text — and whether the text was page text or inside an image
   (OCR).
 - **The picture in the SVG is wrong** — *does Firefox's own screenshot of the
   same area look right?* If not, the page or Firefox paints it that way; if

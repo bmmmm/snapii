@@ -74,7 +74,13 @@ interface Expect {
 
 const DIR = new URL("../fixtures/", import.meta.url);
 const OUT = new URL("../../test-results/vector/", import.meta.url);
-const NOT_FIXTURES = new Set(["smoke.html", "overlay.html", "overlay-csp.html", "rtl-scrolled.html"]);
+const NOT_FIXTURES = new Set([
+  "smoke.html",
+  "overlay.html",
+  "overlay-csp.html",
+  "rtl-scrolled.html",
+  "copy-ocr.html",
+]);
 // Default fidelity gate for the vector fixtures (plan G2, calibrated at Gate B).
 const T = 0.02;
 

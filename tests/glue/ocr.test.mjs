@@ -2,10 +2,13 @@
 // OCR of text inside images (opt-in): the switch is flipped in the real
 // options page, the fixture's images (an <img>, a CSS background, a photo
 // under a DOM caption) are saved through the toolbar/overlay path, and the
-// file shows what Tesseract added. Timings are logged, not asserted.
+// file shows what Tesseract added. Copy text takes the same words to the
+// clipboard, after the click's user activation has lapsed: the browser runs
+// with a short one. Other timings are logged, not asserted.
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { pathToFileURL } from "node:url";
+import { clearClipboard, readClipboard } from "../../tools/marionette/helpers.mjs";
 import { ADDON_ID, startGlue } from "./env.mjs";
 
 const PAGE = "/glue/fixtures/ocr.html";
@@ -14,11 +17,13 @@ const CAP = { x: 40, y: 40, width: 900, height: 560 };
 const IMG = { x: 40, y: 40, width: 420, height: 150 };
 // A save with OCR waits for the engine as well.
 const SAVE_MS = 60_000;
+// Firefox's default is 5 s, more than the pass takes on this page.
+const ACTIVATION_MS = 100;
 
 let g;
 let optionsUrl;
 before(async () => {
-  g = await startGlue(4);
+  g = await startGlue(4, { prefs: { "dom.user_activation.transient.timeout": ACTIVATION_MS } });
   const host = await g.s.chrome(
     "return WebExtensionPolicy.getByID(arguments[0]).mozExtensionHostname;",
     ADDON_ID,
@@ -123,6 +128,9 @@ const wordsOf = (strings) =>
     .map((w) => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ""))
     .filter(Boolean);
 
+/** The blocks of a copied text, each on one line: where a paragraph wraps is up to the machine's fonts. */
+const blocksOf = (plain) => plain.split("\n\n").map((block) => block.replace(/\s+/g, " "));
+
 test("OCR on: the image words are selectable text in <g id=ocr>, the DOM caption over the photo is there once", async () => {
   await setOcr(true);
   const { file, wallMs, during } = await saveRegion(CAP, clickDuringOcr);
@@ -175,6 +183,139 @@ test("OCR on: one image alone (latency of one area)", async () => {
   assert.equal(ocr.areas, 1);
   assert.equal(ocr.recognized, 1);
   assert.ok(wordsOf(layerRuns(file.text, "ocr")).includes("Köln"));
+});
+
+/**
+ * Page-side clock for a copy: the last pointer event (the toolbar click) and
+ * whether the page had a user activation then. When the shield goes (the
+ * background has the pixels and starts reading) the page keeps its thread
+ * until that activation is over: the reply cannot reach the content script
+ * meanwhile, so the clipboard is written without one.
+ */
+const COPY_PROBE = `
+  const p = (window.__copy = { click: null, activeAtClick: null, shieldUp: false, free: null, activeWhenFree: null });
+  for (const type of ["pointerdown", "pointerup", "click"]) {
+    addEventListener(type, () => {
+      p.click = performance.now();
+      p.activeAtClick = navigator.userActivation.isActive;
+    }, true);
+  }
+  new MutationObserver(() => {
+    const up = document.querySelector("snapii-shield") !== null;
+    if (up) p.shieldUp = true;
+    if (up || !p.shieldUp || p.free !== null) return;
+    while (performance.now() - p.click <= ${ACTIVATION_MS} + 50) {}
+    p.free = performance.now();
+    p.activeWhenFree = navigator.userActivation.isActive;
+  }).observe(document.documentElement, { childList: true });
+`;
+
+/** Drags over `rect`, clicks Copy text and returns the clipboard once the copy's last toast is up. */
+async function copyRegion(rect) {
+  await g.open(PAGE);
+  await g.until(async () => (await g.content("return document.documentElement.dataset.ready;")) === "1", "images");
+  await clearClipboard(g.s);
+  await g.content(COPY_PROBE);
+  await g.startOverlay();
+  await g.drag(rect.x, rect.y, rect.x + rect.width, rect.y + rect.height);
+  const t0 = Date.now();
+  await g.clickToolbar("copy-text");
+  const toasts = new Set();
+  await g.until(
+    async () => {
+      const toast = await g.toast();
+      if (toast) toasts.add(toast);
+      return toast !== null && !toast.startsWith("Copying");
+    },
+    "the copy's toast",
+    SAVE_MS,
+  );
+  const clip = await readClipboard(g.s);
+  const probe = await g.content("return window.__copy;");
+  return { clip, toasts: [...toasts], wallMs: Date.now() - t0, probe };
+}
+
+/** Left edge and width (document px) of `word` after `lead` in #img's first line: 16 px into the picture, baseline at y 80. */
+function inFirstLine(lead, word) {
+  return g.content(
+    `const ctx = document.createElement("canvas").getContext("2d");
+     ctx.font = "26px Helvetica, Arial, sans-serif";
+     return { x: 40 + 16 + ctx.measureText(arguments[0]).width, width: ctx.measureText(arguments[1]).width };`,
+    lead,
+    word,
+  );
+}
+
+test("OCR on: Copy text puts the images' words on the clipboard with the DOM text once the click's user activation has lapsed, and the overlay is back", async () => {
+  const { clip, toasts, wallMs, probe } = await copyRegion(CAP);
+  const plain = clip["text/plain"] ?? "";
+  const known = await g.content("return window.OCR_WORDS;");
+  const expected = wordsOf([...known.img, ...known.banner, ...known.photo]);
+  const got = wordsOf([plain]);
+  const hits = expected.filter((w) => got.includes(w));
+  console.log(
+    `copy with ocr: ${hits.length}/${expected.length} known words; toasts ${JSON.stringify(toasts)}; ` +
+      `wall time ${wallMs} ms; probe ${JSON.stringify(probe)}; text ${JSON.stringify(plain)}`,
+  );
+  // The write came after the page was free again, and by then the click's activation was over.
+  assert.equal(probe.activeAtClick, true, "guard: the click gave the page a user activation");
+  assert.ok(probe.shieldUp && probe.free !== null, "guard: the shield came and went");
+  assert.ok(probe.free - probe.click > ACTIVATION_MS, `page free ${probe.free - probe.click} ms after the click`);
+  assert.equal(probe.activeWhenFree, false, "no user activation was left before the reply could arrive");
+  assert.equal(toasts.at(-1), "Copied text");
+  assert.ok(hits.length >= 0.8 * expected.length, `recognised ${hits.length} of ${expected.length}`);
+  // The DOM text is there, the paragraph beside the photo in one piece (the photo's
+  // words are level with its lines), the caption over the photo once (DOM text wins).
+  assert.ok(blocksOf(plain).includes("This paragraph is real DOM text next to the images."), plain);
+  assert.equal(got.filter((w) => w === "Hallstatt").length, 1, plain);
+  // The same words in the HTML flavour.
+  assert.ok((clip["text/html"] ?? "").includes("Köln"), clip["text/html"]);
+  assert.ok((clip["text/html"] ?? "").includes("Hallstatt"), clip["text/html"]);
+  // Nothing of snapii's is left over the page, and the overlay is there for a Save.
+  assert.equal(await g.overlayPresent(), 1);
+  assert.equal(await g.content(`return document.querySelectorAll("snapii-shield").length;`), 0);
+  await g.clickToolbar("cancel");
+});
+
+test("OCR on: Copy text takes a word in an image whole when the selection's edge cuts it, and no other line, 2 px higher or lower alike", async () => {
+  // "Willkommen in Köln": from the middle of Willkommen to the middle of Köln, the height of that line only.
+  const first = await inFirstLine("", "Willkommen");
+  const last = await inFirstLine("Willkommen in ", "Köln");
+  const from = first.x + first.width / 2;
+  // The letters stand at y 61–80, the next line's from y 103. Read in a band of the selection's
+  // height around it, the picture ended 1 px into that line at y 64 and the engine made nothing of either.
+  for (const y of [62, 64, 66]) {
+    const { clip, toasts } = await copyRegion({ x: from, y, width: last.x + last.width / 2 - from, height: 20 });
+    const plain = clip["text/plain"] ?? "";
+    console.log(`copy with ocr, cut words, y ${y}: ${JSON.stringify(plain)}; toasts ${JSON.stringify(toasts)}`);
+    assert.equal(toasts.at(-1), "Copied text", `y ${y}`);
+    assert.equal(plain, "Willkommen in Köln", `y ${y}`);
+    await g.key("Escape");
+  }
+});
+
+test("OCR off (the default): Copy text copies the DOM text alone and never hides the overlay", async () => {
+  await setOcr(false);
+  await g.open(PAGE);
+  await g.until(async () => (await g.content("return document.documentElement.dataset.ready;")) === "1", "images");
+  await clearClipboard(g.s);
+  await g.content(`
+    window.__hidden = false;
+    new MutationObserver(() => {
+      if (document.querySelector("snapii-shield")) window.__hidden = true;
+    }).observe(document.documentElement, { childList: true });
+  `);
+  await g.startOverlay();
+  await g.drag(CAP.x, CAP.y, CAP.x + CAP.width, CAP.y + CAP.height);
+  await g.clickToolbar("copy-text");
+  assert.equal(await g.until(() => g.toast(), "the toast"), "Copied text");
+  const clip = await readClipboard(g.s);
+  assert.deepEqual(blocksOf(clip["text/plain"] ?? ""), [
+    "Photo taken near Hallstatt",
+    "This paragraph is real DOM text next to the images.",
+  ]);
+  assert.equal(await g.content("return window.__hidden;"), false, "no capture: no shield went up");
+  await g.key("Escape");
 });
 
 test("OCR off (the default): no OCR layer, the record says disabled", async () => {

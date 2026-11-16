@@ -4,7 +4,14 @@
 // reaches the first one, which toggles the open session off.
 import { isToContent } from "../shared/messages.ts";
 import { VIEWPORT_ONLY } from "../shared/target.ts";
-import type { CapturedMessage, CaptureModel, SaveResponse, ToBackground } from "../shared/types.ts";
+import type {
+  CapturedMessage,
+  CaptureModel,
+  RecognizeRequest,
+  RecognizeResponse,
+  SaveResponse,
+  ToBackground,
+} from "../shared/types.ts";
 import { writeClipboard } from "./clipboard.ts";
 import { sessionToggle } from "./session.ts";
 
@@ -12,8 +19,10 @@ const GUARD = Symbol.for("snapii.content");
 const scope = globalThis as typeof globalThis & { [GUARD]?: true };
 
 /**
- * Where the background's `captured` goes: the save in flight. One at a time,
- * since no session starts while a capture runs (sessionToggle).
+ * Where the background's `captured` goes: the save in flight, or the Copy
+ * text whose images are being captured. One at a time, since no session
+ * starts while a capture runs (sessionToggle) and a session's overlay is
+ * hidden for as long.
  */
 let onCaptured: ((message: CapturedMessage) => void) | null = null;
 
@@ -25,11 +34,21 @@ function sendSave(model: CaptureModel, captured: (message: CapturedMessage) => v
   return browser.runtime.sendMessage(message) as Promise<SaveResponse>;
 }
 
+function sendRecognize(
+  request: RecognizeRequest,
+  captured: (message: CapturedMessage) => void,
+): Promise<RecognizeResponse> {
+  onCaptured = captured;
+  const message: ToBackground = { type: "recognize", request };
+  return browser.runtime.sendMessage(message) as Promise<RecognizeResponse>;
+}
+
 if (!scope[GUARD]) {
   scope[GUARD] = true;
   const toggle = sessionToggle({
     viewportOnly: VIEWPORT_ONLY,
     sendSave,
+    sendRecognize,
     writeClipboard: (data) => writeClipboard(data),
     now: () => new Date(),
   });

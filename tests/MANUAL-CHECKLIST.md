@@ -40,7 +40,7 @@ the same time; 10 would collide with the Chromium suite's 8470–8479 and
 | 5 | Below-the-fold selection behaves per D1 (captured, not clipped) | auto (tests/glue/offscreen.test.mjs: item 5a, item 5b) + human 5h |
 | 6 | Permission granted path | obsolete (D1) |
 | 7 | Zoom 150 % / 80 % | auto (tests/glue/offscreen.test.mjs: item 7 ×2) |
-| 8 | Copy text into a rich and a plain editor | auto for what lands on Firefox's clipboard, on a secure and a non-secure origin (tests/glue/copy.test.mjs: item 8 ×2) + human 8h (pasting into other apps) |
+| 8 | Copy text into a rich and a plain editor | auto for what lands on Firefox's clipboard, on a secure and a non-secure origin (tests/glue/copy.test.mjs: item 8 ×2), and a region that cuts a word at each edge (item 8 ×1) + human 8h (pasting into other apps) |
 | 9 | Copy link → new tab highlights the passage | auto (tests/glue/copy.test.mjs: item 9) + human 9h |
 | 10 | `about:addons` and AMO → the popup says why (button disabled), the shortcut puts a badge; no console error | auto for `about:addons` and `view-source:` with the shortcut (tests/glue/overlay.test.mjs: item 10 ×2), `about:addons` and an SVG document with the popup (tests/glue/popup.test.mjs: popup on …) + human 10h (AMO, PDF viewer) |
 | 11 | Strict-CSP page → overlay styled | auto with a local page served with `Content-Security-Policy: style-src 'none'; script-src 'none'` as an HTTP header (tests/glue/overlay.test.mjs: item 11) + human 11h (github.com) |
@@ -50,6 +50,7 @@ the same time; 10 would collide with the Chromium suite's 8470–8479 and
 | 15 | Informative: open the SVG in Chrome and Inkscape | human 15h |
 | 16 | Vector output: Output "Shapes and text" in the settings page → the save has shapes, visible text, pictures and patches; the record says `output: "vector"`; OCR is off | auto (tests/glue/options.test.mjs: output Vector …, vector output with pictures …; tests/glue-chromium/save.test.mjs: vector output …; tests/layout/vector.spec.ts) + human 16h |
 | 17 | German interface: with Firefox's UI in German, popup, settings page, overlay hint, toolbar, toasts, the toolbar tooltip and the shortcut's description in `about:addons` are German, nothing is cut off; the saved file is unchanged | auto for the catalogues and the German path with a stand-in API (tests/unit/i18n.test.ts, tests/unit/i18n-de.test.ts), the overlay's German labels in both browsers' layout runs (tests/layout/german.spec.ts), and in Firefox started in German the popup, the settings page, the tooltip, the commands, hint, toolbar, toast and the saved file (tests/glue/german.test.mjs; skipped by a Firefox that has no German) + human 17h (nothing cut off, `about:addons`) |
+| 18 | Copy text with "Recognize text in images" on: the words in the selection's images are on the clipboard with the page's text, a word in an image that the selection's edge cuts whole; the overlay is back while the images are read; with the setting off nothing is captured | auto (tests/glue/ocr.test.mjs: OCR on: Copy text … ×2, OCR off: Copy text …; tests/layout/copy-ocr.spec.ts for the order of events, failures and every way out) + human 18h |
 
 ### Chromium
 
@@ -57,16 +58,18 @@ the same time; 10 would collide with the Chromium suite's 8470–8479 and
 scale factor 2: popup → overlay → save (file name, sub-folder, picture pixels,
 text layer, record), zoom 150 %, the refusal of a selection beyond the
 viewport and the save after scrolling, JPEG, closed shadow trees, Copy text on
-a secure and a non-secure origin and Copy link (read back from the
-clipboard), OCR through the offscreen document, the popup on a browser page,
-the read-only shortcut section, the folder rules against the real download
-API, a save across a service-worker restart, the toolbar notice, a
-cancelled Save-as dialog (headless Chromium has no file dialog, so every
-"Ask where to save" download ends as a cancelled one), and vector output
-(shapes and visible text, pictures and patches, a selection beyond the
-viewport without patches that saves, and one with a patch there that is
-refused), and, started in German, the popup, the settings page, the tooltip,
-the commands, hint, toolbar, toast and the saved file
+a secure and a non-secure origin, Copy text of a selection that cuts a word at
+each edge (both words whole, in both flavours) and Copy link (read back from
+the clipboard), OCR through the offscreen document, Copy text with OCR on (the
+images' words with the page's text, and a cut word on a non-secure origin),
+the popup on a browser page, the read-only shortcut section, the folder rules
+against the real download API, a save across a service-worker restart, the
+toolbar notice, a cancelled Save-as dialog (headless Chromium has no file
+dialog, so every "Ask where to save" download ends as a cancelled one), and
+vector output (shapes and visible text, pictures and patches, a selection
+beyond the viewport without patches that saves, and one with a patch there
+that is refused), and, started in German, the popup, the settings page, the
+tooltip, the commands, hint, toolbar, toast and the saved file
 (tests/glue-chromium/german.test.mjs).
 
 Both glue suites start their browser in English whatever the system's
@@ -98,6 +101,12 @@ mode → Load unpacked):
   description on `chrome://extensions` and the command on
   `chrome://extensions/shortcuts` too. The glue run reads the texts; what is
   left for a person is that nothing is cut off and the browser's two pages.
+- **C8h: Copy text with OCR on, a picture the viewport cuts.** With
+  "Recognize text in images" on, scroll a picture with text half out of the
+  window, pick an element around it that reaches beyond the window, **Copy
+  text**: the overlay blinks away and back, "Copying… (recognizing text)",
+  then "Copied text". Pasted: the page's text of the whole element, and the
+  picture's words from its visible part only.
 
 ### What the automated run cannot stand in for
 
@@ -146,7 +155,10 @@ window): heading, bold/italic, the list and the "real link" link arrive;
 TextEdit in plain-text mode (or Terminal): the six lines with empty lines
 between them. Repeat once on a non-secure origin (e.g. any `http://` site
 that is not localhost) to see the background fallback reach the system
-clipboard.
+clipboard. Then drag a rectangle on one line of the first paragraph that
+starts in the middle of one word and ends in the middle of another, **Copy
+text**: both words arrive whole in both editors, and no word from beside the
+rectangle.
 
 **9h — real click and display.** On
 `http://127.0.0.1:8438/glue/fixtures/article.html` scroll to the last
@@ -196,3 +208,17 @@ save: the toast says "… gespeichert". Hover the toolbar button: the tooltip re
 German description, and Manage Extension Shortcuts the German command names.
 Open the saved file's source: no German word from the interface in it. Switch
 back to English: every text is the English one again.
+
+**18h — Copy text with OCR on, real clipboard.** Switch "Recognize text in
+images" on. On `http://127.0.0.1:8438/glue/fixtures/ocr.html` drag across
+everything, click **Copy text**: the overlay leaves the screen for a moment
+and is back, a toast says "Copying… (recognizing text)", then "Copied text".
+Paste into TextEdit (plain-text mode): the lines of the three pictures, the
+caption "Photo taken near Hallstatt" once, and the paragraph. Paste into a
+rich editor: the same words. Drag a rectangle on the first picture's first
+line from the middle of "Willkommen" to the middle of "Köln", **Copy text**:
+"Willkommen in Köln" and no word of the lines below. Click **Copy text**
+again and press Escape while the toast says "Copying…": the toast goes, and
+pasting still gives the earlier text. Repeat the first step on a non-secure
+origin. Switch the setting off: **Copy text** answers at once with the
+caption and the paragraph, and the overlay never leaves the screen.

@@ -266,6 +266,33 @@ test("runOcrPass: all areas done: planned = recognized, words counted, not trunc
   );
 });
 
+test("runOcrPass: each run comes with its word's own width, which the run's reaches past", async () => {
+  // One area, one line: "Summer" 100 px wide, "Sale" 90 px further on.
+  const e: OcrEngine = {
+    async start() {},
+    async recognize() {
+      return [[word({ text: "Summer", x: 10, width: 100 }), word({ text: "Sale", x: 200, width: 60 })]];
+    },
+  };
+  const out = await runOcrPass(areasOf(1), [], e, opts);
+  assert.deepEqual(
+    out.runs.map((r) => [r.text, r.width]),
+    [
+      ["Summer ", 190],
+      ["Sale", 60],
+    ],
+  );
+  assert.deepEqual(out.wordWidths, [100, 60]);
+  // A word dropped for the DOM text under it has no width in the list either.
+  const dom = lineToRuns([word({ text: "Sale", x: 200, width: 60 })], 0, 0);
+  const less = await runOcrPass(areasOf(1), dom, e, opts);
+  assert.deepEqual(
+    less.runs.map((r) => r.text),
+    ["Summer"],
+  );
+  assert.deepEqual(less.wordWidths, [100]);
+});
+
 test("runOcrPass: a timeout records the planned areas and the ones done before it, no runs", async () => {
   const { e } = engine({ stopAt: 2, late: true });
   const out = await runOcrPass(areasOf(4), [], e, opts);

@@ -129,6 +129,8 @@ async function begin(
           if (w.__clipFail) throw new Error("clipboard write failed");
           w.__clips.push(data);
         },
+        // Copy text with OCR on is tests/layout/copy-ocr.spec.ts; here the setting is off.
+        sendRecognize: async () => ({ ok: false, error: "disabled" }),
       });
     },
     { settings, reply, now: NOW, viewportOnly },
@@ -766,6 +768,85 @@ test("copy text over light-DOM and shadow-tree text: the HTML holds all of it, i
   expect(clip).toEqual({ plain: texts.join("\n\n"), html: texts.map((t) => `<p>${t}</p>`).join("") });
 });
 
+/** The middle of the glyph after the "|" in `at`, a text found in `sel`; top and bottom are the element's. */
+function glyphIn(page: Page, sel: string, at: string): Promise<{ x: number; top: number; bottom: number }> {
+  return page.evaluate(
+    ({ sel, at }) => {
+      const el = document.querySelector(sel);
+      const found = (el?.textContent ?? "").indexOf(at.replace("|", ""));
+      if (!el || found < 0) throw new Error(`no "${at}" in ${sel}`);
+      let index = found + at.indexOf("|");
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      for (let n = walker.nextNode() as Text | null; n; n = walker.nextNode() as Text | null) {
+        if (index < n.data.length) {
+          const glyph = document.createRange();
+          glyph.setStart(n, index);
+          glyph.setEnd(n, index + 1);
+          const g = glyph.getBoundingClientRect();
+          const box = el.getBoundingClientRect();
+          return { x: g.left + g.width / 2, top: box.top, bottom: box.bottom };
+        }
+        index -= n.data.length;
+      }
+      throw new Error(`"${at}" is not in a text node of ${sel}`);
+    },
+    { sel, at },
+  );
+}
+
+test("copy text of a column through a paragraph: each line's words whole, and the HTML says what the plain text says", async ({
+  page,
+}) => {
+  await load(page, "multiline.html");
+  await begin(page, { ok: true, filename: "x.svg" });
+  // "alpha beta gamma", "delta epsilon", "zeta eta theta": the column runs from
+  // the middle of beta's e to the middle of its a, through all three lines.
+  const from = await glyphIn(page, "#cap p", "b|eta");
+  const to = await glyphIn(page, "#cap p", "bet|a");
+  await drag(page, from.x, from.top + 2, to.x, to.bottom - 2);
+  await clickCopy(page);
+  const [clip] = await clips(page);
+  // The drag lies in one text node: its range holds no element.
+  expect(clip).toEqual({ plain: "beta\nepsilon\neta theta", html: "beta epsilon eta theta" });
+});
+
+test("copy text of part of a line: the words at both edges whole, the link kept, nothing from beyond", async ({
+  page,
+}) => {
+  await load(page, "copy.html");
+  await begin(page, { ok: true, filename: "x.svg" });
+  const from = await glyphIn(page, "#first", "r|eal link");
+  const to = await glyphIn(page, "#first", "scr|ipt");
+  await drag(page, from.x, from.top + 2, to.x, to.bottom - 2);
+  await clickCopy(page);
+  const [clip] = await clips(page);
+  const href = new URL("/target?a=1&b=2", await page.evaluate(() => location.origin)).href;
+  expect(clip).toEqual({
+    plain: "real link and a script",
+    html: `<a href="${href.replace(/&/g, "&amp;")}">real link</a> and a script`,
+  });
+});
+
+test("copy text of a picked element whose text runs out of its box: the word at the box's edge whole, in both flavours", async ({
+  page,
+}) => {
+  await load(page);
+  // One line that overflows #para; the box ends in the middle of the x of "text".
+  await page.evaluate(() => {
+    (document.getElementById("para") as HTMLElement).style.whiteSpace = "nowrap";
+  });
+  const x = await glyphIn(page, "#para", "te|xt");
+  await page.evaluate((x) => {
+    const para = document.getElementById("para") as HTMLElement;
+    para.style.width = `${x - para.getBoundingClientRect().left}px`;
+  }, x.x);
+  await begin(page, { ok: true, filename: "x.svg" });
+  await pickElement(page, "para");
+  await clickCopy(page);
+  const [clip] = await clips(page);
+  expect(clip).toEqual({ plain: "Some paragraph text", html: "Some paragraph text" });
+});
+
 for (const action of ["copy-text", "copy-link", "copy-page-link"] as const) {
   test(`a failed clipboard write on ${action} shows the copy-failed toast and keeps the overlay`, async ({
     page,
@@ -946,6 +1027,7 @@ test("after captured a toolbar click opens a new session; the first save's toast
           return new Promise((resolve) => w.__pending.push({ onCaptured, resolve }));
         },
         async writeClipboard() {},
+        sendRecognize: async () => ({ ok: false, error: "disabled" }),
       });
       w.__toggle = () => toggle(settings);
     },
@@ -1032,6 +1114,7 @@ for (const [what, reply] of [
             return reply;
           },
           async writeClipboard() {},
+          sendRecognize: async () => ({ ok: false, error: "disabled" }),
         });
         w.__toggle = () => toggle(settings);
       },
@@ -1071,6 +1154,7 @@ test("a sendSave that throws synchronously does not lock the toolbar button for 
           throw new Error("runtime.sendMessage threw");
         },
         async writeClipboard() {},
+        sendRecognize: async () => ({ ok: false, error: "disabled" }),
       });
       w.__toggle = () => toggle(settings);
     },

@@ -42,6 +42,29 @@ export function minus(r: DocRect, hole: DocRect): DocRect[] {
   return out;
 }
 
+/** Client rects come in 1/60 px steps; this much overhang still counts as inside. */
+export const EPS = 0.5;
+
+/**
+ * `box` reaches into `region` sideways by more than the tolerance: a glyph
+ * the region's edge runs through does. The tolerance is at most half the
+ * box, or a glyph narrower than it (letters drawn over one another by a
+ * negative letter-spacing) could never reach in.
+ */
+export function reachesInto(box: DocRect, region: DocRect): boolean {
+  return Math.min(right(box), right(region)) - Math.max(box.x, region.x) > Math.min(EPS, box.width / 2);
+}
+
+/**
+ * Whether Copy text takes a word with this box for `region`, by the two
+ * rules its text runs follow: the region reaches into the word sideways (it
+ * need not hold it), and shows at least half of its height.
+ */
+export function wordInRegion(box: DocRect, region: DocRect): boolean {
+  const shown = intersect(box, region);
+  return shown !== null && shown.height >= box.height / 2 && reachesInto(box, region);
+}
+
 export function unionAll(rects: readonly DocRect[]): DocRect | null {
   let out: DocRect | null = null;
   for (const r of rects) out = out ? union(out, r) : r;

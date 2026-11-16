@@ -4,6 +4,7 @@
 // against the types before any of it reaches capture, rendering or metadata.
 
 import { isKeptHref } from "./links.ts";
+import { MAX_AREAS } from "./ocr.ts";
 import type { FromPopup, SaveResponse, ToBackground, ToContent, UnsupportedReason } from "./types.ts";
 
 type Rec = Record<string, unknown>;
@@ -252,10 +253,40 @@ const isCaptureModel = (x: unknown): boolean =>
   isPageMeta(x.page) &&
   (x.scene === undefined || isScene(x.scene, x.runs.length));
 
+const hasOnly = (x: Rec, ...keys: string[]): boolean => Object.keys(x).every((k) => keys.includes(k));
+
+const isPageView = (x: unknown): boolean =>
+  isRec(x) &&
+  hasOnly(x, "viewport", "scroll", "devicePixelRatio") &&
+  isRec(x.viewport) &&
+  nums(x.viewport, "width", "height") &&
+  isRec(x.scroll) &&
+  nums(x.scroll, "x", "y") &&
+  isNum(x.devicePixelRatio);
+
+// The content script sends the runs that lie on the image areas, of which a
+// selection has a handful; beyond this the list is not ours.
+export const MAX_RECOGNIZE_RUNS = 20_000;
+
+// Lengths first: a forged list is refused before it is walked.
+const isRecognizeRequest = (x: unknown): boolean =>
+  isRec(x) &&
+  hasOnly(x, "region", "areas", "runs", "page") &&
+  isRect(x.region) &&
+  Array.isArray(x.areas) &&
+  x.areas.length >= 1 &&
+  x.areas.length <= MAX_AREAS &&
+  all(x.areas, isImageArea) &&
+  Array.isArray(x.runs) &&
+  x.runs.length <= MAX_RECOGNIZE_RUNS &&
+  all(x.runs, isTextRun) &&
+  isPageView(x.page);
+
 /** True only for a well-formed `ToBackground`; the router drops everything else. */
 export function isToBackground(x: unknown): x is ToBackground {
   if (!isRec(x)) return false;
   if (x.type === "copy") return isStr(x.plain) && isStr(x.html);
+  if (x.type === "recognize") return isRecognizeRequest(x.request);
   return x.type === "save" && isCaptureModel(x.model);
 }
 
@@ -275,7 +306,10 @@ export function isToContent(x: unknown): x is ToContent {
 export type Route =
   /** Not ours (malformed or foreign): no reply, so another listener may answer. */
   | { kind: "ignore" }
-  /** A save that cannot run: answered, so the content script gets a SaveResponse, not undefined. */
+  /**
+   * A save or a recognition that cannot run: answered, so the content script
+   * gets a response (`capture-failed` is one of both kinds), not undefined.
+   */
   | { kind: "reject"; response: Extract<SaveResponse, { ok: false }> }
   | { kind: "handle"; message: ToBackground }
   | { kind: "start"; message: FromPopup };
@@ -305,13 +339,14 @@ export function routeMessage(x: unknown, sender: MessageOrigin, popupUrl?: strin
       return { kind: "ignore" };
     return { kind: "start", message: { type: "start-capture", tabId } };
   }
-  // Our own content script asked for a save; answering with nothing would
-  // make it read `reply.ok` of undefined.
-  if (isRec(x) && x.type === "save") {
+  // Our own content script asked for a save, or for the words in the
+  // selection's images; answering with nothing would make it read `reply.ok`
+  // of undefined.
+  if (isRec(x) && (x.type === "save" || x.type === "recognize")) {
     // content.js is injected into the top frame only, and the region is in
-    // top-document coordinates; a save from any other frame is not ours.
+    // top-document coordinates; a request from any other frame is not ours.
     if (sender.frameId !== 0) return reject("not sent from the top frame");
-    if (!isToBackground(x)) return reject("invalid model");
+    if (!isToBackground(x)) return reject(x.type === "save" ? "invalid model" : "invalid request");
   }
   if (isToBackground(x)) return { kind: "handle", message: x };
   return { kind: "ignore" };

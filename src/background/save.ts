@@ -12,6 +12,7 @@ import type {
   ImageArea,
   OcrOutput,
   PageMeta,
+  PageView,
   RasterTile,
   RenderInput,
   SaveError,
@@ -30,7 +31,7 @@ export interface SaveDeps {
     windowId: number,
     region: DocRect,
     settings: Settings,
-    page: PageMeta,
+    page: PageView,
   ): Promise<CaptureResult>;
   /** The pixels of a vector capture's patches (region-relative); none needs no capture. */
   capturePatches(

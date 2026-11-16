@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isToBackground, isToContent, routeMessage } from "../../src/shared/messages.ts";
+import { isToBackground, isToContent, MAX_RECOGNIZE_RUNS, routeMessage } from "../../src/shared/messages.ts";
+import { MAX_AREAS } from "../../src/shared/ocr.ts";
 import { DEFAULT_SETTINGS } from "../../src/shared/settings.ts";
-import type { CaptureModel, Scene } from "../../src/shared/types.ts";
+import type { CaptureModel, RecognizeRequest, Scene } from "../../src/shared/types.ts";
 
 const model = (): CaptureModel => ({
   region: { x: 10, y: 20, width: 300, height: 200 },
@@ -467,6 +468,63 @@ test("isToBackground: rejects a malformed copy message", () => {
   }
 });
 
+/** What Copy text sends with OCR on: the images' bounding box, the areas and the DOM text on them, relative to it. */
+const request = (): RecognizeRequest => ({
+  region: { x: 40, y: 300, width: 320, height: 90 },
+  areas: [{ x: 0, y: 0, width: 320, height: 90, kind: "img" }],
+  runs: model().runs,
+  page: { viewport: { width: 1280, height: 715 }, scroll: { x: 0, y: 120 }, devicePixelRatio: 2 },
+});
+
+// Each mutation breaks exactly one field of an otherwise valid recognize message.
+const requestMutations: Array<[string, (r: Loose) => void]> = [
+  ["region missing", (r) => delete r.region],
+  ["region NaN", (r) => (r.region.y = Number.NaN)],
+  ["region negative size", (r) => (r.region.height = -90)],
+  ["areas missing", (r) => delete r.areas],
+  ["areas not an array", (r) => (r.areas = { 0: r.areas[0], length: 1 })],
+  // Nothing to read is nothing to capture: the content script never asks.
+  ["no areas", (r) => (r.areas = [])],
+  ["more areas than a pass reads", (r) => (r.areas = Array(MAX_AREAS + 1).fill(r.areas[0]))],
+  ["area kind unknown", (r) => (r.areas[0].kind = "video")],
+  ["area width Infinity", (r) => (r.areas[0].width = Number.POSITIVE_INFINITY)],
+  ["areas with a hole", (r) => (r.areas = holed([r.areas[0], r.areas[0]], 0))],
+  ["runs missing", (r) => delete r.runs],
+  ["run text not a string", (r) => (r.runs[0].text = { toString: () => "x" })],
+  ["run href javascript:", (r) => (r.runs[0].href = "javascript:alert(1)")],
+  ["runs with a hole", (r) => (r.runs = holed([r.runs[0], r.runs[0]], 1))],
+  [
+    "more runs than lie on a selection's images",
+    (r) => (r.runs = Array(MAX_RECOGNIZE_RUNS + 1).fill(r.runs[0])),
+  ],
+  ["page missing", (r) => delete r.page],
+  ["page viewport string", (r) => (r.page.viewport.width = "1280")],
+  ["page scroll missing", (r) => delete r.page.scroll],
+  ["page devicePixelRatio NaN", (r) => (r.page.devicePixelRatio = Number.NaN)],
+  ["page with a foreign key", (r) => (r.page.url = "https://example.com/")],
+  ["request with a foreign key", (r) => (r.tiles = [{ dataURL: "data:image/png;base64,AAAA" }])],
+];
+
+test("isToBackground: accepts a well-formed recognize, with or without DOM text on the images", () => {
+  assert.equal(isToBackground({ type: "recognize", request: request() }), true);
+  assert.equal(isToBackground({ type: "recognize", request: { ...request(), runs: [] } }), true);
+  const full = { ...request(), areas: Array(MAX_AREAS).fill(request().areas[0]) };
+  assert.equal(isToBackground({ type: "recognize", request: full }), true);
+});
+
+test("isToBackground: rejects a recognize whose request is malformed in any one field", () => {
+  for (const [name, mutate] of requestMutations) {
+    const r = request() as unknown as Loose;
+    mutate(r);
+    assert.equal(isToBackground({ type: "recognize", request: r }), false, name);
+  }
+  assert.equal(isToBackground({ type: "recognize" }), false);
+  assert.equal(isToBackground({ type: "recognize", request: null }), false);
+  // A save's model is no request, nor the other way round.
+  assert.equal(isToBackground({ type: "recognize", request: model() }), false);
+  assert.equal(isToBackground({ type: "save", model: request() }), false);
+});
+
 // content.js runs in the top frame only (frameId 0).
 const TOP = { frameId: 0 };
 const INVALID_MODEL = {
@@ -482,6 +540,23 @@ test("routeMessage: a save with a malformed model gets a capture-failed reply", 
   }
   assert.deepEqual(routeMessage({ type: "save" }, TOP), INVALID_MODEL);
   assert.deepEqual(routeMessage({ type: "save", model: null }, TOP), INVALID_MODEL);
+});
+
+test("routeMessage: a malformed recognize, or one from another frame, gets a capture-failed reply", () => {
+  const invalid = {
+    kind: "reject",
+    response: { ok: false, error: "capture-failed", detail: "invalid request" },
+  };
+  for (const [name, mutate] of requestMutations) {
+    const r = request() as unknown as Loose;
+    mutate(r);
+    assert.deepEqual(routeMessage({ type: "recognize", request: r }, TOP), invalid, name);
+  }
+  assert.deepEqual(routeMessage({ type: "recognize" }, TOP), invalid);
+  assert.deepEqual(routeMessage({ type: "recognize", request: request() }, { frameId: 3 }), {
+    kind: "reject",
+    response: { ok: false, error: "capture-failed", detail: "not sent from the top frame" },
+  });
 });
 
 test("routeMessage: unknown or foreign messages get no reply", () => {
@@ -505,6 +580,7 @@ test("routeMessage: well-formed messages are handled", () => {
   for (const message of [
     { type: "save", model: model() },
     { type: "copy", plain: "a", html: "<p>a</p>" },
+    { type: "recognize", request: request() },
   ]) {
     assert.deepEqual(routeMessage(message, TOP), { kind: "handle", message }, message.type);
   }

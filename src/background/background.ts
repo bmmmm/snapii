@@ -3,8 +3,9 @@
 // `start-capture` message) or the keyboard shortcut (the start-capture command) injects the
 // content script into the tab and starts a capture session there; the content
 // script's `save` message comes back here to be captured, rendered and
-// downloaded. Called at the top level of each entry so the listeners wake the
-// event page or the service worker.
+// downloaded, its `recognize` message (Copy text with OCR on) to have the
+// selection's images captured and read. Called at the top level of each entry
+// so the listeners wake the event page or the service worker.
 
 import { routeMessage } from "../shared/messages.ts";
 import { CAPTURE_COMMAND } from "../shared/shortcut.ts";
@@ -12,6 +13,7 @@ import { rasterTextRenderer } from "../shared/svg/build.ts";
 import { vectorRenderer } from "../shared/svg/vector.ts";
 import { flagTab } from "./flag.ts";
 import type { BrowserPlatform } from "./platform.ts";
+import { recognize } from "./recognize.ts";
 import { type SaveDeps, save } from "./save.ts";
 import { loadSettings } from "./settings.ts";
 import { startCapture } from "./start.ts";
@@ -34,16 +36,17 @@ export function startBackground(platform: BrowserPlatform): void {
   browser.runtime.onMessage.addListener((raw: unknown, sender) => {
     const route = routeMessage(raw, sender, POPUP_URL);
     // Foreign or malformed messages are not ours to answer (a malformed save
-    // is, see routeMessage); the page cannot steer the router.
+    // or recognition is, see routeMessage); the page cannot steer the router.
     if (route.kind === "ignore") return undefined;
     if (route.kind === "reject") {
-      console.warn(`snapii: save rejected: ${route.response.detail}`);
+      console.warn(`snapii: request rejected: ${route.response.detail}`);
       return Promise.resolve(route.response);
     }
     // The popup waits for the reply: it closes on success and shows the reason otherwise.
     if (route.kind === "start") return startCapture(route.message.tabId);
     const { message } = route;
     if (message.type === "copy") return platform.copyToClipboard(message.plain, message.html);
+    if (message.type === "recognize") return recognize(message.request, sender.tab, saveDeps);
     return save(message.model, sender.tab, saveDeps);
   });
 

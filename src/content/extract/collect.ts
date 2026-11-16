@@ -2,7 +2,17 @@
 // The DOM inside a capture rectangle -> text runs: one run per visual line
 // of each visible text node, in flat-tree document order, in document CSS px
 // of the top-level document. The renderer puts one invisible <text> on each.
-import { assignLines, bottom, intersect, right, union } from "../../shared/geometry.ts";
+import {
+  assignLines,
+  bottom,
+  EPS,
+  intersect,
+  reachesInto,
+  right,
+  UNBOUNDED,
+  union,
+  unionAll,
+} from "../../shared/geometry.ts";
 import { linkFor } from "../../shared/links.ts";
 import type { DocRect, TextRun } from "../../shared/types.ts";
 import {
@@ -14,9 +24,10 @@ import {
   normalizeLines,
   wordTail,
 } from "../../shared/whitespace.ts";
+import { runsOn, wordAt } from "../../shared/words.ts";
 import { baselineY, fontMetrics } from "./baseline.ts";
 import { closestComposed, type FrameContext, flatParent, walkFlatTree } from "./flat-tree.ts";
-import { codePointBoundary, codePointStart, sliceRects, splitIntoLines } from "./lines.ts";
+import { codePointBoundary, codePointStart, type LineSlice, sliceRects, splitIntoLines } from "./lines.ts";
 import { Layout } from "./visibility.ts";
 
 export interface CollectOptions {
@@ -24,6 +35,15 @@ export interface CollectOptions {
   skip?: Element | null;
   /** Drop lines whose centre is covered by another element (viewport only). */
   occlusionCheck?: boolean;
+  /**
+   * Copy text: a word the rectangle's left or right edge runs through is
+   * taken whole, with the part of it in a neighbouring text node of its line
+   * (foo<b>bar</b>), and a word wholly outside is left out. Only the
+   * rectangle's own edges give way: what the page clips stays cut. Off, a
+   * cut line keeps the glyphs that lie wholly inside, as the saved picture
+   * shows them.
+   */
+  wholeWords?: boolean;
 }
 
 export interface CollectStats {
@@ -42,8 +62,6 @@ export interface RunSource {
   clip: DocRect;
 }
 
-// Client rects come in 1/60 px steps; this much overhang still counts as inside.
-const EPS = 0.5;
 const XLINK = "http://www.w3.org/1999/xlink";
 const XML = "http://www.w3.org/XML/1998/namespace";
 const XHTML = "http://www.w3.org/1999/xhtml";
@@ -131,6 +149,22 @@ const ATOMIC = new Set([
   "button",
 ]);
 
+/** Whole words: the ruby elements whose text annotates the base beside it. */
+const RUBY_TEXT = new Set(["rt", "rp"]);
+/** Whole words: displays whose in-flow children are items, each a box of its own. */
+const ITEM_CONTAINERS = new Set(["flex", "inline-flex", "grid", "inline-grid"]);
+/**
+ * Whole words: the old flexbox, whose items are the children that compute to
+ * a block. Chromium makes no blocks of the others: they share one item and
+ * its lines, as in a block (measured: a <b> in one takes no width, no
+ * -webkit-box-flex and no -webkit-box-pack, and stays on the text's line
+ * under a vertical orient). With -webkit-line-clamp and a vertical orient the
+ * box itself computes to flow-root, the inline one to inline-block, and is a
+ * block of lines.
+ */
+const OLD_FLEXBOXES = new Set(["-webkit-box", "-webkit-inline-box"]);
+const OUT_OF_FLOW = new Set(["absolute", "fixed"]);
+
 // Everything a run takes from its parent element, read once per element.
 interface ParentInfo {
   visible: boolean;
@@ -157,6 +191,38 @@ interface RawRun extends TextRun {
   source: RunSource;
 }
 
+/** The characters [start, end) of one line of a text node that make a run. */
+interface Cut {
+  line: LineSlice;
+  /** The line's box and the box of the characters taken, document coordinates. */
+  rect: DocRect;
+  box: DocRect;
+  start: number;
+  end: number;
+  /** Whole words with the occlusion check: something else is painted over the part of it in the rectangle; no run. */
+  covered?: true;
+}
+
+/** A text node's part in the capture: its parent, the clip its runs are cut to, and its cuts in line order. */
+interface Measured {
+  parent: Element;
+  info: ParentInfo;
+  clip: DocRect;
+  cuts: Cut[];
+}
+
+/**
+ * Two boxes of one visual line: the shorter one's vertical centre lies in the
+ * taller one, as `assignLines` has it. Any overlap is not enough: under a
+ * tight line-height the next line's box reaches up into this one, and a word
+ * wrapped at its hyphen is not one word of one line.
+ */
+function sameLine(a: DocRect, b: DocRect): boolean {
+  const [short, tall] = a.height <= b.height ? [a, b] : [b, a];
+  const centre = short.y + short.height / 2;
+  return centre >= tall.y && centre <= bottom(tall);
+}
+
 /**
  * Keeps the characters of [start, end) whose glyphs lie inside clip
  * horizontally; a capture edge through a word keeps only whole glyphs.
@@ -164,6 +230,9 @@ interface RawRun extends TextRun {
  * followed by one outside the clip no later glyph can be inside — reading on
  * to the end of a million-character line took minutes. It also lets a binary
  * search skip the glyphs before the clip (14 s for an edge 1 M px in).
+ * `touching` keeps the glyphs clip reaches into as well, a glyph its edge
+ * runs through included: the characters whose words Copy text takes. Never
+ * fewer than without it.
  */
 function trimToClip(
   node: Text,
@@ -173,26 +242,30 @@ function trimToClip(
   clip: DocRect,
   toDoc: (r: DocRect) => DocRect,
   monotonic: boolean,
+  touching = false,
 ): { start: number; end: number; box: DocRect } | null {
   let first = -1;
   let last = -1;
   let box: DocRect | null = null;
-  if (monotonic) start = firstAtClip(node, range, start, end, clip, toDoc);
+  let rtl = false;
+  if (monotonic) ({ at: start, rtl } = firstAtClip(node, range, start, end, clip, toDoc, touching));
   for (let i = start; i < end; i++) {
     let glyph = false;
     let inside = false;
+    // Touching: the glyph lies beyond clip's far edge, where no later one reaches back.
+    let past = false;
     for (const r of sliceRects(node, range, i, i + 1)) {
       glyph = true;
       const d = toDoc(r);
-      if (d.x >= clip.x - EPS && right(d) <= right(clip) + EPS) {
+      if ((d.x >= clip.x - EPS && right(d) <= right(clip) + EPS) || (touching && reachesInto(d, clip))) {
         inside = true;
         if (first < 0) first = i;
         last = i;
         box = box ? union(box, d) : d;
-      }
+      } else if (touching) past = rtl ? right(d) <= clip.x - EPS : d.x >= right(clip) + EPS;
     }
     // A collapsed space has no glyph and says nothing about where the line is.
-    if (monotonic && first >= 0 && glyph && !inside) break;
+    if (monotonic && (first >= 0 || past) && glyph && !inside) break;
   }
   if (!box) return null;
   // Keep surrogate pairs whole at both ends.
@@ -203,6 +276,8 @@ function trimToClip(
  * On a one-fragment line: the first offset in [start, end) whose glyph is not
  * before clip's leading edge (left for LTR, right for RTL), or a smaller one.
  * Offsets without a glyph (collapsed spaces) take the next glyph's side.
+ * `touching`: or whose glyph reaches past that edge, as `reachesInto` has
+ * it. `rtl`: the line runs right to left.
  */
 function firstAtClip(
   node: Text,
@@ -211,7 +286,8 @@ function firstAtClip(
   end: number,
   clip: DocRect,
   toDoc: (r: DocRect) => DocRect,
-): number {
+  touching: boolean,
+): { at: number; rtl: boolean } {
   /** The first glyph from i on, before `to`. */
   const glyph = (i: number, to = end): { at: number; rect: DocRect } | null => {
     for (let j = i; j < to; j++) {
@@ -221,14 +297,16 @@ function firstAtClip(
     return null;
   };
   const head = glyph(start);
-  if (!head) return start;
+  if (!head) return { at: start, rtl: false };
   let tail: DocRect | null = null;
   for (let j = end - 1; j > head.at && !tail; j--) {
     const [r] = sliceRects(node, range, j, j + 1);
     if (r) tail = toDoc(r);
   }
   const rtl = tail !== null && tail.x < head.rect.x;
-  const reached = (d: DocRect) => (rtl ? right(d) <= right(clip) + EPS : d.x >= clip.x - EPS);
+  const reached = (d: DocRect) =>
+    (rtl ? right(d) <= right(clip) + EPS : d.x >= clip.x - EPS) ||
+    (touching && (rtl ? right(clip) - d.x : right(d) - clip.x) > EPS);
   let lo = start;
   let hi = end;
   while (lo < hi) {
@@ -238,7 +316,7 @@ function firstAtClip(
     if (!g || reached(g.rect)) hi = mid;
     else lo = g.at + 1;
   }
-  return lo;
+  return { at: lo, rtl };
 }
 
 export async function collectTextRuns(
@@ -379,6 +457,315 @@ export async function collectTextRunsDetailed(
     return newlines(tail.node.data, tail.from);
   };
 
+  const words = opts.wholeWords === true;
+  // Whole words: the rectangle's rows across the page's width. A word's glyphs
+  // beyond the rectangle's left or right edge count; what the page clips of
+  // them does not.
+  const rows: DocRect = words
+    ? { x: UNBOUNDED.x, y: captureRect.y, width: UNBOUNDED.width, height: captureRect.height }
+    : captureRect;
+
+  type TextAt = (typeof texts)[number];
+  const textAt = (i: number): TextAt => texts[i] as TextAt;
+
+  /**
+   * t is laid out in root's inline flow: it has a box — under display:
+   * contents (a slot) its nearest boxed ancestor has one — and is in no other
+   * inline-block and in no box out of the flow (absolutely positioned or
+   * floated).
+   */
+  const flows = (t: TextAt, root: Element): boolean => {
+    const p = flatParent(t.node);
+    const boxed = p && closestComposed(p, (e) => layout.style(e).display !== "contents");
+    return !!p && !!boxed && layout.hasBox(boxed) && infoOf(p, t.ctx).root === root;
+  };
+
+  /** No atomic element and no inline-block is laid out between texts j and i (j first): none a word of one line would have to get past. */
+  const unbroken = (j: number, i: number): boolean => {
+    const between = elements.slice(textAt(j).at, textAt(i).at);
+    // The flat-tree ancestors of the later text: an element between that holds it is no boundary.
+    // Its nearest ones, as many as there are elements between: an element comes before what it
+    // holds, so none further up can stand between. A walk to the root for each pair of texts,
+    // here and for the ruby annotation, took 5.5 s for one word across 2 000 nested <u>.
+    const ancestors = new Set<Element>();
+    for (let a = flatParent(textAt(i).node); a && ancestors.size < between.length; a = flatParent(a))
+      ancestors.add(a);
+    for (const e of between) {
+      if (ancestors.has(e) || !layout.hasBox(e)) continue;
+      const d = layout.style(e).display;
+      if (ATOMIC.has(e.localName) || d.startsWith("inline-") || INLINE_ATOMIC.has(d)) return false;
+    }
+    return true;
+  };
+
+  /**
+   * What text i gives the capture, or null for none. `beside` asks a
+   * neighbour of a cut word instead (whole words): the word at the node's end
+   * (`tail`) or start, if it stands on the line of `rect` — also in a node the
+   * rectangle does not touch.
+   */
+  const measure = (i: number, beside?: { rect: DocRect; tail: boolean }): Measured | null => {
+    const { node, ctx } = textAt(i);
+    if (!node.data) return null;
+    if (!layout.frame(ctx).clip) return null;
+    let range = ranges.get(ctx.doc);
+    if (!range) {
+      range = ctx.doc.createRange();
+      ranges.set(ctx.doc, range);
+    }
+    range.selectNodeContents(node);
+    // Cheap reject: one rect read per node; everything below costs far more.
+    const outer = range.getBoundingClientRect();
+    if (
+      outer.width <= 0 ||
+      outer.height <= 0 ||
+      !intersect(layout.toDoc(outer, ctx), beside ? rows : captureRect)
+    )
+      return null;
+
+    const parent = flatParent(node);
+    if (!parent) return null;
+    const info = infoOf(parent, ctx);
+    if (!info.visible) return null;
+    if (info.vertical) {
+      if (!beside) stats.skippedVertical++;
+      return null;
+    }
+    const clip = info.clip && intersect(info.clip, rows);
+    // Whole words: the lines to look at are still those the rectangle meets.
+    const within = clip && words ? intersect(clip, captureRect) : clip;
+    if (!clip || !(within || beside)) return null;
+    const toDoc = (r: DocRect) => layout.toDoc(r, ctx);
+    const cuts: Cut[] = [];
+    const lines = splitIntoLines(node, range, (r) =>
+      beside ? sameLine(toDoc(r), beside.rect) : within !== null && intersect(toDoc(r), within) !== null,
+    );
+    for (const line of lines) {
+      const rect = toDoc(line.rect);
+      // A node of one line comes back whatever the filter says.
+      if (beside && !sameLine(rect, beside.rect)) continue;
+      const shown = intersect(rect, clip);
+      // Less than half the line visible: the raster shows a sliver, not text.
+      if (!shown || shown.height < rect.height / 2) continue;
+      let { start, end } = line;
+      let box = rect;
+      if (rect.x < clip.x - EPS || right(rect) > right(clip) + EPS) {
+        const kept = trimToClip(node, range, start, end, clip, toDoc, line.parts.length === 1);
+        if (!kept) continue;
+        ({ start, end, box } = kept);
+      }
+      if (words) {
+        // The characters the rectangle reaches, then out to the edges of their
+        // words, as far as the line shows them.
+        let from = start;
+        let to = end;
+        if (beside) {
+          if (beside.tail ? end !== node.data.length : start !== 0) continue;
+          if (beside.tail) from = end - 1;
+          else to = start + 1;
+        } else if (box.x < captureRect.x - EPS || right(box) > right(captureRect) + EPS) {
+          const hit = trimToClip(node, range, start, end, captureRect, toDoc, line.parts.length === 1, true);
+          if (!hit) continue;
+          ({ start: from, end: to } = hit);
+        }
+        from = Math.max(start, wordAt(node.data, from, info.lang, line.start, line.end).start);
+        to = Math.min(end, wordAt(node.data, to - 1, info.lang, line.start, line.end).end);
+        if (from > start || to < end) {
+          box = unionAll(sliceRects(node, range, from, to).map(toDoc)) ?? box;
+          start = from;
+          end = to;
+        }
+      }
+      cuts.push({ line, rect, start, end, box });
+    }
+    return { parent, info, clip, cuts };
+  };
+
+  /**
+   * Whole words across text nodes: where a taken word reaches the start or
+   * the end of its text node and goes on in the text beside it on its line
+   * (foo<b>bar</b>baz), the neighbour gives its part of the word, and through
+   * a neighbour that is all one word the next one does. What parts two words
+   * there is what parts them for `capitalize` (see `before` below) — white
+   * space, another block or inline-block, an atomic element between — and
+   * what parts them for the eye: a gap between the two (padding, a margin),
+   * a flex or grid item between, a ruby annotation.
+   */
+  const joinWords = (plan: (Measured | null)[]): void => {
+    /**
+     * The widest gap a word goes on across: what rounding leaves between
+     * two boxes that touch, a sixteenth of the font size (1 px for small
+     * print). Nothing else needs one: the boxes are the glyphs' advances,
+     * letter-spacing included, and kerning, an italic, a raised letter or a
+     * justified line leave no gap of 0.1 px (measured, Chromium). A space is
+     * a quarter of the font size and more, and a margin or a padding half as
+     * wide is a gap the eye sees. The smaller of the two texts' counts: the
+     * word is the same whichever of them the rectangle cuts, and a cut says
+     * by itself how far its neighbour can be.
+     */
+    const slack = (m: Measured): number => Math.max(1, m.info.fontSize / 16);
+
+    /** The glyph at a cut's end (`tail`) or start: the one that faces the text beside it. */
+    const facing = (k: number, cut: Cut, tail: boolean): DocRect => {
+      const { node, ctx } = textAt(k);
+      const from = tail ? codePointStart(node.data, cut.end - 1) : cut.start;
+      const to = tail ? cut.end : codePointBoundary(node.data, cut.start + 1);
+      const rects = sliceRects(node, ranges.get(ctx.doc) as Range, from, to);
+      return unionAll(rects.map((r) => layout.toDoc(r, ctx))) ?? cut.box;
+    };
+
+    /**
+     * The flowing text before and after each flowing text of the same word
+     * root (see `flows`), -1 for none. One pass over the page, made when the
+     * first cut asks: a search from each text for its neighbour took 25 s on
+     * 600 nested blocks.
+     */
+    let links: { before: Int32Array; after: Int32Array } | null = null;
+    const linked = (): NonNullable<typeof links> => {
+      if (links) return links;
+      const before = new Int32Array(texts.length).fill(-1);
+      const after = new Int32Array(texts.length).fill(-1);
+      const last = new Map<Element, number>();
+      const boxes = new Map<Element, boolean>();
+      for (const [i, t] of texts.entries()) {
+        const p = t.node.data ? flatParent(t.node) : null;
+        const boxed = p && closestComposed(p, (e) => layout.style(e).display !== "contents");
+        if (!p || !boxed) continue;
+        let has = boxes.get(boxed);
+        if (has === undefined) {
+          has = layout.hasBox(boxed);
+          boxes.set(boxed, has);
+        }
+        if (!has) continue;
+        const root = inheritedOf(p).root ?? p;
+        const j = last.get(root);
+        if (j !== undefined) {
+          before[i] = j;
+          after[j] = i;
+        }
+        last.set(root, i);
+      }
+      links = { before, after };
+      return links;
+    };
+
+    /** The ruby annotation each element is in, or null: asked up to the nearest element already known, as `inheritedOf` does. */
+    const annotations = new Map<Element, Element | null>();
+    const annotation = (k: number): Element | null => {
+      const chain: Element[] = [];
+      let at = flatParent(textAt(k).node);
+      while (at && !annotations.has(at)) {
+        chain.push(at);
+        at = flatParent(at);
+      }
+      let found = (at && annotations.get(at)) ?? null;
+      for (const e of chain.reverse()) {
+        if (RUBY_TEXT.has(e.localName) || layout.style(e).display === "ruby-text") found = e;
+        annotations.set(e, found);
+      }
+      return found;
+    };
+    /**
+     * Something parts texts j and i (j first) that a word of one line does
+     * not get past: what parts them for `capitalize`; a ruby annotation, which
+     * is never part of its base's word; a flex or grid item between them — a
+     * box of its own, however close it stands (Total<b>5</b>items in a flex
+     * row are three items, and the two texts share the container as root),
+     * or a block that is an item of an old flexbox.
+     */
+    const parted = (j: number, i: number): boolean => {
+      if (!unbroken(j, i) || annotation(j) !== annotation(i)) return true;
+      for (const e of elements.slice(textAt(j).at, textAt(i).at)) {
+        if (!layout.hasBox(e) || OUT_OF_FLOW.has(layout.style(e).position)) continue;
+        const up = flatParent(e);
+        const container = up && closestComposed(up, (a) => layout.style(a).display !== "contents");
+        const display = container ? layout.style(container).display : "";
+        if (ITEM_CONTAINERS.has(display)) return true;
+        if (OLD_FLEXBOXES.has(display) && isBlockLevel(layout.style(e).display)) return true;
+      }
+      return false;
+    };
+
+    /**
+     * Takes the part of cut's word that stands in the text before text i
+     * (`backwards`) or after it, if there is one; that text and its cut, or
+     * null. The checks go from cheap to dear, and the first needs nothing
+     * but the cut: a neighbour near enough to belong to the word, next to a
+     * glyph well inside the rectangle, is one the rectangle reaches itself.
+     */
+    const reach = (i: number, cut: Cut, backwards: boolean): { at: number; cut: Cut } | null => {
+      const reachable = slack(plan[i] as Measured);
+      const inside = (r: DocRect): boolean =>
+        r.x > captureRect.x + EPS + reachable && right(r) < right(captureRect) - EPS - reachable;
+      if (inside(cut.box)) return null;
+      const k = backwards ? linked().before[i] : linked().after[i];
+      if (k === undefined || k < 0) return null;
+      const { data } = textAt(k).node;
+      if (!runsOn(data, backwards ? data.length - 1 : 0)) return null;
+      const had = plan[k];
+      // Its word is taken already, or is covered.
+      if (backwards ? had?.cuts.at(-1)?.end === data.length : had?.cuts[0]?.start === 0) return null;
+      const mine = facing(i, cut, !backwards);
+      if (inside(mine)) return null;
+      const more = measure(k, { rect: cut.rect, tail: backwards });
+      const part = more?.cuts[0];
+      if (!more || !part) return null;
+      const theirs = facing(k, part, backwards);
+      const gap = Math.max(mine.x, theirs.x) - Math.min(right(mine), right(theirs));
+      if (gap > Math.min(reachable, slack(more))) return null;
+      if (backwards ? parted(k, i) : parted(i, k)) return null;
+      if (!had) {
+        plan[k] = more;
+        return { at: k, cut: part };
+      }
+      const next = backwards ? had.cuts[had.cuts.length - 1] : had.cuts[0];
+      if (next && next.line.start === part.line.start && part.start <= next.end && next.start <= part.end) {
+        // A covered one stays covered, with what it takes in.
+        next.box = union(next.box, part.box);
+        next.start = Math.min(next.start, part.start);
+        next.end = Math.max(next.end, part.end);
+        return { at: k, cut: next };
+      }
+      if (backwards) had.cuts.push(part);
+      else had.cuts.unshift(part);
+      return { at: k, cut: part };
+    };
+
+    for (let i = 0; i < plan.length; i++) {
+      const measured = plan[i];
+      if (!measured || measured.cuts.length === 0) continue;
+      // Backwards, node by node: the texts before i have had their turn.
+      let at = i;
+      let cut = measured.cuts[0] as Cut;
+      while (!cut.covered && cut.start === 0 && runsOn(textAt(at).node.data, 0)) {
+        const more = reach(at, cut, true);
+        if (!more) break;
+        ({ at, cut } = more);
+      }
+      // Forwards one node: the loop goes on from there.
+      const last = measured.cuts[measured.cuts.length - 1] as Cut;
+      const { data } = textAt(i).node;
+      if (!last.covered && last.end === data.length && runsOn(data, data.length - 1)) reach(i, last, false);
+    }
+  };
+
+  const plan = words ? texts.map((_, i) => measure(i)) : null;
+  if (plan) {
+    // Before the words grow: a word is covered or not by its part in the
+    // rectangle. The middle of the whole word can lie under something the
+    // rectangle does not show.
+    if (opts.occlusionCheck) {
+      for (const [i, measured] of plan.entries()) {
+        if (!measured) continue;
+        for (const cut of measured.cuts) {
+          const seen = intersect(cut.box, captureRect) ?? cut.box;
+          if (layout.occluded(measured.parent, seen, textAt(i).ctx, opts.skip)) cut.covered = true;
+        }
+      }
+    }
+    joinWords(plan);
+  }
+
   const raw: RawRun[] = [];
   /** Index in `texts` of the node the last raw run came from. */
   let lastRun = -1;
@@ -396,28 +783,9 @@ export async function collectTextRunsDetailed(
   for (const [i, { node, ctx }] of texts.entries()) {
     if (tail && lastInfo && tail.node.data.includes("\n", tail.from)) breaks += tailBreaks(tail, lastInfo);
     tail = { node, ctx, from: 0 };
-    if (!node.data) continue;
-    if (!layout.frame(ctx).clip) continue;
-    let range = ranges.get(ctx.doc);
-    if (!range) {
-      range = ctx.doc.createRange();
-      ranges.set(ctx.doc, range);
-    }
-    range.selectNodeContents(node);
-    // Cheap reject: one rect read per node; everything below costs far more.
-    const outer = range.getBoundingClientRect();
-    if (outer.width <= 0 || outer.height <= 0 || !intersect(layout.toDoc(outer, ctx), captureRect)) continue;
-
-    const parent = flatParent(node);
-    if (!parent) continue;
-    const info = infoOf(parent, ctx);
-    if (!info.visible) continue;
-    if (info.vertical) {
-      stats.skippedVertical++;
-      continue;
-    }
-    const clip = info.clip && intersect(info.clip, captureRect);
-    if (!clip) continue;
+    const measured = plan ? plan[i] : measure(i);
+    if (!measured) continue;
+    const { parent, info, clip, cuts } = measured;
     const metrics = fontMetrics(ctx.doc, info.fontKey);
     const toDoc = (r: DocRect) => layout.toDoc(r, ctx);
     /**
@@ -440,50 +808,20 @@ export async function collectTextRunsDetailed(
       const prevInfo = parent && infoOf(parent, ctx);
       if (!prevInfo || prevInfo.root !== info.root) return "";
       if (!(prev.top < box.y + box.height && box.y < prev.top + prev.height)) return "";
-      // The flat-tree ancestors of this text: an element between that holds it is no boundary.
-      const ancestors = new Set<Element>();
-      for (let a = flatParent(node); a; a = flatParent(a)) ancestors.add(a);
-      const last = texts[lastRun] as (typeof texts)[number];
       for (let j = lastRun + 1; j < i; j++) {
         // A text node that made no run: one laid out in this line's flow holding a
-        // space is a boundary; one without a box or out of the flow (an absolutely
-        // positioned or floated box) is not. Under display: contents (a slot) the
-        // nearest boxed ancestor lays it out.
-        const t = texts[j] as (typeof texts)[number];
-        const p = flatParent(t.node);
-        const boxed = p && closestComposed(p, (e) => layout.style(e).display !== "contents");
-        if (
-          p &&
-          boxed &&
-          /\s/.test(t.node.data) &&
-          layout.hasBox(boxed) &&
-          infoOf(p, t.ctx).root === info.root
-        )
-          return "";
+        // space is a boundary; one without a box or out of the flow is not.
+        const t = textAt(j);
+        if (/\s/.test(t.node.data) && flows(t, info.root)) return "";
       }
-      for (const e of elements.slice(last.at, (texts[i] as (typeof texts)[number]).at)) {
-        if (ancestors.has(e) || !layout.hasBox(e)) continue;
-        const d = layout.style(e).display;
-        if (ATOMIC.has(e.localName) || d.startsWith("inline-") || INLINE_ATOMIC.has(d)) return "";
-      }
+      if (!unbroken(lastRun, i)) return "";
       // Not wordTail: across nodes the engines part after marks, joiners, emoji or a
       // second apostrophe (x''<b>abc</b>: Chromium "Abc", Firefox "abc"; measured).
       return prev.source.node.data.slice(-2);
     };
 
-    for (const line of splitIntoLines(node, range, (r) => intersect(toDoc(r), clip) !== null)) {
-      const rect = toDoc(line.rect);
-      const shown = intersect(rect, clip);
-      // Less than half the line visible: the raster shows a sliver, not text.
-      if (!shown || shown.height < rect.height / 2) continue;
-      let { start, end } = line;
-      let box = rect;
-      if (rect.x < clip.x - EPS || right(rect) > right(clip) + EPS) {
-        const kept = trimToClip(node, range, start, end, clip, toDoc, line.parts.length === 1);
-        if (!kept) continue;
-        ({ start, end, box } = kept);
-      }
-      if (opts.occlusionCheck && layout.occluded(parent, box, ctx, opts.skip)) continue;
+    for (const { line, rect, start, end, box, covered } of cuts) {
+      if (covered || (!plan && opts.occlusionCheck && layout.occluded(parent, box, ctx, opts.skip))) continue;
       const text = applyTextTransform(
         collapse(node.data.slice(start, end), info.whiteSpace),
         info.transform,

@@ -409,6 +409,18 @@
   "toastCopiedText": {
     "message": "Copied text"
   },
+  "toastCopyRecognizing": {
+    "message": "Copying… (recognizing text)",
+    "description": "Copy text with OCR on, while the selection's images are read."
+  },
+  "toastCopiedWithoutImages": {
+    "message": "Copied text. Text in images was not recognized",
+    "description": "Copy text with OCR on: the page's text was copied, the images could not be read."
+  },
+  "toastImagesNotRead": {
+    "message": "Nothing copied. Text in images was not recognized",
+    "description": "Copy text with OCR on: no page text in the selection, and the images could not be read."
+  },
   "toastCopiedLink": {
     "message": "Copied link",
     "description": "Copy element link worked: the link points at the selected text."
