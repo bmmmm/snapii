@@ -3,7 +3,7 @@
 // looks at: <img> (also inside <picture>), <canvas>, SVG <image>, and boxes
 // painted with a CSS background image. Only the visible part counts, clipped
 // like text; tiny images (icons, bullets) are left out.
-import { intersect } from "../../shared/geometry.ts";
+import { EPS, intersect } from "../../shared/geometry.ts";
 import { MIN_AREA } from "../../shared/ocr.ts";
 import type { DocRect, ImageArea } from "../../shared/types.ts";
 import { walkFlatTree } from "./flat-tree.ts";
@@ -19,11 +19,16 @@ function kindOf(el: Element, layout: Layout): ImageArea["kind"] | null {
   return layout.style(el).backgroundImage.includes("url(") ? "background" : null;
 }
 
-/** Image areas in document CSS px, in flat-tree order. */
+/**
+ * Image areas in document CSS px, in flat-tree order: of each image that
+ * shows in `captureRect`, the part inside it. With `extent`, the part inside
+ * that instead (Copy text reads an image beyond the selection's edge, for
+ * the words the edge cuts); an image the rect merely borders is none of its.
+ */
 export function collectImageAreas(
   root: Document | Element,
   captureRect: DocRect,
-  opts: { skip?: Element | null } = {},
+  opts: { skip?: Element | null; extent?: DocRect } = {},
 ): ImageArea[] {
   const layout = new Layout();
   const out: ImageArea[] = [];
@@ -40,8 +45,12 @@ export function collectImageAreas(
     const clip = layout.clip(el, ctx);
     const shown = clip && intersect(box, clip);
     const inside = shown && intersect(shown, captureRect);
-    if (inside && inside.width >= MIN_AREA.width && inside.height >= MIN_AREA.height) {
-      out.push({ ...inside, kind });
+    if (!inside) continue;
+    const area = opts.extent
+      ? inside.width > EPS && inside.height > EPS && intersect(shown, opts.extent)
+      : inside;
+    if (area && area.width >= MIN_AREA.width && area.height >= MIN_AREA.height) {
+      out.push({ ...area, kind });
     }
   }
   return out;

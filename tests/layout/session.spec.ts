@@ -129,6 +129,8 @@ async function begin(
           if (w.__clipFail) throw new Error("clipboard write failed");
           w.__clips.push(data);
         },
+        // Copy text with OCR on is tests/layout/copy-ocr.spec.ts; here the setting is off.
+        sendRecognize: async () => ({ ok: false, error: "disabled" }),
       });
     },
     { settings, reply, now: NOW, viewportOnly },
@@ -1025,6 +1027,7 @@ test("after captured a toolbar click opens a new session; the first save's toast
           return new Promise((resolve) => w.__pending.push({ onCaptured, resolve }));
         },
         async writeClipboard() {},
+        sendRecognize: async () => ({ ok: false, error: "disabled" }),
       });
       w.__toggle = () => toggle(settings);
     },
@@ -1111,6 +1114,7 @@ for (const [what, reply] of [
             return reply;
           },
           async writeClipboard() {},
+          sendRecognize: async () => ({ ok: false, error: "disabled" }),
         });
         w.__toggle = () => toggle(settings);
       },
@@ -1150,6 +1154,7 @@ test("a sendSave that throws synchronously does not lock the toolbar button for 
           throw new Error("runtime.sendMessage threw");
         },
         async writeClipboard() {},
+        sendRecognize: async () => ({ ok: false, error: "disabled" }),
       });
       w.__toggle = () => toggle(settings);
     },

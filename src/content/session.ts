@@ -4,17 +4,23 @@
 // harness can run it in page context with stubbed sendSave/writeClipboard;
 // main.ts wires the real messaging and clipboard.
 import { cleanPageUrl } from "../shared/cleanurl.ts";
-import { linksRelativeTo, runsRelativeTo } from "../shared/geometry.ts";
+import { intersect, linksRelativeTo, runsRelativeTo, unionAll } from "../shared/geometry.ts";
+import { MAX_RECOGNIZE_RUNS } from "../shared/messages.ts";
+import { MAX_AREAS, runBox } from "../shared/ocr.ts";
 import { runsToPlainText } from "../shared/plaintext.ts";
+import { readingExtent, recognizedIn, withRecognized } from "../shared/recognized.ts";
 import { fragmentToCleanHtml, type SNode, toSNodes } from "../shared/sanitize.ts";
 import type {
   CapturedMessage,
   CaptureModel,
   FragmentStatus,
   PageMeta,
+  RecognizeRequest,
+  RecognizeResponse,
   SaveError,
   SaveResponse,
   Settings,
+  TextRun,
 } from "../shared/types.ts";
 import { fitsViewport } from "../shared/viewport.ts";
 import type { ClipboardData } from "./clipboard.ts";
@@ -65,6 +71,12 @@ const LATE_ERROR_TOAST = "The selection was captured, but no SVG came of it. Sta
 const COPY_FAILED_TOAST = "Copy failed. Try again";
 const NO_TEXT_TOAST = "No text in the selection";
 const COPIED_TEXT_TOAST = "Copied text";
+/** Copy text, between `captured` and the reply, while Tesseract reads the selection's images. */
+const COPY_RECOGNIZING_TOAST = "Copying… (recognizing text)";
+/** The images could not be read (capture or OCR failed, or ran out of time): the DOM text is copied all the same. */
+const COPIED_WITHOUT_IMAGES_TOAST = "Copied text. Text in images was not recognized";
+/** The same, with no DOM text in the selection: nothing was copied. */
+const IMAGES_NOT_READ_TOAST = "Nothing copied. Text in images was not recognized";
 const COPIED_PAGE_LINK_TOAST = "Copied page link";
 const COPIED_CLEAN_LINK_TOAST = "Copied page link, tracking removed";
 
@@ -88,6 +100,15 @@ export interface SessionDeps {
    * once the last tile is taken, before OCR and download.
    */
   sendSave(model: CaptureModel, onCaptured: (message: CapturedMessage) => void): Promise<SaveResponse>;
+  /**
+   * Copy text with OCR on: asks the background for the words in the
+   * selection's images. `onCaptured` as in sendSave: the pixels are taken,
+   * the reading goes on.
+   */
+  sendRecognize(
+    request: RecognizeRequest,
+    onCaptured: (message: CapturedMessage) => void,
+  ): Promise<RecognizeResponse>;
   /** Writes both flavours (writeClipboard in main.ts); rejects if nothing was written. */
   writeClipboard(data: ClipboardData): Promise<void>;
   now(): Date;
@@ -159,6 +180,20 @@ function captureWindow(): () => void {
     showToast(held.message, held.ms);
   };
 }
+
+/**
+ * Counts the copy actions of this page, across sessions. A Copy text whose
+ * images are still being read when the next copy starts is out of date: it
+ * would write the older text over the newer.
+ */
+let clipboardTurn = 0;
+
+/** What Copy text gets from the selection's images: the words it takes (document px), or that they could not be read. */
+interface FromImages {
+  runs: TextRun[];
+  failed: boolean;
+}
+const NO_IMAGES: FromImages = { runs: [], failed: false };
 
 /** Snapshot of the page's text selection, so the capture never shows its highlight. */
 function takeSelection(): Range[] {
@@ -254,8 +289,10 @@ export function startSession(deps: SessionDeps): SessionHandle {
   let cancelled = false;
   /** The background has captured this session's save (`captured` arrived). */
   let captured = false;
-  /** The hover shield of a save in flight. */
+  /** The hover shield of a capture in flight. */
   let shield: HTMLElement | null = null;
+  /** Copy texts of this session whose images are being read. */
+  let reading = 0;
 
   /**
    * Every way out of the session, including a cancel while the background
@@ -271,6 +308,8 @@ export function startSession(deps: SessionDeps): SessionHandle {
 
   const cancel = (): void => {
     cancelled = true;
+    // "Copying…" would go on announcing a copy that no longer happens.
+    if (reading > 0) for (const t of document.querySelectorAll("snapii-toast")) t.remove();
     close();
   };
 
@@ -306,22 +345,37 @@ export function startSession(deps: SessionDeps): SessionHandle {
     return textFragmentURL(range, pageURL);
   }
 
+  /**
+   * Takes snapii and the reader's text selection off the screen for a
+   * capture: the hover shield up, the overlay hidden; two frames later the
+   * screen shows it. The returned function gives the page back: no shield,
+   * the selection back. Once only: after that the selection is the reader's
+   * again, and a late reply must not overwrite it.
+   */
+  function conceal(): () => void {
+    const mine = hoverShield();
+    shield = mine;
+    overlay.hide();
+    const ranges = takeSelection();
+    let given = false;
+    return () => {
+      if (given) return;
+      given = true;
+      mine.remove();
+      if (shield === mine) shield = null;
+      restoreSelection(ranges);
+    };
+  }
+
   async function save(selection: Selection): Promise<void> {
     const endCapture = captureWindow();
-    let ranges: Range[] = [];
+    let giveBack = (): void => {};
     let released = false;
-    /**
-     * Gives the page back: no more capture, no shield, the reader's text
-     * selection back. Once only: after that the selection is the reader's
-     * again, and a late reply must not overwrite it.
-     */
+    /** Gives the page back: no more capture, and what conceal() took. */
     const release = (): void => {
       endCapture();
-      if (released) return;
       released = true;
-      shield?.remove();
-      shield = null;
-      restoreSelection(ranges);
+      giveBack();
     };
     /** The background has the last tile: the page is free while OCR, rendering and download run. */
     const onCaptured = (message: CapturedMessage): void => {
@@ -362,9 +416,7 @@ export function startSession(deps: SessionDeps): SessionHandle {
         );
       }
 
-      shield = hoverShield();
-      overlay.hide();
-      ranges = takeSelection();
+      giveBack = conceal();
       // The hide and the cleared selection have to reach the screen before the
       // background captures it: one frame to style/lay out, one to paint.
       await nextFrame();
@@ -392,21 +444,103 @@ export function startSession(deps: SessionDeps): SessionHandle {
     notify(vectorOutside ? VECTOR_OUTSIDE_NOTICE : (ERROR_TOAST[reply.error] ?? UNEXPECTED_TOAST));
   }
 
+  /** What the background is asked to read for a Copy text, or null where the selection shows no image. */
+  function recognitionOf(selection: Selection, runs: readonly TextRun[]): RecognizeRequest | null {
+    const extent = readingExtent(selection.rect, deps.viewportOnly ? visibleViewport() : null);
+    if (!extent) return null;
+    const areas = collectImageAreas(document, selection.rect, { skip: overlay.host, extent }).slice(
+      0,
+      MAX_AREAS,
+    );
+    const box = unionAll(areas);
+    if (!box) return null;
+    // A single area is its own bounding box, `kind` and all.
+    const region = { x: box.x, y: box.y, width: box.width, height: box.height };
+    // Only text on an image can lie on one of its words.
+    const onImages = runs.filter((r) => areas.some((a) => intersect(runBox(r), a)));
+    return {
+      region,
+      areas: areasRelativeTo(areas, region),
+      runs: runsRelativeTo(onImages.slice(0, MAX_RECOGNIZE_RUNS), region),
+      page: { viewport: viewportSize(), scroll: { x: scrollX, y: scrollY }, devicePixelRatio },
+    };
+  }
+
+  /**
+   * With the OCR setting on: the words the selection takes from the images
+   * it touches. The background captures those, so snapii leaves the screen
+   * until it has the pixels; then the overlay is back and `onCaptured` runs,
+   * while the reading takes its seconds. null: this copy is over (the
+   * session was cancelled, or the clipboard has been written again since).
+   */
+  async function recognizeImages(
+    selection: Selection,
+    runs: readonly TextRun[],
+    onCaptured: () => void,
+  ): Promise<FromImages | null> {
+    if (!deps.settings.ocr) return NO_IMAGES;
+    const request = recognitionOf(selection, runs);
+    if (!request) return NO_IMAGES;
+    const turn = clipboardTurn;
+    const endCapture = captureWindow();
+    const giveBack = conceal();
+    let back = false;
+    /** Once only, like giveBack: a save may have hidden the overlay again by the time the reply comes. */
+    const release = (): void => {
+      endCapture();
+      giveBack();
+      if (back) return;
+      back = true;
+      if (open) overlay.show();
+    };
+    let reply: RecognizeResponse | undefined;
+    reading++;
+    try {
+      // As in save(): the hide has to be on screen before the capture.
+      await nextFrame();
+      await nextFrame();
+      if (cancelled) return null;
+      reply = await deps.sendRecognize(request, () => {
+        // After the reply (a stale message): the reply has decided already.
+        if (back) return;
+        release();
+        notify(COPY_RECOGNIZING_TOAST, RECOGNIZING_TOAST_MS);
+        onCaptured();
+      });
+    } catch (e) {
+      // The DOM text is still worth copying.
+      console.error("snapii: recognizing text failed", e);
+    } finally {
+      reading--;
+      release();
+    }
+    if (cancelled || turn !== clipboardTurn) return null;
+    // No reply at all (the background went away) is a failure like any other.
+    if (!reply?.ok) return { runs: [], failed: reply?.error !== "disabled" };
+    const { x, y } = request.region;
+    const inDocument = reply.runs.map((r) => ({ ...r, x: r.x + x, y: r.y + y, top: r.top + y }));
+    return { runs: recognizedIn(inDocument, selection.rect), failed: false };
+  }
+
   /**
    * text/plain as the capture shows it, a word the selection's edge runs
    * through taken whole; text/html from the visible part of the selected
-   * DOM, the same characters.
+   * DOM, the same characters. With the OCR setting on, the words in the
+   * selection's images too; `onReading` runs once those are only being read.
    */
-  async function copyText(selection: Selection): Promise<void> {
+  async function copyText(selection: Selection, onReading: () => void): Promise<void> {
     const { runs, sources } = await collect(selection, true);
     // Cancelled while collection waited for the fonts: the user is done, so
     // the clipboard keeps what they had there.
     if (!open) return;
-    if (runs.length === 0) {
-      notify(NO_TEXT_TOAST);
+    const images = await recognizeImages(selection, runs, onReading);
+    if (!images) return;
+    const text = withRecognized(runs, images.runs);
+    if (text.length === 0) {
+      notify(images.failed ? IMAGES_NOT_READ_TOAST : NO_TEXT_TOAST);
       return;
     }
-    const plain = runsToPlainText(runs);
+    const plain = runsToPlainText(text);
     const ctx = { baseURL: document.baseURI, pageURL: location.href };
     // A range never holds shadow-tree or frame content. Where whole lines
     // live only there (a drag over a web component's paragraphs, a picked
@@ -419,9 +553,15 @@ export function startSession(deps: SessionDeps): SessionHandle {
     const outside = runs.some((r, i) => !own(i) && !ownLines.has(r.line));
     const range = outside ? null : selectionRange(selection, sources);
     const cloned = range ? fragmentToCleanHtml(toSNodes(cloneVisibleRange(range, sources)), ctx) : "";
-    const html = cloned.trim() !== "" ? cloned : fragmentToCleanHtml(plainParagraphs(plain), ctx);
+    // The page's HTML has no place for an image's words: they follow it, a
+    // paragraph per image, the same characters as in the plain text.
+    const read = images.runs.length > 0 ? plainParagraphs(runsToPlainText(images.runs)) : [];
+    const html =
+      cloned.trim() !== ""
+        ? cloned + (read.length > 0 ? fragmentToCleanHtml(read, ctx) : "")
+        : fragmentToCleanHtml(plainParagraphs(plain), ctx);
     await deps.writeClipboard({ plain, html });
-    notify(COPIED_TEXT_TOAST);
+    notify(images.failed ? COPIED_WITHOUT_IMAGES_TOAST : COPIED_TEXT_TOAST);
   }
 
   /** The selection's text-fragment URL, else the page URL; as html a link named like the page. */
@@ -454,18 +594,28 @@ export function startSession(deps: SessionDeps): SessionHandle {
 
   async function onAction(action: ToolbarAction, selection: Selection): Promise<void> {
     if (action !== "save") {
+      clipboardTurn++;
+      const failed = (e: unknown): void => {
+        console.error("snapii: copy failed", e);
+        notify(COPY_FAILED_TOAST);
+      };
       // The overlay stays open after copied text: saving the same selection
       // is a likely next step, and Escape still closes it. A copied link is
       // the end of it; a failed copy keeps it for another try.
       try {
-        if (action === "copy-text") await copyText(selection);
-        else {
+        if (action === "copy-text") {
+          // Reading images takes seconds, in which the toolbar and Escape
+          // work again: the action ends once the copy needs the overlay no
+          // more, the copy on its own.
+          await new Promise<void>((free) => {
+            copyText(selection, free).catch(failed).finally(free);
+          });
+        } else {
           await (action === "copy-page-link" ? copyPageLink() : copyLink(selection));
           close();
         }
       } catch (e) {
-        console.error("snapii: copy failed", e);
-        notify(COPY_FAILED_TOAST);
+        failed(e);
       }
       return;
     }
@@ -514,35 +664,44 @@ export function startSession(deps: SessionDeps): SessionHandle {
  */
 export function sessionToggle(deps: Omit<SessionDeps, "settings">): (settings: Settings) => void {
   let session: SessionHandle | null = null;
-  /** The save whose capture is in flight (a token per save). */
+  /** The save, or the Copy text reading images, whose capture is in flight (a token per request). */
   let saving: object | null = null;
-  const sendSave: SessionDeps["sendSave"] = (model, onCaptured) => {
-    const token = {};
-    saving = token;
-    const settle = (): void => {
-      if (saving === token) saving = null;
-    };
-    let sent: ReturnType<SessionDeps["sendSave"]>;
-    try {
-      sent = deps.sendSave(model, (message) => {
+  type OnCaptured = (message: CapturedMessage) => void;
+  const guarded =
+    <A, R>(send: (what: A, onCaptured: OnCaptured) => Promise<R>) =>
+    (what: A, onCaptured: OnCaptured): Promise<R> => {
+      const token = {};
+      saving = token;
+      const settle = (): void => {
+        if (saving === token) saving = null;
+      };
+      let sent: Promise<R>;
+      try {
+        sent = send(what, (message) => {
+          settle();
+          onCaptured(message);
+        });
+      } catch (e) {
+        // A synchronous throw would otherwise leave the guard set for good and
+        // every later start in this tab would be ignored.
         settle();
-        onCaptured(message);
-      });
-    } catch (e) {
-      // A synchronous throw would otherwise leave the guard set for good and
-      // every later start in this tab would be ignored.
-      settle();
-      throw e;
-    }
-    sent.then(settle, settle);
-    return sent;
-  };
+        throw e;
+      }
+      sent.then(settle, settle);
+      return sent;
+    };
+  const sendSave = guarded<CaptureModel, SaveResponse>((model, onCaptured) =>
+    deps.sendSave(model, onCaptured),
+  );
+  const sendRecognize = guarded<RecognizeRequest, RecognizeResponse>((request, onCaptured) =>
+    deps.sendRecognize(request, onCaptured),
+  );
   return (settings) => {
     if (session?.isOpen()) {
       session.cancel();
       session = null;
     } else if (!saving) {
-      session = startSession({ ...deps, settings, sendSave });
+      session = startSession({ ...deps, settings, sendSave, sendRecognize });
     }
   };
 }
