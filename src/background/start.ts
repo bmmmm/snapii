@@ -3,13 +3,14 @@
 // at all, then the injection of the content script and its `start` message.
 // Needs activeTab for the tab (the toolbar popup or the shortcut grants it).
 
-import { browserWords } from "../shared/target.ts";
+import { msg } from "../shared/i18n.ts";
+import { TARGET } from "../shared/target.ts";
 import type { StartResult, ToContent } from "../shared/types.ts";
 import { loadSettings } from "./settings.ts";
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
-const NO_ACCESS = `${browserWords().browser} does not let extensions run on this page`;
+const NO_ACCESS = TARGET === "firefox" ? msg("noAccessFirefox") : msg("noAccessChromium");
 
 /**
  * Runs in the page. The overlay is HTML appended to the root element, and
@@ -41,7 +42,7 @@ export async function cannotRun(tabId: number): Promise<string | null> {
     // a start message there only fails with "Receiving end does not exist"
     // and an uncaught exception in Firefox's messaging code (measured).
     if (probe == null) return NO_ACCESS;
-    if (probe.result === false) return "snapii works on HTML pages only";
+    if (probe.result === false) return msg("htmlOnly");
     return null;
   } catch (e) {
     return errorText(e);

@@ -47,6 +47,8 @@ Status: **beta** (0.2.0) — see [Install](#install).
   ([details](docs/details.md#vector-output-beta)).
 - **PNG or JPEG**, optional save-as dialog, a folder of your choice inside
   Downloads, all in the settings.
+- **English or German** — the interface follows the browser's language; the
+  saved file is the same in both.
 - **Local only** — no network, no tracking, only the permissions it needs.
 
 ## Install

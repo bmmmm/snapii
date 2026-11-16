@@ -28,10 +28,11 @@ allowed (`tsconfig.json`).
 
 `pnpm test:glue`, `pnpm drive` and `pnpm start` need a release Firefox 157 or
 newer. They look for it at the macOS path; elsewhere set `SNAPII_FIREFOX` to
-the binary for the glue tests and `pnpm drive`, and run
-`pnpm exec web-ext run --source-dir dist` instead of `pnpm start`. Ports, the
-other environment variables and the interactive driver are in
-[docs/development.md](docs/development.md).
+the binary. Ports, the other environment variables and the interactive driver
+are in [docs/development.md](docs/development.md).
+The glue/drive launcher enables system access with
+`MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1` for Firefox 159+ and retains
+`--remote-allow-system-access` for older releases.
 
 ## Where things live
 
@@ -64,6 +65,7 @@ other environment variables and the interactive driver are in
 | `src/shared/messages.ts` | Runtime validation of every message the background receives |
 | `src/shared/settings.ts` | `DEFAULT_SETTINGS` |
 | `src/shared/*.ts` (rest) | Pure helpers: geometry, tiling, capture strategy, pick heuristic, toolbar placement, links, tracker removal from copied links (`cleanurl.ts`), whitespace and plain text, word boundaries for Copy text (`words.ts`), the recognised words Copy text takes and their place among the lines (`recognized.ts`), HTML sanitising for Copy text, text directives, OCR geometry, file name, save-folder rules, shortcut syntax, CSS colours as numbers (`color.ts`), the version line (`about.ts`) |
+| `src/shared/i18n.ts`, `src/_locales/` | Every user-visible string: `msg()` asks the browser's i18n API, the English catalogue stands in where there is none; `localizePage()` fills the popup's and the settings page's `data-i18n` elements |
 | `src/shared/spike.ts` | Platform facts measured on Firefox 157 and on Chromium 151/153 (the headers say how); never edit by hand without a new measurement |
 | `src/shared/manifest.ts`, `target.ts` | The manifest each browser gets; which browser a bundle was built for (`TARGET`, set by the build) |
 | `src/shared/viewport.ts` | Chromium only: whether a region fits the viewport and where it lies in the captured picture |
@@ -201,9 +203,11 @@ of what is still open to the job summary. It **never fails your build** —
 advisory only, a reading aid for the reviewer. Unlike a linter or a checker,
 snapii cannot be pointed at its own pull request, so nothing runs the project
 on the diff itself; review rests on the claims and the tests. The **tests**
-workflow (`pnpm check`, `pnpm test`, `pnpm build`, `pnpm lint:ext` and
-`pnpm test:glue:chromium`) is the one that has to pass. Firefox glue remains
-a local gate; both glue suites must run outside a process sandbox.
+workflow is the one that has to pass, all three of its jobs: `check`
+(`pnpm check`, `pnpm test:unit`, `pnpm build`, `pnpm lint:ext`) and one
+`layout` job per browser (the layout half of `pnpm test` for that browser;
+Chromium's then runs `pnpm test:glue:chromium`). Firefox glue remains a
+local gate; both glue suites must run outside a process sandbox.
 
 Write claims as one bullet per user-visible change, files, functions and SVG
 elements in `backticks`, issues as `#N`. Claim what the change *does*, not

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The selection toolbar (built into the overlay's shadow root) and the
 // short-lived toast shown after the overlay is gone.
+import { msg } from "../../shared/i18n.ts";
 import { adoptStyles, appendFixed, createHtml, styleHost, TOAST_CSS } from "./styles.ts";
 
 export type ToolbarButton = "save" | "copy-text" | "copy-link" | "copy-page-link" | "cancel";
@@ -8,11 +9,11 @@ export type ToolbarButton = "save" | "copy-text" | "copy-link" | "copy-page-link
 // Action, label and its key: the left hand's top row in toolbar order, so
 // hovering an element and one key is the whole gesture.
 const BUTTONS: [ToolbarButton, string, string][] = [
-  ["save", "Save SVG", "Q"],
-  ["copy-text", "Copy text", "W"],
-  ["copy-link", "Copy element link", "E"],
-  ["copy-page-link", "Copy page link", "R"],
-  ["cancel", "Cancel", "F"],
+  ["save", msg("toolbarSave"), "Q"],
+  ["copy-text", msg("toolbarCopyText"), "W"],
+  ["copy-link", msg("toolbarCopyLink"), "E"],
+  ["copy-page-link", msg("toolbarCopyPageLink"), "R"],
+  ["cancel", msg("toolbarCancel"), "F"],
 ];
 
 /**

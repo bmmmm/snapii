@@ -116,7 +116,10 @@ Limits:
 - **Not drawn**, and outside patches not in the file at all, among others:
   the colour of visited links (the browser hides it from extensions, so
   they come out in the link colour), a decoration of `::first-line`, the
-  `…` of `text-overflow: ellipsis`, scrollbars and column rules.
+  `…` of `text-overflow: ellipsis`, scrollbars, column rules, and an
+  absolutely positioned `::before` or `::after` where it lies outside its
+  element's box (the `pseudo` patch covers the box only; with the box
+  outside the selection the record does not count it either).
 - A decoration takes the viewer's own way of skipping descenders
   (`text-decoration-skip-ink` is not carried over), and breaks between the
   glyphs where the viewer spaces them out to the run's width (a narrower
@@ -401,9 +404,9 @@ address carries a token.
 A file saved with vector output holds more of the page than its pixels:
 
 - the colours of the region's boxes, and their gradients and shadows;
-- the boxes, gradients and shadows that reach into the selection, at their
-  full size (beyond the selection's edge, hidden by the SVG's frame), also
-  where something else covers them on the page;
+- the boxes, gradients, shadows and outlines that reach into the selection,
+  at their full size (beyond the selection's edge, hidden by the SVG's
+  frame), also where something else covers them on the page;
 - the pictures of the region's images and canvases, cut to the part inside
   their box, their clips and the selection, but not to what covers them: a
   picture under another element, or sharp under a blurring overlay, is in the

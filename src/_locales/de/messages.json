@@ -1,0 +1,196 @@
+{
+  "htmlLang": { "message": "de" },
+  "extensionDescription": {
+    "message": "Einen Seitenbereich als SVG speichern – mit echtem, auswählbarem Text und anklickbaren Links."
+  },
+  "actionTitle": { "message": "snapii: Bereich als SVG aufnehmen" },
+  "commandCapture": { "message": "Bereich aufnehmen" },
+  "commandMenu": { "message": "snapii-Menü öffnen" },
+  "cannotCapture": {
+    "message": "snapii kann diese Seite nicht aufnehmen: $REASON$",
+    "placeholders": { "reason": { "content": "$1" } }
+  },
+  "noAccessFirefox": { "message": "Firefox lässt auf dieser Seite keine Erweiterungen zu" },
+  "noAccessChromium": { "message": "Der Browser lässt auf dieser Seite keine Erweiterungen zu" },
+  "htmlOnly": { "message": "snapii funktioniert nur auf HTML-Seiten" },
+  "noActiveTab": { "message": "kein aktiver Tab" },
+  "noBackgroundAnswer": { "message": "keine Antwort von snapiis Hintergrundseite" },
+  "popupCapture": { "message": "Bereich aufnehmen" },
+  "popupQuickSettings": { "message": "Schnelleinstellungen" },
+  "popupTextFragment": { "message": "Link zum ausgewählten Text hinzufügen" },
+  "popupFolder": { "message": "In einem Unterordner des Download-Ordners speichern" },
+  "popupOcrOffVector": {
+    "message": "Aus bei der Ausgabe „Formen und Text“ (siehe Alle Einstellungen)"
+  },
+  "popupAllSettings": { "message": "Alle Einstellungen…" },
+  "couldNotSaveSetting": { "message": "Einstellung konnte nicht gespeichert werden" },
+  "couldNotOpenSettings": {
+    "message": "Einstellungen konnten nicht geöffnet werden: $ERROR$",
+    "placeholders": { "error": { "content": "$1" } }
+  },
+  "notSaved": {
+    "message": "Nicht gespeichert: $PROBLEM$",
+    "placeholders": { "problem": { "content": "$1" } }
+  },
+  "settingSaveAs": { "message": "Für jede Datei nach dem Speicherort fragen" },
+  "settingRemoveTrackers": { "message": "Tracker aus kopierten Links entfernen" },
+  "settingOcr": { "message": "Text in Bildern erkennen (OCR)" },
+  "folderPlaceholder": { "message": "Download-Ordner selbst" },
+  "optionsTitle": { "message": "snapii-Einstellungen" },
+  "optionsImageFormat": { "message": "Bildformat" },
+  "optionsPng": { "message": "PNG (verlustfrei)" },
+  "optionsJpeg": { "message": "JPEG (kleinere Dateien)" },
+  "optionsJpegQuality": { "message": "JPEG-Qualität" },
+  "optionsOutput": { "message": "Ausgabe" },
+  "optionsOutputRaster": { "message": "Bild der Seite mit auswählbarem Text" },
+  "optionsOutputVector": { "message": "Formen und Text (Beta)" },
+  "optionsOutputHint": {
+    "message": "Kästen und Text werden zu SVG-Formen: Die Datei bleibt bei jeder Vergrößerung scharf und lässt sich bearbeiten. Was sich nicht als Form zeichnen lässt (Bilder, innere Schatten, Effekte), bleibt als Pixel erhalten. Die Texterkennung ist in diesem Modus aus."
+  },
+  "optionsBehavior": { "message": "Verhalten" },
+  "optionsOcclusion": { "message": "Text auslassen, den andere Elemente verdecken" },
+  "optionsTextFragment": { "message": "Link zum ausgewählten Text hinzufügen (Textfragment)" },
+  "optionsTrackersHint": {
+    "message": "„Elementlink kopieren“ und „Seitenlink kopieren“ lassen Tracking-Parameter weg (utm_*, fbclid, gclid und ähnliche)."
+  },
+  "optionsOcrHint": { "message": "Läuft lokal; das Speichern dauert dadurch einige Sekunden länger." },
+  "optionsSaveLocation": { "message": "Speicherort" },
+  "optionsFolder": { "message": "Unterordner im Download-Ordner" },
+  "optionsFolderHint": {
+    "message": "$RULE$, daher ist dies der Name eines Unterordners wie snapii oder Seiten/snapii; er wird bei Bedarf angelegt. Leer lassen für den Download-Ordner selbst.",
+    "placeholders": { "rule": { "content": "$1" } }
+  },
+  "insideDownloadsFirefox": {
+    "message": "Firefox erlaubt Add-ons das Speichern nur innerhalb seines Download-Ordners"
+  },
+  "insideDownloadsChromium": {
+    "message": "Der Browser erlaubt Erweiterungen das Speichern nur innerhalb seines Download-Ordners"
+  },
+  "optionsReset": { "message": "Auf Standardwerte zurücksetzen" },
+  "optionsSaved": { "message": "Gespeichert" },
+  "optionsInvalidValue": { "message": "Nicht gespeichert: ungültiger Wert" },
+  "optionsCouldNotSave": { "message": "Speichern fehlgeschlagen" },
+  "optionsDefaultsRestored": { "message": "Standardwerte wiederhergestellt" },
+  "optionsCouldNotReset": { "message": "Zurücksetzen fehlgeschlagen" },
+  "optionsShortcut": { "message": "Tastenkombination" },
+  "optionsShortcutNone": { "message": "Keine" },
+  "optionsShortcutReset": { "message": "Tastenkombination zurücksetzen" },
+  "optionsShortcutSettings": { "message": "In den Browser-Einstellungen ändern" },
+  "optionsShortcutHint": {
+    "message": "Feld anklicken und die neue Kombination drücken. Esc bricht ab; Rücktaste oder Entf entfernt die Tastenkombination."
+  },
+  "optionsShortcutHintReadOnly": {
+    "message": "Der Browser verwaltet diese Tastenkombination. Sie lässt sich auf seiner Seite für Tastenkombinationen ändern; danach diese Seite neu öffnen."
+  },
+  "shortcutRemoved": { "message": "Tastenkombination entfernt" },
+  "shortcutKeyUnusable": { "message": "Diese Taste lässt sich nicht in einer Tastenkombination verwenden." },
+  "shortcutRefused": {
+    "message": "$SHORTCUT$: $PROBLEM$",
+    "placeholders": { "shortcut": { "content": "$1" }, "problem": { "content": "$2" } }
+  },
+  "shortcutSaved": {
+    "message": "Tastenkombination gespeichert: $SHORTCUT$",
+    "placeholders": { "shortcut": { "content": "$1" } }
+  },
+  "shortcutDefaultRestored": {
+    "message": "Standard wiederhergestellt: $SHORTCUT$",
+    "placeholders": { "shortcut": { "content": "$1" } }
+  },
+  "couldNotOpenShortcutSettings": {
+    "message": "Die Einstellungen des Browsers für Tastenkombinationen konnten nicht geöffnet werden: $ERROR$",
+    "placeholders": { "error": { "content": "$1" } }
+  },
+  "couldNotReadShortcut": {
+    "message": "Tastenkombination konnte nicht gelesen werden: $ERROR$",
+    "placeholders": { "error": { "content": "$1" } }
+  },
+  "shortcutUnknownModifier": { "message": "Unbekannte Zusatztaste." },
+  "shortcutModifierRequiredMac": {
+    "message": "Befehlstaste, Wahltaste oder Control hinzunehmen (die Umschalttaste allein genügt nicht); nur Funktionstasten funktionieren ohne Zusatztaste."
+  },
+  "shortcutModifierRequiredOther": {
+    "message": "Strg oder Alt hinzunehmen (Umschalt allein genügt nicht); nur Funktionstasten funktionieren ohne Zusatztaste."
+  },
+  "shortcutDuplicateModifier": { "message": "Jede Zusatztaste nur einmal verwenden." },
+  "shortcutTooManyModifiers": { "message": "Höchstens zwei Zusatztasten verwenden." },
+  "shortcutInvalidKey": {
+    "message": "Diese Taste lässt sich nicht verwenden. Möglich sind ein Buchstabe, eine Ziffer, F1–F19, eine Pfeiltaste, Pos 1, Ende, Bild auf/ab, Einfg, Entf, die Leertaste, Komma oder Punkt."
+  },
+  "keyCtrl": { "message": "Strg" },
+  "keyShift": { "message": "Umschalt" },
+  "keySpace": { "message": "Leertaste" },
+  "keyComma": { "message": "Komma" },
+  "keyPeriod": { "message": "Punkt" },
+  "keyHome": { "message": "Pos 1" },
+  "keyEnd": { "message": "Ende" },
+  "keyPageUp": { "message": "Bild auf" },
+  "keyPageDown": { "message": "Bild ab" },
+  "keyInsert": { "message": "Einfg" },
+  "keyDelete": { "message": "Entf" },
+  "keyUp": { "message": "Pfeil nach oben" },
+  "keyDown": { "message": "Pfeil nach unten" },
+  "keyLeft": { "message": "Pfeil links" },
+  "keyRight": { "message": "Pfeil rechts" },
+  "folderAbsolute": {
+    "message": "$RULE$, daher kein vollständiger Pfad. Einen Namen wie snapii oder Seiten/snapii verwenden.",
+    "placeholders": { "rule": { "content": "$1" } }
+  },
+  "folderParent": {
+    "message": "Ein Ordner darf kein „..“ enthalten (er läge sonst außerhalb des Download-Ordners)."
+  },
+  "folderDot": { "message": "Ein Ordnername darf nicht mit einem Punkt beginnen oder enden." },
+  "folderUnsafe": {
+    "message": "Ein Ordnername darf weder : * ? \" < > | % noch Steuerzeichen oder andere Leerzeichen als das normale enthalten."
+  },
+  "folderReserved": {
+    "message": "Dieser Ordnername ist vom Browser reserviert (ein Name wie CON, einer, der mit ~ beginnt oder endet, oder einer, der auf .lnk endet)."
+  },
+  "folderTooLong": {
+    "message": "Höchstens $MAX$ Zeichen verwenden.",
+    "placeholders": { "max": { "content": "$1" } }
+  },
+  "toolbarSave": { "message": "SVG speichern" },
+  "toolbarCopyText": { "message": "Text kopieren" },
+  "toolbarCopyLink": { "message": "Elementlink kopieren" },
+  "toolbarCopyPageLink": { "message": "Seitenlink kopieren" },
+  "toolbarCancel": { "message": "Abbrechen" },
+  "overlayHint": {
+    "message": "Element anklicken oder Bereich aufziehen · ↑ ↓ äußeres/inneres Element · Q W E R ausführen · Esc bricht ab"
+  },
+  "noticeViewportOnly": {
+    "message": "In diesem Browser lässt sich nur Sichtbares speichern. Die Auswahl ganz in den sichtbaren Bereich scrollen oder einen kleineren Bereich auswählen"
+  },
+  "noticeVectorOutside": {
+    "message": "Teile dieser Auswahl, die als Pixel gespeichert werden, liegen außerhalb des sichtbaren Bereichs. Sie in den sichtbaren Bereich scrollen oder einen kleineren Bereich auswählen"
+  },
+  "toastNoPermission": { "message": "snapii hat keine Berechtigung, diese Seite aufzunehmen" },
+  "toastCaptureFailed": {
+    "message": "Aufnahme fehlgeschlagen. Erneut versuchen oder einen anderen Bereich auswählen"
+  },
+  "toastTooLarge": { "message": "Dieser Bereich ist zu groß für eine Aufnahme. Einen kleineren auswählen" },
+  "toastDownloadFailed": {
+    "message": "Die SVG-Datei wurde nicht gespeichert (Download fehlgeschlagen oder abgebrochen)"
+  },
+  "toastUnexpected": { "message": "Aufnahme unerwartet fehlgeschlagen. Erneut versuchen" },
+  "toastRecognizing": { "message": "Speichern … (Texterkennung läuft)" },
+  "toastLateError": {
+    "message": "Die Auswahl wurde aufgenommen, aber es ist keine SVG-Datei daraus entstanden. Für einen neuen Versuch snapii erneut starten"
+  },
+  "toastSaved": {
+    "message": "$FILENAME$ gespeichert",
+    "placeholders": { "filename": { "content": "$1" } }
+  },
+  "toastCopyFailed": { "message": "Kopieren fehlgeschlagen. Erneut versuchen" },
+  "toastNoText": { "message": "Kein Text in der Auswahl" },
+  "toastCopiedText": { "message": "Text kopiert" },
+  "toastCopyRecognizing": { "message": "Kopieren … (Texterkennung läuft)" },
+  "toastCopiedWithoutImages": { "message": "Text kopiert. Text in Bildern wurde nicht erkannt" },
+  "toastImagesNotRead": { "message": "Nichts kopiert. Text in Bildern wurde nicht erkannt" },
+  "toastCopiedLink": { "message": "Link kopiert" },
+  "toastCopiedPageLink": { "message": "Seitenlink kopiert" },
+  "toastCopiedCleanLink": { "message": "Seitenlink kopiert, Tracking entfernt" },
+  "toastLinkAmbiguous": { "message": "Seitenlink kopiert (Text nicht eindeutig)" },
+  "toastLinkNoSelection": { "message": "Seitenlink kopiert (kein Text ausgewählt)" },
+  "toastLinkTimeout": { "message": "Seitenlink kopiert (Seite zu groß, um genau den Text zu verlinken)" },
+  "toastLinkFailed": { "message": "Seitenlink kopiert (kein Textlink möglich)" }
+}

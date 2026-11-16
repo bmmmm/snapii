@@ -13,8 +13,9 @@
 // Chromium (measured on 153, Linux) refuses all of that as well, and on top
 // the names Windows reserves on any system: see CHROMIUM_RESERVED.
 
+import { msg } from "./i18n.ts";
 import type { BuildTarget } from "./manifest.ts";
-import { browserWords, TARGET } from "./target.ts";
+import { TARGET } from "./target.ts";
 
 /** 80 UTF-16 units are at most 240 UTF-8 bytes, so any one folder name fits in 255. */
 export const MAX_FOLDER_LENGTH = 80;
@@ -60,24 +61,23 @@ export function checkFolder(input: string, target: BuildTarget = TARGET): Folder
 
 /** The rule behind the folder setting, as the options page and the error say it. */
 export function insideDownloads(target: BuildTarget = TARGET): string {
-  const { browser, extensions } = browserWords(target);
-  return `${browser} lets ${extensions} save only inside its Downloads folder`;
+  return target === "firefox" ? msg("insideDownloadsFirefox") : msg("insideDownloadsChromium");
 }
 
 /** Why a folder is refused, for a status line. */
 export function describeFolderProblem(reason: FolderProblem, target: BuildTarget = TARGET): string {
   switch (reason) {
     case "absolute":
-      return `${insideDownloads(target)}, so no full path. Use a name like snapii or Pages/snapii.`;
+      return msg("folderAbsolute", insideDownloads(target));
     case "parent":
-      return 'A folder cannot contain ".." (it would leave the Downloads folder).';
+      return msg("folderParent");
     case "dot":
-      return "A folder name cannot start or end with a dot.";
+      return msg("folderDot");
     case "unsafe":
-      return 'A folder name cannot contain : * ? " < > | % , control characters or spaces other than the plain one.';
+      return msg("folderUnsafe");
     case "reserved":
-      return "This folder name is reserved by the browser (a name such as CON, one that starts or ends with ~, or one that ends in .lnk).";
+      return msg("folderReserved");
     case "too-long":
-      return `Use at most ${MAX_FOLDER_LENGTH} characters.`;
+      return msg("folderTooLong", String(MAX_FOLDER_LENGTH));
   }
 }

@@ -25,8 +25,9 @@ const PORT_OFFSET = Number(process.env.SNAPII_GLUE_PORT_OFFSET ?? 0);
 /**
  * Starts server + Chromium for one test file. Call `close()` in `after`.
  * @param {number} slot 0–9
+ * @param {{ lang?: string }} [options] the browser's UI language; English if left out
  */
-export async function startGlue(slot) {
+export async function startGlue(slot, { lang } = {}) {
   const out = process.env.SNAPII_GLUE_OUT
     ? join(process.env.SNAPII_GLUE_OUT, `chromium-slot${slot}`)
     : mkdtempSync(join(tmpdir(), `snapii-glue-chromium-${slot}-`));
@@ -40,6 +41,7 @@ export async function startGlue(slot) {
       downloads,
       debugPort: 2970 + PORT_OFFSET + slot,
       hostRules: `MAP ${NON_SECURE_HOST} 127.0.0.1`,
+      lang,
     });
     return new Glue(driver, server, out);
   } catch (e) {

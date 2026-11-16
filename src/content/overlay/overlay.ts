@@ -3,6 +3,7 @@
 // rectangle (secondary), walk the ancestor chain with ArrowUp/ArrowDown, then
 // act on the selection from a small toolbar. Behaviour follows Firefox
 // Screenshots (40 px drag threshold, Escape cancels, H1–H6 skipped).
+import { msg } from "../../shared/i18n.ts";
 import { placeToolbar } from "../../shared/place.ts";
 import type { DocRect } from "../../shared/types.ts";
 import { shadowRootOf } from "../shadow.ts";
@@ -36,7 +37,7 @@ export const DRAG_THRESHOLD = 40;
 
 type State = "hover" | "pressed" | "dragging" | "selected";
 
-const HINT_TEXT = "Click an element or drag an area · ↑ ↓ parent/child · Q W E R act on it · Esc cancels";
+const HINT_TEXT = msg("overlayHint");
 
 // Swallowed so the page never reacts while the overlay is up. Pointer events
 // are only stopped, not default-prevented: preventDefault on pointerdown would

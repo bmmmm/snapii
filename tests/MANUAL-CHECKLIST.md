@@ -49,7 +49,8 @@ the same time; 10 would collide with the Chromium suite's 8470–8479 and
 | 14 | Revoke host permission in `about:addons` → hint | obsolete (D1) |
 | 15 | Informative: open the SVG in Chrome and Inkscape | human 15h |
 | 16 | Vector output: Output "Shapes and text" in the settings page → the save has shapes, visible text, pictures and patches; the record says `output: "vector"`; OCR is off | auto (tests/glue/options.test.mjs: output Vector …, vector output with pictures …; tests/glue-chromium/save.test.mjs: vector output …; tests/layout/vector.spec.ts) + human 16h |
-| 17 | Copy text with "Recognize text in images" on: the words in the selection's images are on the clipboard with the page's text, a word in an image that the selection's edge cuts whole; the overlay is back while the images are read; with the setting off nothing is captured | auto (tests/glue/ocr.test.mjs: OCR on: Copy text … ×2, OCR off: Copy text …; tests/layout/copy-ocr.spec.ts for the order of events, failures and every way out) + human 17h |
+| 17 | German interface: with Firefox's UI in German, popup, settings page, overlay hint, toolbar, toasts, the toolbar tooltip and the shortcut's description in `about:addons` are German, nothing is cut off; the saved file is unchanged | auto for the catalogues and the German path with a stand-in API (tests/unit/i18n.test.ts, tests/unit/i18n-de.test.ts), the overlay's German labels in both browsers' layout runs (tests/layout/german.spec.ts), and in Firefox started in German the popup, the settings page, the tooltip, the commands, hint, toolbar, toast and the saved file (tests/glue/german.test.mjs; skipped by a Firefox that has no German) + human 17h (nothing cut off, `about:addons`) |
+| 18 | Copy text with "Recognize text in images" on: the words in the selection's images are on the clipboard with the page's text, a word in an image that the selection's edge cuts whole; the overlay is back while the images are read; with the setting off nothing is captured | auto (tests/glue/ocr.test.mjs: OCR on: Copy text … ×2, OCR off: Copy text …; tests/layout/copy-ocr.spec.ts for the order of events, failures and every way out) + human 18h |
 
 ### Chromium
 
@@ -67,7 +68,12 @@ toolbar notice, a cancelled Save-as dialog (headless Chromium has no file
 dialog, so every "Ask where to save" download ends as a cancelled one), and
 vector output (shapes and visible text, pictures and patches, a selection
 beyond the viewport without patches that saves, and one with a patch there
-that is refused).
+that is refused), and, started in German, the popup, the settings page, the
+tooltip, the commands, hint, toolbar, toast and the saved file
+(tests/glue-chromium/german.test.mjs).
+
+Both glue suites start their browser in English whatever the system's
+language is; the German tests start their own in German.
 
 Human steps there (load `dist-chromium/` via `chrome://extensions` → Developer
 mode → Load unpacked):
@@ -88,7 +94,14 @@ mode → Load unpacked):
   be captured, the button is disabled.
 - **C6h: another Chromium browser.** Repeat C1h and one save in Edge or
   Brave.
-- **C7h: Copy text with OCR on, a picture the viewport cuts.** With
+- **C7h: German interface.** Start Chromium in German (Linux, Windows:
+  `--lang=de`; macOS: German first for the app in System Settings → General →
+  Language & Region) and go through 17h there: popup, settings page with the
+  read-only shortcut section, overlay and toast in German, the extension's
+  description on `chrome://extensions` and the command on
+  `chrome://extensions/shortcuts` too. The glue run reads the texts; what is
+  left for a person is that nothing is cut off and the browser's two pages.
+- **C8h: Copy text with OCR on, a picture the viewport cuts.** With
   "Recognize text in images" on, scroll a picture with text half out of the
   window, pick an element around it that reaches beyond the window, **Copy
   text**: the overlay blinks away and back, "Copying… (recognizing text)",
@@ -180,7 +193,23 @@ Inkscape and macOS Preview: the shapes show and can be selected and moved in
 Inkscape; note fonts the viewer replaces. Record the record's `scene` counts
 and what differs from the page.
 
-**17h — Copy text with OCR on, real clipboard.** Switch "Recognize text in
+**17h — German interface.** Switch Firefox to German (Settings → General →
+Language, German language pack) and restart. Click the snapii button: the
+popup says **Bereich aufnehmen** with the shortcut as Strg+Alt+S (macOS: ⇧⌘E),
+the quick settings and **Alle Einstellungen…** are German and no line is cut
+off. Open the settings page: every label, hint and button is German, the
+folder hint names "Download-Ordner"; record a shortcut and type a folder with
+`..`: the messages are German. On a page, start a capture: the hint reads
+"Element anklicken oder Bereich aufziehen · …", the toolbar shows **SVG
+speichern**, **Text kopieren**, **Elementlink kopieren**, **Seitenlink
+kopieren**, **Abbrechen** on one line inside the window at 800 px width too;
+save: the toast says "… gespeichert". Hover the toolbar button: the tooltip reads
+"snapii: Bereich als SVG aufnehmen"; `about:addons` → snapii shows the
+German description, and Manage Extension Shortcuts the German command names.
+Open the saved file's source: no German word from the interface in it. Switch
+back to English: every text is the English one again.
+
+**18h — Copy text with OCR on, real clipboard.** Switch "Recognize text in
 images" on. On `http://127.0.0.1:8438/glue/fixtures/ocr.html` drag across
 everything, click **Copy text**: the overlay leaves the screen for a moment
 and is back, a toast says "Copying… (recognizing text)", then "Copied text".

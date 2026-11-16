@@ -5,6 +5,8 @@
 // commands.update), so the options page can say why a combination is refused
 // before the browser does; the browser stays the authority.
 
+import { msg } from "./i18n.ts";
+
 /**
  * The manifest command of the keyboard shortcut that starts a capture directly
  * (the toolbar button opens the popup instead). Shown in the popup, changed
@@ -157,18 +159,17 @@ export function validateShortcut(shortcut: string): ShortcutCheck {
 
 /** Why a combination is refused, for a status line. */
 export function describeProblem(reason: ShortcutProblem, platform: Platform): string {
-  const ctrl = platform === "mac" ? "Command, Option or Control" : "Ctrl or Alt";
   switch (reason) {
     case "invalid-modifier":
-      return "Unknown modifier key.";
+      return msg("shortcutUnknownModifier");
     case "modifier-required":
-      return `Add ${ctrl} (Shift alone is not enough); only function keys work without a modifier.`;
+      return platform === "mac" ? msg("shortcutModifierRequiredMac") : msg("shortcutModifierRequiredOther");
     case "duplicate-modifier":
-      return "Use each modifier key only once.";
+      return msg("shortcutDuplicateModifier");
     case "too-many-modifiers":
-      return "Use at most two modifier keys.";
+      return msg("shortcutTooManyModifiers");
     case "invalid-key":
-      return "This key cannot be used. Use a letter, digit, F1-F19, arrow, Home, End, Page Up/Down, Insert, Delete, Space, comma or period.";
+      return msg("shortcutInvalidKey");
   }
 }
 
@@ -182,7 +183,25 @@ const MAC_KEYS: Record<string, string> = {
   Left: "←",
   Right: "→",
 };
-const OTHER_MODIFIERS: Record<string, string> = { Command: "Ctrl" };
+/** Elsewhere the names the browser's UI uses; a name it already gave in its language passes through. */
+const otherNames = (): Record<string, string> => ({
+  Ctrl: msg("keyCtrl"),
+  Command: msg("keyCtrl"),
+  Shift: msg("keyShift"),
+  Space: msg("keySpace"),
+  Comma: msg("keyComma"),
+  Period: msg("keyPeriod"),
+  Home: msg("keyHome"),
+  End: msg("keyEnd"),
+  PageUp: msg("keyPageUp"),
+  PageDown: msg("keyPageDown"),
+  Insert: msg("keyInsert"),
+  Delete: msg("keyDelete"),
+  Up: msg("keyUp"),
+  Down: msg("keyDown"),
+  Left: msg("keyLeft"),
+  Right: msg("keyRight"),
+});
 
 /** Display text: "⌥⇧S" on macOS (the order of the menus), "Alt+Shift+S" elsewhere; "" for no shortcut. */
 export function formatShortcut(shortcut: string, platform: Platform): string {
@@ -193,7 +212,8 @@ export function formatShortcut(shortcut: string, platform: Platform): string {
     const glyphs = MAC_ORDER.filter((m) => parts.includes(m)).map((m) => MAC_MODIFIERS[m]);
     return `${glyphs.join("")}${MAC_KEYS[key] ?? key}`;
   }
-  return [...parts.map((m) => OTHER_MODIFIERS[m] ?? m), key].join("+");
+  const names = otherNames();
+  return [...parts, key].map((p) => names[p] ?? p).join("+");
 }
 
 const ARIA_KEYS: Record<string, string> = {
