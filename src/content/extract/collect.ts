@@ -153,6 +153,16 @@ const ATOMIC = new Set([
 const RUBY_TEXT = new Set(["rt", "rp"]);
 /** Whole words: displays whose in-flow children are items, each a box of its own. */
 const ITEM_CONTAINERS = new Set(["flex", "inline-flex", "grid", "inline-grid"]);
+/**
+ * Whole words: the old flexbox, whose items are the children that compute to
+ * a block. Chromium makes no blocks of the others: they share one item and
+ * its lines, as in a block (measured: a <b> in one takes no width, no
+ * -webkit-box-flex and no -webkit-box-pack, and stays on the text's line
+ * under a vertical orient). With -webkit-line-clamp and a vertical orient the
+ * box itself computes to flow-root, the inline one to inline-block, and is a
+ * block of lines.
+ */
+const OLD_FLEXBOXES = new Set(["-webkit-box", "-webkit-inline-box"]);
 const OUT_OF_FLOW = new Set(["absolute", "fixed"]);
 
 // Everything a run takes from its parent element, read once per element.
@@ -472,10 +482,15 @@ export async function collectTextRunsDetailed(
 
   /** No atomic element and no inline-block is laid out between texts j and i (j first): none a word of one line would have to get past. */
   const unbroken = (j: number, i: number): boolean => {
+    const between = elements.slice(textAt(j).at, textAt(i).at);
     // The flat-tree ancestors of the later text: an element between that holds it is no boundary.
+    // Its nearest ones, as many as there are elements between: an element comes before what it
+    // holds, so none further up can stand between. A walk to the root for each pair of texts,
+    // here and for the ruby annotation, took 5.5 s for one word across 2 000 nested <u>.
     const ancestors = new Set<Element>();
-    for (let a = flatParent(textAt(i).node); a; a = flatParent(a)) ancestors.add(a);
-    for (const e of elements.slice(textAt(j).at, textAt(i).at)) {
+    for (let a = flatParent(textAt(i).node); a && ancestors.size < between.length; a = flatParent(a))
+      ancestors.add(a);
+    for (const e of between) {
       if (ancestors.has(e) || !layout.hasBox(e)) continue;
       const d = layout.style(e).display;
       if (ATOMIC.has(e.localName) || d.startsWith("inline-") || INLINE_ATOMIC.has(d)) return false;
@@ -578,15 +593,17 @@ export async function collectTextRunsDetailed(
    */
   const joinWords = (plan: (Measured | null)[]): void => {
     /**
-     * The widest gap a word goes on across: what letter-spacing puts
-     * between two letters, and a quarter of the font size (2 px for small
-     * print) for kerning, an italic's overhang and rounding. The smaller of
-     * the two texts' counts, so a cut says by itself how far its neighbour
-     * can be.
+     * The widest gap a word goes on across: what rounding leaves between
+     * two boxes that touch, a sixteenth of the font size (1 px for small
+     * print). Nothing else needs one: the boxes are the glyphs' advances,
+     * letter-spacing included, and kerning, an italic, a raised letter or a
+     * justified line leave no gap of 0.1 px (measured, Chromium). A space is
+     * a quarter of the font size and more, and a margin or a padding half as
+     * wide is a gap the eye sees. The smaller of the two texts' counts: the
+     * word is the same whichever of them the rectangle cuts, and a cut says
+     * by itself how far its neighbour can be.
      */
-    const slack = (m: Measured): number =>
-      Math.max(2, m.info.fontSize / 4) +
-      Math.max(0, Number.parseFloat(layout.style(m.parent).letterSpacing) || 0);
+    const slack = (m: Measured): number => Math.max(1, m.info.fontSize / 16);
 
     /** The glyph at a cut's end (`tail`) or start: the one that faces the text beside it. */
     const facing = (k: number, cut: Cut, tail: boolean): DocRect => {
@@ -632,18 +649,29 @@ export async function collectTextRunsDetailed(
       return links;
     };
 
+    /** The ruby annotation each element is in, or null: asked up to the nearest element already known, as `inheritedOf` does. */
+    const annotations = new Map<Element, Element | null>();
     const annotation = (k: number): Element | null => {
-      const p = flatParent(textAt(k).node);
-      return (
-        p && closestComposed(p, (e) => RUBY_TEXT.has(e.localName) || layout.style(e).display === "ruby-text")
-      );
+      const chain: Element[] = [];
+      let at = flatParent(textAt(k).node);
+      while (at && !annotations.has(at)) {
+        chain.push(at);
+        at = flatParent(at);
+      }
+      let found = (at && annotations.get(at)) ?? null;
+      for (const e of chain.reverse()) {
+        if (RUBY_TEXT.has(e.localName) || layout.style(e).display === "ruby-text") found = e;
+        annotations.set(e, found);
+      }
+      return found;
     };
     /**
      * Something parts texts j and i (j first) that a word of one line does
      * not get past: what parts them for `capitalize`; a ruby annotation, which
      * is never part of its base's word; a flex or grid item between them — a
      * box of its own, however close it stands (Total<b>5</b>items in a flex
-     * row are three items, and the two texts share the container as root).
+     * row are three items, and the two texts share the container as root),
+     * or a block that is an item of an old flexbox.
      */
     const parted = (j: number, i: number): boolean => {
       if (!unbroken(j, i) || annotation(j) !== annotation(i)) return true;
@@ -651,7 +679,9 @@ export async function collectTextRunsDetailed(
         if (!layout.hasBox(e) || OUT_OF_FLOW.has(layout.style(e).position)) continue;
         const up = flatParent(e);
         const container = up && closestComposed(up, (a) => layout.style(a).display !== "contents");
-        if (container && ITEM_CONTAINERS.has(layout.style(container).display)) return true;
+        const display = container ? layout.style(container).display : "";
+        if (ITEM_CONTAINERS.has(display)) return true;
+        if (OLD_FLEXBOXES.has(display) && isBlockLevel(layout.style(e).display)) return true;
       }
       return false;
     };

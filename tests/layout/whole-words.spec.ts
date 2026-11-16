@@ -95,6 +95,21 @@ const line = (inner: string, style = ""): string =>
 
 const WORDS = line("alpha beta gamma delta");
 
+/**
+ * The letter-spacing that sets the letters of `line` `apart` px after one
+ * another, from the font's own width as the page has it: the fonts differ by
+ * hundredths of a pixel, which is what these tests are about.
+ */
+async function spacing(page: Page, apart: number): Promise<string> {
+  const width = await page.evaluate((html) => {
+    document.body.innerHTML = html;
+    const range = document.createRange();
+    range.selectNodeContents(document.querySelector("#p") as Element);
+    return range.getBoundingClientRect().width / 10;
+  }, line("abcdefghij"));
+  return `letter-spacing:${(apart - width).toFixed(4)}px`;
+}
+
 test("a word cut at the region's left edge is taken whole; without the option the glyphs inside, as Save has them", async ({
   page,
 }) => {
@@ -175,10 +190,11 @@ test("a word that ends inside its text node takes nothing from the text beside i
     (await collect(page, INLINE, { left: ["#p", at, 0.2], right: ["#p", at, 0.8] })).taken;
   expect(await cut("s|ee")).toEqual(["see"]);
   expect(await cut("n|ow")).toEqual(["now"]);
-  // Nor where the letters stand 1 px apart, and the text beside is nearer than a gap that parts words.
+  // Nor where the letters stand half a pixel apart, and the text beside is nearer than a gap that parts words.
+  const close = await spacing(page, 0.5);
   const near = async (inner: string) =>
     (
-      await collect(page, line(inner, "letter-spacing:-11px"), {
+      await collect(page, line(inner, close), {
         left: ["#p", "b|ar", 0.2],
         right: ["#p", "b|ar", 0.8],
       })
@@ -205,8 +221,8 @@ test("what parts two words for capitalize parts them here: a space, an inline-bl
   const plain = async (inner: string) => (await collect(page, line(inner), inBar)).plain;
   expect(await plain("foo <b>bar</b> baz")).toBe("bar");
   expect(await plain('foo<span style="display:inline-block">bar</span>baz')).toBe("bar");
-  // 4 px wide: nearer than the gap that parts two words by itself.
-  expect(await plain('foo<img src="images/quadrants.png" alt="" width="4" height="4"><b>bar</b>')).toBe(
+  // 1 px wide: nearer than the gap that parts two words by itself.
+  expect(await plain('foo<img src="images/quadrants.png" alt="" width="1" height="4"><b>bar</b>')).toBe(
     "bar",
   );
   // Two lines; the region is on the second.
@@ -226,13 +242,44 @@ test("a gap the eye sees ends a word: padded links side by side are three words"
   expect(await cut(nav, "Ab|out")).toBe("About");
   expect(await cut(nav, "H|ome")).toBe("Home");
   expect(await cut(nav, "Cont|act")).toBe("Contact");
-  // 6 px between the two: more than a quarter of the font size.
   expect(await cut(line('foo<b style="margin-left:6px">bar</b>'), "f|oo")).toBe("foo");
   // What letter-spacing puts between two letters is no gap, here 10 px after each.
   const spaced = line("S<span>PA</span>CED out", "letter-spacing:10px");
   expect(await cut(spaced, "P|A")).toBe("SPACED");
   expect(await cut(spaced, "|SPACED")).toBe("SPACED");
   expect(await cut(spaced, "SPAC|ED")).toBe("SPACED");
+});
+
+test("a gap narrower than a space ends a word too; only what rounding leaves between two boxes does not", async ({
+  page,
+}) => {
+  await load(page);
+  const text = (inner: string, size = 16) =>
+    `<p id="p" style="font:${size}px/1.5 Arial;white-space:nowrap;margin:20px">${inner}</p>`;
+  const cut = async (html: string, at: string) =>
+    (await collect(page, html, { left: ["#p", at, 0.2], right: ["#p", at, 0.8] })).plain;
+  // A byline: 4 px between the two, where a space is 4.4 px.
+  const byline = text('<span>Posted by</span><a style="margin-left:.25rem">Jane</a>');
+  expect(await cut(byline, "b|y")).toBe("by");
+  expect(await cut(byline, "J|ane")).toBe("Jane");
+  expect(await cut(text('<span style="margin-right:3px">Posted by</span><a>Jane</a>'), "b|y")).toBe("by");
+  const nav = text('<a style="padding:0 2px">Home</a><a style="padding:0 2px">About</a>');
+  expect(await cut(nav, "Ho|me")).toBe("Home");
+  expect(await cut(nav, "Ab|out")).toBe("About");
+  expect(await cut(text('foo<b style="margin-left:6px">bar</b>', 24), "f|oo")).toBe("foo");
+  expect(await cut(text('foo<b style="margin-left:2px">bar</b>'), "f|oo")).toBe("foo");
+  // What still is one word: 1 px at 20 px, 0.75 px in small print (a sixteenth of 8 px is less),
+  // 1.5 px between large letters (1 px is less). None stands on the limit, where the last digit
+  // of a coordinate would decide.
+  expect(await cut(text('fo<b style="margin-left:1px">o</b> bar', 20), "f|o")).toBe("foo");
+  expect(await cut(text('fo<b style="margin-left:1px">o</b> bar', 20), "fo|o")).toBe("foo");
+  expect(await cut(text('fo<b style="margin-left:.75px">o</b> bar', 8), "f|o")).toBe("foo");
+  expect(await cut(text('fo<b style="margin-left:1.5px">o</b> bar', 32), "f|o")).toBe("foo");
+  // The smaller of the two texts says how far: 3 px is within a sixteenth of the large letters'
+  // size and not of the small ones', and the word is the same from either end.
+  const sizes = text('<span>foo</span><b style="font-size:64px;margin-left:3px">BAR</b>');
+  expect(await cut(sizes, "f|oo")).toBe("foo");
+  expect(await cut(sizes, "B|AR")).toBe("BAR");
 });
 
 test("in a flex or grid row each item is a box of its own: no word goes on past one", async ({ page }) => {
@@ -246,7 +293,7 @@ test("in a flex or grid row each item is a box of its own: no word goes on past 
     expect(await cut(row("Total<b>5</b>items", style), "it|ems")).toBe("items");
   }
   // An item too narrow to part them by its width: it parts them as an item.
-  const thin = row('Total<b style="width:2px"></b>items', "display:flex");
+  const thin = row('Total<b style="width:1px"></b>items', "display:flex");
   expect(await cut(thin, "T|otal")).toBe("Total");
   expect(await cut(thin, "it|ems")).toBe("items");
   const grid = row("Name<i>x</i>Value", "display:grid;grid-template-columns:200px 200px 200px");
@@ -254,7 +301,7 @@ test("in a flex or grid row each item is a box of its own: no word goes on past 
   expect(await cut(grid, "Val|ue")).toBe("Value");
   expect(
     await cut(
-      row('Total<i style="width:2px"></i>items', "display:inline-grid;grid-auto-flow:column"),
+      row('Total<i style="width:1px"></i>items', "display:inline-grid;grid-auto-flow:column"),
       "T|otal",
     ),
   ).toBe("Total");
@@ -264,7 +311,7 @@ test("in a flex or grid row each item is a box of its own: no word goes on past 
   );
   // An item of the row all the same under a wrapper that has no box of its own.
   const wrapped = row(
-    '<span style="display:contents">Total<b style="width:2px"></b>items</span>',
+    '<span style="display:contents">Total<b style="width:1px"></b>items</span>',
     "display:flex",
   );
   expect(await cut(wrapped, "T|otal")).toBe("Total");
@@ -278,6 +325,35 @@ test("in a flex or grid row each item is a box of its own: no word goes on past 
   // Two text nodes with no item between are one item, and so is a word inside an item.
   expect(await cut(row("To<!-- -->tal<b>5</b>items", "display:flex"), "T|o")).toBe("Total");
   expect(await cut(row("<span>foo<b>bar</b>baz</span><b>5</b>", "display:flex"), "b|ar")).toBe("foobarbaz");
+});
+
+test("the old flexbox: a child that is a block is an item, inline children are one line of text, and so is all of it under a line clamp", async ({
+  page,
+}) => {
+  await load(page);
+  const cut = async (html: string, at: string) =>
+    (await collect(page, html, { left: ["#p", at, 0.2], right: ["#p", at, 0.8] })).plain;
+  for (const display of ["-webkit-box", "-webkit-inline-box"]) {
+    const box = (inner: string, style = "") =>
+      `<div id="p" style="display:${display};${style}width:600px;font:20px/1.5 monospace">${inner}</div>`;
+    // Too narrow to part them by its width: it parts them as an item.
+    const row = box('Total<b style="display:block;width:1px"></b>items');
+    expect(await cut(row, "T|otal")).toBe("Total");
+    expect(await cut(row, "it|ems")).toBe("items");
+    // An inline child is an item where the browser makes a block of it, as it does in a flex row.
+    // Chromium does not: the three are one line of text, as in a block.
+    const inline = box("Total<b>5</b>items");
+    const first = await cut(inline, "T|otal");
+    const item = await page.evaluate(
+      () => getComputedStyle(document.querySelector("b") as Element).display !== "inline",
+    );
+    expect(first).toBe(item ? "Total" : "Total5items");
+    expect(await cut(inline, "it|ems")).toBe(item ? "items" : "Total5items");
+    // With a line clamp the same display lays its text out in lines, as a block does.
+    const clamp = box("see foo<b>bar</b>baz now", "-webkit-box-orient:vertical;-webkit-line-clamp:2;");
+    expect(await cut(clamp, "b|ar")).toBe("foobarbaz");
+    expect(await cut(clamp, "f|oo")).toBe("foobarbaz");
+  }
 });
 
 test("a ruby annotation is no part of its base's word, nor the base of the annotation's", async ({
@@ -366,14 +442,15 @@ test("a word under something else is left out by its part in the region, with th
 
 test("glyphs narrower than the tolerance still reach into the region", async ({ page }) => {
   await load(page);
-  // Each letter 0.3 px after the one before.
-  const html = line("abcdefgh ijkl", "letter-spacing:-11.7px");
+  // Each letter 0.4 px after the one before: the edge, half way into the "b", is within the
+  // tolerance of the "b" and not of the "a".
+  const html = line("abcdefgh ijkl", await spacing(page, 0.4));
   const region: Region = { left: ["#p", "a|bcdefgh", 0.5], right: null };
   expect((await collect(page, html, region, OFF)).texts).toEqual(["bcdefgh ijkl"]);
   expect((await collect(page, html, region)).texts).toEqual(["abcdefgh ijkl"]);
   // 0.7 px apart, the edge 0.42 px into the "b": less than half of it inside, but within the
   // tolerance that makes it a glyph inside for Save. A word of its own, it must not get lost.
-  const wider = line("a b cdefgh ijkl", "letter-spacing:-11.3px");
+  const wider = line("a b cdefgh ijkl", await spacing(page, 0.7));
   const inB: Region = { left: ["#p", "a |b", 0.6], right: null };
   expect((await collect(page, wider, inB, OFF)).texts).toEqual(["b cdefgh ijkl"]);
   expect((await collect(page, wider, inB)).texts).toEqual(["b cdefgh ijkl"]);
@@ -594,18 +671,85 @@ test("600 blocks nested in one another: the text beside a word is looked up, not
   await load(page);
   const got = await page.evaluate(async () => {
     const n = 600;
-    document.body.innerHTML = `<div id="p">${"<div>h".repeat(n)}${"t</div>".repeat(n)}</div>`;
+    // Built by script: a parser stops nesting at a depth of its own and makes siblings of the rest.
+    const outer = document.createElement("div");
+    outer.id = "p";
+    let at: Element = outer;
+    for (let i = 0; i < n; i++) {
+      const div = document.createElement("div");
+      div.append("h");
+      at.append(div);
+      at = div;
+    }
+    let depth = 0;
+    for (let e: Element | null = at; e && e !== outer; e = e.parentElement) {
+      e.append("t");
+      depth++;
+    }
+    document.body.replaceChildren(outer);
+    const walker = document.createTreeWalker(outer, NodeFilter.SHOW_TEXT);
+    let textNodes = 0;
+    while (walker.nextNode()) textNodes++;
     const h = window.__snapii;
     const cap = h.debug.captureRect("#p");
     const collect = (wholeWords: boolean) => h.debug.collectTextRunsDetailed(document, cap, { wholeWords });
     await collect(false);
     const off = (await collect(false)).stats.ms;
     const on = await collect(true);
-    return { off, ms: on.stats.ms, runs: on.runs.length };
+    return { off, ms: on.stats.ms, runs: on.runs.length, depth, textNodes };
   });
-  expect(got.runs).toBeGreaterThan(1000);
-  // Every line starts at the region's edge, so each asks for its neighbour. Measured 60–80 ms
-  // without the option and 80–110 ms with it; a search from each text took 23–27 s here (4.5 s
-  // for 300 blocks, 0.7 s for 160).
+  expect(got.depth).toBe(600);
+  expect(got.textNodes).toBe(1200);
+  // A line each.
+  expect(got.runs).toBe(got.textNodes);
+  // Every line starts at the region's edge, so each asks for its neighbour. Measured 55–60 ms
+  // without the option and 60–70 ms with it. A search from each text took 23–27 s on what a
+  // parser makes of the same markup (4.5 s for 300 blocks, 0.7 s for 160).
   expect(got.ms).toBeLessThan(3000);
+});
+
+test("1 000 inline elements nested in one another, one word: what parts two texts is not asked of every ancestor", async ({
+  page,
+}) => {
+  await load(page);
+  const got = await page.evaluate(async () => {
+    const n = 1000;
+    const p = document.createElement("p");
+    p.id = "p";
+    p.style.cssText = "font:20px/1.5 monospace;white-space:nowrap;margin:0";
+    let at: Element = p;
+    for (let i = 0; i < n; i++) {
+      const u = document.createElement("u");
+      u.append("h");
+      at.append(u);
+      at = u;
+    }
+    document.body.replaceChildren(p);
+    const h = window.__snapii;
+    const cap = h.debug.captureRect("#p");
+    // A column 3 px wide through the middle of the line.
+    const region = { ...cap, x: cap.x + p.scrollWidth / 2, width: 3 };
+    // Steps from a node to its parent: what a walk up the tree is made of, and no clock.
+    let steps = 0;
+    const parentNode = Object.getOwnPropertyDescriptor(Node.prototype, "parentNode") as PropertyDescriptor;
+    Object.defineProperty(Node.prototype, "parentNode", {
+      ...parentNode,
+      get(this: Node) {
+        steps++;
+        return parentNode.get?.call(this);
+      },
+    });
+    try {
+      const { runs } = await h.debug.collectTextRunsDetailed(document, region, { wholeWords: true });
+      return { n, steps, letters: h.runsToPlainText(runs).length };
+    } finally {
+      Object.defineProperty(Node.prototype, "parentNode", parentNode);
+    }
+  });
+  // The word is the line: every text is asked for the one beside it.
+  expect(got.letters).toBe(got.n);
+  // Measured 20 steps per text, whatever the depth (250 to 2 000). A walk to the root for each
+  // pair of texts took 1 000 per text at this depth for what stands between them and 4 000 for
+  // their ruby annotations (5.5 s at twice the depth).
+  expect(got.steps).toBeLessThan(60 * got.n);
 });
