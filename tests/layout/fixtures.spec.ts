@@ -71,7 +71,13 @@ interface Expect {
 const DIR = new URL("../fixtures/", import.meta.url);
 // Pages that serve other specs (harness smoke, overlay interaction) carry no
 // extraction expectations.
-const NOT_FIXTURES = new Set(["smoke.html", "overlay.html", "overlay-csp.html", "rtl-scrolled.html"]);
+const NOT_FIXTURES = new Set([
+  "smoke.html",
+  "overlay.html",
+  "overlay-csp.html",
+  "rtl-scrolled.html",
+  "copy-ocr.html",
+]);
 // The fixture table; each needs its own expect block.
 const REQUIRED = [
   "multiline.html",
