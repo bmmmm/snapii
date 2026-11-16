@@ -7,7 +7,9 @@
       ::before/::after have no DOM node and no box of their own to read: an
       element whose pseudo-element paints (text content, or a box with a
       background) becomes a patch. A clearfix paints nothing and is left
-      alone: content "" without a box, Bootstrap 3's " ", or a hidden ".".
+      alone: content "" without a box, Bootstrap 3's " ", or a hidden ".". So is
+      one that is fully transparent (a dimmer faded out) or whose only content
+      is a WORD JOINER; a half-transparent one still paints.
     -->
     <style>
       body { margin: 0; padding: 20px; font: 16px/1.5 serif; background: rgb(255, 255, 255); }
@@ -18,6 +20,10 @@
       .bs::before, .bs::after { content: " "; display: table; }
       .pie::after { content: "."; display: block; height: 0; clear: both; visibility: hidden; }
       .bar::after { content: ""; display: block; height: 4px; background: rgb(0, 0, 0); }
+      .dim::after { content: ""; display: block; height: 4px; background: rgb(0, 0, 0); opacity: 0; }
+      .dimtext::before { content: "x"; opacity: 0; }
+      .wj::before { content: "\2060"; }
+      .half::after { content: ""; display: block; height: 4px; background: rgb(0, 0, 0); opacity: 0.5; }
     </style>
     <script type="application/json" id="expect">
       {
@@ -27,13 +33,24 @@
           "Clearfix text",
           "Bootstrap clearfix",
           "Hidden dot clearfix",
-          "Underlined by a pseudo box"
+          "Underlined by a pseudo box",
+          "Faded out box",
+          "Faded out text",
+          "Word joiner only",
+          "Half faded box"
         ],
         "vector": {
           "maxPatchArea": 0.4,
-          "unsupported": { "pseudo": 2 },
-          "hidden": ["Section sign before", "Underlined by a pseudo box"],
-          "visible": ["Clearfix text", "Bootstrap clearfix", "Hidden dot clearfix"]
+          "unsupported": { "pseudo": 3 },
+          "hidden": ["Section sign before", "Underlined by a pseudo box", "Half faded box"],
+          "visible": [
+            "Clearfix text",
+            "Bootstrap clearfix",
+            "Hidden dot clearfix",
+            "Faded out box",
+            "Faded out text",
+            "Word joiner only"
+          ]
         }
       }
     </script>
@@ -45,6 +62,10 @@
       <div class="bs">Bootstrap clearfix</div>
       <div class="pie">Hidden dot clearfix</div>
       <div class="bar">Underlined by a pseudo box</div>
+      <div class="dim">Faded out box</div>
+      <div class="dimtext">Faded out text</div>
+      <div class="wj">Word joiner only</div>
+      <div class="half">Half faded box</div>
     </main>
   </body>
 </html>

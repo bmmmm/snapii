@@ -928,15 +928,20 @@ class Builder {
     if (content === "none" || content === "normal" || cs.display === "none") return false;
     // A hidden tooltip paints nothing, background or not.
     if (cs.visibility !== "visible") return false;
+    // Fully transparent: a dimmer that is faded out paints nothing either. Its own
+    // opacity only: a pseudo-element has no children, an ancestor's is the box's business.
+    if (Number.parseFloat(cs.opacity) === 0) return false;
     if (hasPaintedBox(cs)) return true;
-    // Only strings: a clearfix's "" or " " (Bootstrap 3) paints nothing. Counters,
-    // attr() and images are taken to paint.
+    // Only strings: a clearfix's "" or " " (Bootstrap 3) paints nothing, nor does a
+    // lone WORD JOINER or zero-width space (no glyph). Counters, attr() and images
+    // are taken to paint.
     const strings = /^\s*(?:"(?:[^"\\]|\\.)*"\s*)+$/.test(content);
     return (
       !strings ||
       content
         .replace(/"((?:[^"\\]|\\.)*)"/g, "$1")
         .replace(/\\(.)/g, "$1")
+        .replace(/[\u200B-\u200D\u2060\uFEFF]/g, "")
         .trim() !== ""
     );
   }
