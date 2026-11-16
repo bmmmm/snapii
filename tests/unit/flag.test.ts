@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { setTimeout as sleep } from "node:timers/promises";
+import { setImmediate as nextMacrotask, setTimeout as sleep } from "node:timers/promises";
 import { flagTab } from "../../src/background/flag.ts";
 
 /**
@@ -17,11 +17,11 @@ function harness() {
     setBadgeText: async ({ text }: { tabId: number; text: string | null }) => {
       log.push(`badge:${text}`);
       if (text !== null) badgeAfterSettledTitle = titleSettled;
-      await sleep(1);
+      await nextMacrotask();
     },
     setTitle: async ({ title }: { tabId: number; title: string | null }) => {
       log.push(`title:${title}`);
-      await sleep(1);
+      await nextMacrotask();
       titleSettled = true;
     },
   };
@@ -70,16 +70,19 @@ test("flagTab: a tab that is gone when the notice ends leaves no unhandled rejec
   assert.equal(restoreCalls, 2);
 });
 
-test("flagTab: a second notice on the same tab outlives the first one's timer", async () => {
+test("flagTab: a second notice on the same tab outlives the first one's timer", async (t) => {
+  // Mocked clock: the first timer is due long before the second one, and no
+  // real time passes between the calls, so a loaded machine cannot reorder them.
+  t.mock.timers.enable({ apis: ["setTimeout"] });
   const h = harness();
   await flagTab(h.action, 7, "a", 5);
   await flagTab(h.action, 7, "b", 40);
-  await sleep(20);
+  t.mock.timers.tick(20); // past the first timer's 5 ms, before the second's 40 ms
   assert.equal(
     h.log.filter((e) => e === "badge:null").length,
     0,
     "the first timer must not clear the second notice",
   );
-  await sleep(40);
+  t.mock.timers.tick(20);
   assert.equal(h.log.filter((e) => e === "badge:null").length, 1);
 });
