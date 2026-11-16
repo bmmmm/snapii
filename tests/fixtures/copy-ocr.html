@@ -44,6 +44,19 @@
         width: 400px;
         height: 30px;
       }
+      /* Right of the picture and level with it; its two lines stand above and below the top of the picture's first word (y 160). */
+      #beside {
+        left: 720px;
+        top: 138px;
+        width: 300px;
+      }
+      /* 600 × 2600 CSS px: more than a crop at full resolution holds (1 500 000 CSS px² at 2 px per CSS px). */
+      #tall {
+        left: 80px;
+        top: 400px;
+        width: 600px;
+        height: 2600px;
+      }
       #spacer {
         height: 3000px;
       }
@@ -56,6 +69,8 @@
       <p id="caption" class="abs">On it.</p>
       <p id="outro" class="abs">Text below the picture.</p>
     </main>
+    <p id="beside" class="abs">Beside the<br />picture.</p>
+    <img id="tall" class="abs" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='2600'%3E%3Crect width='600' height='2600' fill='%23ded'/%3E%3C/svg%3E" />
     <div id="spacer"></div>
   </body>
 </html>

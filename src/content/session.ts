@@ -13,6 +13,7 @@ import { fragmentToCleanHtml, type SNode, toSNodes } from "../shared/sanitize.ts
 import type {
   CapturedMessage,
   CaptureModel,
+  DocRect,
   FragmentStatus,
   PageMeta,
   RecognizeRequest,
@@ -191,9 +192,11 @@ let clipboardTurn = 0;
 /** What Copy text gets from the selection's images: the words it takes (document px), or that they could not be read. */
 interface FromImages {
   runs: TextRun[];
+  /** The images read, in document px, by the block number of their runs. */
+  areas: readonly DocRect[];
   failed: boolean;
 }
-const NO_IMAGES: FromImages = { runs: [], failed: false };
+const NO_IMAGES: FromImages = { runs: [], areas: [], failed: false };
 
 /** Snapshot of the page's text selection, so the capture never shows its highlight. */
 function takeSelection(): Range[] {
@@ -454,12 +457,11 @@ export function startSession(deps: SessionDeps): SessionHandle {
 
   /** What the background is asked to read for a Copy text, or null where the selection shows no image. */
   function recognitionOf(selection: Selection, runs: readonly TextRun[]): RecognizeRequest | null {
-    const extent = readingExtent(selection.rect, deps.viewportOnly ? visibleViewport() : null);
-    if (!extent) return null;
-    const areas = collectImageAreas(document, selection.rect, { skip: overlay.host, extent }).slice(
-      0,
-      MAX_AREAS,
-    );
+    const viewport = deps.viewportOnly ? visibleViewport() : null;
+    const areas = collectImageAreas(document, selection.rect, {
+      skip: overlay.host,
+      extent: (image) => readingExtent(image, selection.rect, viewport, devicePixelRatio),
+    }).slice(0, MAX_AREAS);
     const box = unionAll(areas);
     if (!box) return null;
     // A single area is its own bounding box, `kind` and all.
@@ -523,10 +525,11 @@ export function startSession(deps: SessionDeps): SessionHandle {
     }
     if (cancelled || turn !== clipboardTurn) return null;
     // No reply at all (the background went away) is a failure like any other.
-    if (!reply?.ok) return { runs: [], failed: reply?.error !== "disabled" };
+    if (!reply?.ok) return { runs: [], areas: [], failed: reply?.error !== "disabled" };
     const { x, y } = request.region;
     const inDocument = reply.runs.map((r) => ({ ...r, x: r.x + x, y: r.y + y, top: r.top + y }));
-    return { runs: recognizedIn(inDocument, selection.rect), failed: false };
+    const areas = request.areas.map((a) => ({ ...a, x: a.x + x, y: a.y + y }));
+    return { runs: recognizedIn(inDocument, selection.rect), areas, failed: false };
   }
 
   /**
@@ -559,7 +562,7 @@ export function startSession(deps: SessionDeps): SessionHandle {
     try {
       images = await recognizeImages(selection, runs, onReading);
       if (!images) return;
-      const text = withRecognized(runs, images.runs);
+      const text = withRecognized(runs, images.runs, images.areas);
       if (text.length === 0) {
         notify(images.failed ? IMAGES_NOT_READ_TOAST : NO_TEXT_TOAST);
         return;

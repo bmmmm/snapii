@@ -24,15 +24,16 @@ function kindOf(el: Element, layout: Layout): ImageArea["kind"] | null {
 
 /**
  * Image areas in document CSS px, in flat-tree order: of each image that
- * shows in `captureRect`, the part inside it. With `extent`, the part inside
- * that instead (Copy text reads an image beyond the selection's edge, for
- * the words the edge cuts); an image the rect merely borders is none of its,
- * nor one it shows too low a strip of for any word to count.
+ * shows in `captureRect`, the part inside it. With `extent`, the part that
+ * gives for what the page shows of the image instead (Copy text reads an
+ * image beyond the selection's edge, for the words the edge cuts); an image
+ * the rect merely borders is none of its, nor one it shows too low a strip
+ * of for any word to count.
  */
 export function collectImageAreas(
   root: Document | Element,
   captureRect: DocRect,
-  opts: { skip?: Element | null; extent?: DocRect } = {},
+  opts: { skip?: Element | null; extent?: (shown: DocRect) => DocRect | null } = {},
 ): ImageArea[] {
   const layout = new Layout();
   const out: ImageArea[] = [];
@@ -51,7 +52,7 @@ export function collectImageAreas(
     const inside = shown && intersect(shown, captureRect);
     if (!inside) continue;
     const area = opts.extent
-      ? inside.width > EPS && inside.height >= MIN_HEIGHT_INSIDE && intersect(shown, opts.extent)
+      ? inside.width > EPS && inside.height >= MIN_HEIGHT_INSIDE && opts.extent(shown)
       : inside;
     if (area && area.width >= MIN_AREA.width && area.height >= MIN_AREA.height) {
       out.push({ ...area, kind });

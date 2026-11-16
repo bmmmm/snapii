@@ -4,7 +4,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { captureViewportRegion, type ViewportCaptureDeps } from "../../../src/background/chromium/capture.ts";
 import { type RecognizeDeps, recognize } from "../../../src/background/recognize.ts";
-import { intersect } from "../../../src/shared/geometry.ts";
 import { ocrInfo } from "../../../src/shared/ocr.ts";
 import { readingExtent } from "../../../src/shared/recognized.ts";
 import { DEFAULT_SETTINGS } from "../../../src/shared/settings.ts";
@@ -77,17 +76,16 @@ test("recognize in Chromium: of an image that runs out of the viewport, the part
   // A selection near the viewport's lower edge (1713) on an image that ends 187 px below it.
   const selection = { x: 100, y: 1650, width: 300, height: 40 };
   const image = { x: 50, y: 1500, width: 600, height: 400 };
-  const extent = readingExtent(selection, visibleRect(PAGE));
-  const area = extent && intersect(image, extent);
-  assert.deepEqual(area, { x: 50, y: 1610, width: 600, height: 103 });
+  const area = readingExtent(image, selection, visibleRect(PAGE), PAGE.devicePixelRatio);
+  assert.deepEqual(area, { x: 50, y: 1500, width: 600, height: 213 });
   const { d, log } = deps();
   const reply = await recognize(requestFor(area as DocRect), TAB, d);
   assert.deepEqual(reply, { ok: true, runs: [] });
   assert.deepEqual(log, [
     "capture",
-    'crop:{"x":150,"y":1830,"width":1800,"height":309}',
+    'crop:{"x":150,"y":1500,"width":1800,"height":639}',
     "tell:captured",
-    "ocr:1:[[600,103]]",
+    "ocr:1:[[600,213]]",
   ]);
 });
 

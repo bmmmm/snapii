@@ -40,6 +40,9 @@ const wordsOf = (strings) =>
     .map((w) => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ""))
     .filter(Boolean);
 
+/** The blocks of a copied text, each on one line: where a paragraph wraps is up to the machine's fonts. */
+const blocksOf = (plain) => plain.split("\n\n").map((block) => block.replace(/\s+/g, " "));
+
 async function saveCap() {
   await g.open(PAGE);
   await g.until(async () => (await g.content("return document.documentElement.dataset.ready;")) === "1", "images");
@@ -118,7 +121,8 @@ test("OCR on: Copy text puts the images' words on the clipboard with the DOM tex
   );
   assert.equal(toasts.at(-1), "Copied text");
   assert.ok(hits.length >= 0.8 * expected.length, `recognised ${hits.length} of ${expected.length}`);
-  assert.ok(plain.includes("This paragraph is real DOM text next to the images."), plain);
+  // The paragraph beside the photo in one piece: the photo's words are level with its lines.
+  assert.ok(blocksOf(plain).includes("This paragraph is real DOM text next to the images."), plain);
   // DOM text wins: the caption over the photo is there once.
   assert.equal(got.filter((w) => w === "Hallstatt").length, 1, plain);
   assert.ok((clip["text/html"] ?? "").includes("Köln"), clip["text/html"]);
@@ -129,7 +133,7 @@ test("OCR on: Copy text puts the images' words on the clipboard with the DOM tex
   await g.until(async () => !(await g.offscreenOpen()), "the offscreen document to be closed");
 });
 
-test("OCR on: Copy text on a non-secure origin takes a cut word in an image whole; the pass and the write share the offscreen document", async () => {
+test("OCR on: Copy text on a non-secure origin takes a cut word in an image whole, 2 px higher or lower alike; the pass and the write share the offscreen document", async () => {
   const origin = `http://${NON_SECURE_HOST}:${new URL(g.base).port}`;
   // "Willkommen in Köln", 16 px into #img (40, 40), baseline at y 80: from
   // the middle of Willkommen to the middle of Köln, the height of that line only.
@@ -141,18 +145,19 @@ test("OCR on: Copy text on a non-secure origin takes a cut word in an image whol
      return [at("", "Willkommen"), at("Willkommen in ", "Köln")];`,
   );
   const from = first.x + first.width / 2;
-  const { clip, toasts } = await copyRegion(
-    { x: from, y: 64, width: last.x + last.width / 2 - from, height: 20 },
-    origin,
-  );
-  const plain = clip["text/plain"] ?? "";
-  console.log(`copy with ocr, cut words: ${JSON.stringify(plain)}; toasts ${JSON.stringify(toasts)}`);
-  assert.equal(toasts.at(-1), "Copied text");
-  const got = wordsOf([plain]);
-  assert.ok(got.includes("Willkommen"), plain);
-  assert.ok(got.includes("Köln"), plain);
-  for (const w of ["Straßenbahn", "Quick", "Summer", "Hallstatt", "paragraph"]) assert.ok(!got.includes(w), plain);
-  await g.key("Escape");
+  // The letters stand at y 61–80, the next line's from y 103. Read in a band of the selection's
+  // height around it, the picture ended 1 px into that line at y 64 and the engine made nothing of either.
+  for (const y of [62, 64, 66]) {
+    const { clip, toasts } = await copyRegion(
+      { x: from, y, width: last.x + last.width / 2 - from, height: 20 },
+      origin,
+    );
+    const plain = clip["text/plain"] ?? "";
+    console.log(`copy with ocr, cut words, y ${y}: ${JSON.stringify(plain)}; toasts ${JSON.stringify(toasts)}`);
+    assert.equal(toasts.at(-1), "Copied text", `y ${y}`);
+    assert.equal(plain, "Willkommen in Köln", `y ${y}`);
+    await g.key("Escape");
+  }
   await g.until(async () => !(await g.offscreenOpen()), "the offscreen document to be closed");
 });
 
@@ -160,10 +165,10 @@ test("OCR off: Copy text copies the DOM text alone, without a capture or an offs
   await g.setSettings({ ocr: false });
   const { clip, toasts } = await copyRegion(CAP);
   assert.deepEqual(toasts, ["Copied text"]);
-  assert.equal(
-    clip["text/plain"],
-    "Photo taken near Hallstatt\n\nThis paragraph is real DOM text next to the images.",
-  );
+  assert.deepEqual(blocksOf(clip["text/plain"] ?? ""), [
+    "Photo taken near Hallstatt",
+    "This paragraph is real DOM text next to the images.",
+  ]);
   assert.equal(await g.offscreenOpen(), false);
   await g.key("Escape");
 });

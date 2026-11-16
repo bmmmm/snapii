@@ -128,6 +128,9 @@ const wordsOf = (strings) =>
     .map((w) => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ""))
     .filter(Boolean);
 
+/** The blocks of a copied text, each on one line: where a paragraph wraps is up to the machine's fonts. */
+const blocksOf = (plain) => plain.split("\n\n").map((block) => block.replace(/\s+/g, " "));
+
 test("OCR on: the image words are selectable text in <g id=ocr>, the DOM caption over the photo is there once", async () => {
   await setOcr(true);
   const { file, wallMs, during } = await saveRegion(CAP, clickDuringOcr);
@@ -261,8 +264,9 @@ test("OCR on: Copy text puts the images' words on the clipboard with the DOM tex
   assert.equal(probe.activeWhenFree, false, "no user activation was left before the reply could arrive");
   assert.equal(toasts.at(-1), "Copied text");
   assert.ok(hits.length >= 0.8 * expected.length, `recognised ${hits.length} of ${expected.length}`);
-  // The DOM text is there, the caption over the photo once (DOM text wins).
-  assert.ok(plain.includes("This paragraph is real DOM text next to the images."), plain);
+  // The DOM text is there, the paragraph beside the photo in one piece (the photo's
+  // words are level with its lines), the caption over the photo once (DOM text wins).
+  assert.ok(blocksOf(plain).includes("This paragraph is real DOM text next to the images."), plain);
   assert.equal(got.filter((w) => w === "Hallstatt").length, 1, plain);
   // The same words in the HTML flavour.
   assert.ok((clip["text/html"] ?? "").includes("Köln"), clip["text/html"]);
@@ -273,20 +277,21 @@ test("OCR on: Copy text puts the images' words on the clipboard with the DOM tex
   await g.clickToolbar("cancel");
 });
 
-test("OCR on: Copy text takes a word in an image whole when the selection's edge cuts it, and no other line", async () => {
+test("OCR on: Copy text takes a word in an image whole when the selection's edge cuts it, and no other line, 2 px higher or lower alike", async () => {
   // "Willkommen in Köln": from the middle of Willkommen to the middle of Köln, the height of that line only.
   const first = await inFirstLine("", "Willkommen");
   const last = await inFirstLine("Willkommen in ", "Köln");
   const from = first.x + first.width / 2;
-  const { clip, toasts } = await copyRegion({ x: from, y: 64, width: last.x + last.width / 2 - from, height: 20 });
-  const plain = clip["text/plain"] ?? "";
-  console.log(`copy with ocr, cut words: ${JSON.stringify(plain)}; toasts ${JSON.stringify(toasts)}`);
-  assert.equal(toasts.at(-1), "Copied text");
-  const got = wordsOf([plain]);
-  assert.ok(got.includes("Willkommen"), plain);
-  assert.ok(got.includes("Köln"), plain);
-  for (const w of ["Straßenbahn", "Quick", "Summer", "Hallstatt", "paragraph"]) assert.ok(!got.includes(w), plain);
-  await g.key("Escape");
+  // The letters stand at y 61–80, the next line's from y 103. Read in a band of the selection's
+  // height around it, the picture ended 1 px into that line at y 64 and the engine made nothing of either.
+  for (const y of [62, 64, 66]) {
+    const { clip, toasts } = await copyRegion({ x: from, y, width: last.x + last.width / 2 - from, height: 20 });
+    const plain = clip["text/plain"] ?? "";
+    console.log(`copy with ocr, cut words, y ${y}: ${JSON.stringify(plain)}; toasts ${JSON.stringify(toasts)}`);
+    assert.equal(toasts.at(-1), "Copied text", `y ${y}`);
+    assert.equal(plain, "Willkommen in Köln", `y ${y}`);
+    await g.key("Escape");
+  }
 });
 
 test("OCR off (the default): Copy text copies the DOM text alone and never hides the overlay", async () => {
@@ -305,10 +310,10 @@ test("OCR off (the default): Copy text copies the DOM text alone and never hides
   await g.clickToolbar("copy-text");
   assert.equal(await g.until(() => g.toast(), "the toast"), "Copied text");
   const clip = await readClipboard(g.s);
-  assert.equal(
-    clip["text/plain"],
-    "Photo taken near Hallstatt\n\nThis paragraph is real DOM text next to the images.",
-  );
+  assert.deepEqual(blocksOf(clip["text/plain"] ?? ""), [
+    "Photo taken near Hallstatt",
+    "This paragraph is real DOM text next to the images.",
+  ]);
   assert.equal(await g.content("return window.__hidden;"), false, "no capture: no shield went up");
   await g.key("Escape");
 });

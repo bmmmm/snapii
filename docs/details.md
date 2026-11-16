@@ -226,16 +226,25 @@ models ship in the add-on (8.3 MB of the unpacked add-on), nothing is downloaded
   - **Whole words, as for page text:** a word in an image that the
     selection's edge runs through is copied whole, one beside the selection
     is not, and a line with less than half its height in the selection is
-    left out. For that the image is read beyond the selection: sideways as
-    far as it is visible, up and down by the selection's height (not the
-    whole of a page-high background picture for one line picked on it). An
-    image of which the selection shows a strip lower than 4 px is not read:
-    that is half the height of the smallest text the engine reads.
+    left out. For that the image is read beyond the selection: all that is
+    visible of it, so that moving the selection by a pixel or two never
+    decides whether a line is found (a picture cut through a line of text is
+    read badly, the lines beside the cut included). Only an image too large
+    to be read at full resolution, more than 6 megapixels of the crop the
+    engine gets, is read in a band instead: sideways as far as it is visible,
+    up and down by the selection's height (not the whole of a page-high
+    background picture for one line picked on it). An image of which the
+    selection shows a strip lower than 4 px is not read: that is half the
+    height of the smallest text the engine reads.
   - **Where the words go:** in the plain text an image's words are a block of
     their own, its lines kept, after the last line of page text that stands
-    above the image or left of it; a picture a paragraph flows around follows
-    that paragraph instead of splitting it. In the HTML they follow the
-    page's HTML, one paragraph per image.
+    above the image or left of it. Where the image stands decides, not where
+    in it the words are: a paragraph beside a picture is never split, the
+    picture's words follow it (or come before it, with the picture on its
+    left and no line of it above the picture). Only a picture that stands
+    between two lines of one block, one above it and the next below, has its
+    words between them. In the HTML they follow the page's HTML, one
+    paragraph per image.
   - **What you see:** snapii's overlay and your text selection leave the
     screen while the images are captured and come back as soon as the
     background has the pixels; a toast says "Copying… (recognizing text)"

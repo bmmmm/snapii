@@ -384,9 +384,37 @@ test("a recognised word the selection's edge cuts is copied whole, one beside or
   await drag(page, 150, 150, 240, 185);
   await clickButton(page, "copy-text", "Copied text");
   const [ask] = await asks(page);
-  // The picture is read to its sides, and above and below as far as a word of the selection can reach.
-  expect(ask?.request.region).toEqual({ x: 100, y: 140, width: 400, height: 80 });
+  // The picture is read whole: where the selection ends in it does not decide what the engine sees.
+  expect(ask?.request.region).toEqual(PICTURE);
   expect(await clips(page)).toEqual([{ plain: "Summer Sale", html: "<p>Summer Sale</p>" }]);
+});
+
+test("a picture too large to be read whole is read in a band: to its sides, and above and below as far as a word of the selection can reach", async ({
+  page,
+}) => {
+  await load(page);
+  await begin(page);
+  await page.evaluate(() => scrollTo(0, 800));
+  // #tall (80, 400, 600 × 2600): 40 px of it, at document y 1000.
+  await drag(page, 200, 200, 400, 240);
+  await clickButton(page, "copy-text", "No text in the selection");
+  expect((await asks(page)).map((a) => a.request.region)).toEqual([
+    { x: 80, y: 960, width: 600, height: 120 },
+  ]);
+});
+
+test("a paragraph beside the picture stays whole: the picture's words do not go between its lines", async ({
+  page,
+}) => {
+  await load(page);
+  await begin(page);
+  // The picture and #beside right of it, whose first line stands higher than the picture's first word and whose second does not.
+  await drag(page, 90, 130, 1040, 250);
+  await clickButton(page, "copy-text", "Copied text");
+  expect((await asks(page)).map((a) => a.request.region)).toEqual([PICTURE]);
+  expect((await clips(page)).map((c) => c.plain)).toEqual([
+    "Summer Sale Today\nHalf price\n\nOn it.\n\nBeside the\npicture.",
+  ]);
 });
 
 test("a selection on the picture that reaches no word: no text", async ({ page }) => {
