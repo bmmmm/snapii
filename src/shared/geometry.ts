@@ -45,9 +45,14 @@ export function minus(r: DocRect, hole: DocRect): DocRect[] {
 /** Client rects come in 1/60 px steps; this much overhang still counts as inside. */
 export const EPS = 0.5;
 
-/** `box` reaches into `region` sideways by more than the tolerance: a glyph the region's edge runs through does. */
+/**
+ * `box` reaches into `region` sideways by more than the tolerance: a glyph
+ * the region's edge runs through does. The tolerance is at most half the
+ * box, or a glyph narrower than it (letters drawn over one another by a
+ * negative letter-spacing) could never reach in.
+ */
 export function reachesInto(box: DocRect, region: DocRect): boolean {
-  return Math.min(right(box), right(region)) - Math.max(box.x, region.x) > EPS;
+  return Math.min(right(box), right(region)) - Math.max(box.x, region.x) > Math.min(EPS, box.width / 2);
 }
 
 /**

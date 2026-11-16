@@ -552,7 +552,7 @@ export function startSession(deps: SessionDeps): SessionHandle {
     const ownLines = new Set(runs.filter((_, i) => own(i)).map((r) => r.line));
     const outside = runs.some((r, i) => !own(i) && !ownLines.has(r.line));
     const range = outside ? null : selectionRange(selection, sources);
-    const cloned = range ? fragmentToCleanHtml(toSNodes(cloneVisibleRange(range, sources)), ctx) : "";
+    const cloned = range ? fragmentToCleanHtml(toSNodes(cloneVisibleRange(range, sources, runs)), ctx) : "";
     // The page's HTML has no place for an image's words: they follow it, a
     // paragraph per image, the same characters as in the plain text.
     const read = images.runs.length > 0 ? plainParagraphs(runsToPlainText(images.runs)) : [];

@@ -59,6 +59,11 @@ test("reachesInto: more than the tolerance of the box's width inside, however li
   assert.equal(reachesInto(R(300, 0, 10, 20), region), false);
   // Sideways only: the rows are the caller's.
   assert.equal(reachesInto(R(120, 500, 10, 20), region), true);
+  // A glyph narrower than the tolerance (letters drawn over one another): half of it is enough.
+  assert.equal(reachesInto(R(150, 0, 0.3, 20), region), true);
+  assert.equal(reachesInto(R(99.8, 0, 0.3, 20), region), false);
+  assert.equal(reachesInto(R(99.9, 0, 0.3, 20), region), true);
+  assert.equal(reachesInto(R(99.7, 0, 0.3, 20), region), false);
 });
 
 test("wordInRegion: a word the region cuts sideways counts, one with less than half its height in it does not", () => {

@@ -90,9 +90,8 @@ builds name Chromium instead).
   text layer does (but takes a word at the selection's edge whole, where the
   text layer keeps the letters inside): if it is wrong too, extraction is at
   fault (`src/content/extract/`); if it is right, the renderer or the viewer
-  is. The
-  form also asks which program opened the SVG — only browsers select the
-  invisible text — and whether the text was page text or inside an image
+  is. The form also asks which program opened the SVG — only browsers select
+  the invisible text — and whether the text was page text or inside an image
   (OCR).
 - **The picture in the SVG is wrong** — *does Firefox's own screenshot of the
   same area look right?* If not, the page or Firefox paints it that way; if
