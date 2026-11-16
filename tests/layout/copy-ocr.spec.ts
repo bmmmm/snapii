@@ -400,6 +400,31 @@ for (const [name, reply, captured] of FAILURES) {
     page,
   }) => {
     await load(page);
+test("a strip of the picture too low for any word to count: nothing is asked, nothing hidden", async ({
+  page,
+}) => {
+  await load(page);
+  await begin(page);
+  // The picture's last 2 px (it ends at y 240) and the paragraph below it.
+  await drag(page, 120, 238, 400, 320);
+  await clickButton(page, "copy-text", "Copied text");
+  expect(await asks(page)).toEqual([]);
+  expect(await everHidden(page)).toBe(false);
+  expect((await clips(page)).map((c) => c.plain)).toEqual(["Text below the picture."]);
+});
+
+test("12 px of the picture, enough for half a word: it is asked for", async ({ page }) => {
+  await load(page);
+  await begin(page);
+  // Below the caption (it ends at y 224): the picture's last 12 px and the paragraph below it.
+  await drag(page, 120, 228, 400, 320);
+  await clickButton(page, "copy-text", "Copied text");
+  expect((await asks(page)).map((a) => a.request.region)).toEqual([PICTURE]);
+  expect(await everHidden(page)).toBe(true);
+  // "Half price" (y 200–220) has no half of its height in the selection.
+  expect((await clips(page)).map((c) => c.plain)).toEqual(["Text below the picture."]);
+});
+
     await selectIntro(page);
     await begin(page, { reply, captured });
     await pickAll(page);

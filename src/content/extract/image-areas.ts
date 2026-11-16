@@ -11,6 +11,9 @@ import { Layout } from "./visibility.ts";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
+/** Copy text reads an image only with this much of its height (CSS px) in the selection: half of the smallest text the engine reads. */
+const MIN_HEIGHT_INSIDE = 4;
+
 function kindOf(el: Element, layout: Layout): ImageArea["kind"] | null {
   if (el.localName === "img") return "img";
   if (el.localName === "canvas") return "canvas";
@@ -23,7 +26,8 @@ function kindOf(el: Element, layout: Layout): ImageArea["kind"] | null {
  * Image areas in document CSS px, in flat-tree order: of each image that
  * shows in `captureRect`, the part inside it. With `extent`, the part inside
  * that instead (Copy text reads an image beyond the selection's edge, for
- * the words the edge cuts); an image the rect merely borders is none of its.
+ * the words the edge cuts); an image the rect merely borders is none of its,
+ * nor one it shows too low a strip of for any word to count.
  */
 export function collectImageAreas(
   root: Document | Element,
@@ -47,7 +51,7 @@ export function collectImageAreas(
     const inside = shown && intersect(shown, captureRect);
     if (!inside) continue;
     const area = opts.extent
-      ? inside.width > EPS && inside.height > EPS && intersect(shown, opts.extent)
+      ? inside.width > EPS && inside.height >= MIN_HEIGHT_INSIDE && intersect(shown, opts.extent)
       : inside;
     if (area && area.width >= MIN_AREA.width && area.height >= MIN_AREA.height) {
       out.push({ ...area, kind });

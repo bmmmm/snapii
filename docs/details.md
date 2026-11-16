@@ -228,7 +228,9 @@ models ship in the add-on (8.3 MB of the unpacked add-on), nothing is downloaded
     is not, and a line with less than half its height in the selection is
     left out. For that the image is read beyond the selection: sideways as
     far as it is visible, up and down by the selection's height (not the
-    whole of a page-high background picture for one line picked on it).
+    whole of a page-high background picture for one line picked on it). An
+    image of which the selection shows a strip lower than 4 px is not read:
+    that is half the height of the smallest text the engine reads.
   - **Where the words go:** in the plain text an image's words are a block of
     their own, its lines kept, after the last line of page text that stands
     above the image or left of it; a picture a paragraph flows around follows
