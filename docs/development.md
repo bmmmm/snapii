@@ -169,13 +169,16 @@ default, the others only report it),
 checks the text layer, the links, hostile values and that the save message
 passes the background's validator.
 
-CI runs `pnpm check`, `pnpm test`, `pnpm build`, `pnpm lint:ext` and
-`pnpm test:glue:chromium` (`.github/workflows/tests.yml`). Firefox glue
-remains a local gate. Playwright retries twice in CI; a pass only on retry
-still needs investigation. When a spec failed or was retried, the run keeps
-Playwright's HTML report and the traces as the `playwright-report` artifact
-for seven days. A newer push to a pull request cancels the run of the one
-before it.
+CI runs `pnpm check`, `pnpm test:unit`, `pnpm build` and `pnpm lint:ext` in
+the `check` job (`.github/workflows/tests.yml`). Two independent `layout`
+jobs install and test only their browser, Firefox or Chromium; the Chromium
+job then runs `pnpm test:glue:chromium`. A failure in one browser leaves
+the other running. Firefox glue remains a local gate. Playwright retries
+twice in CI; a pass only on retry still needs investigation. When a spec
+failed or was retried, the run keeps Playwright's HTML report and the
+traces as a `playwright-report-firefox` or `playwright-report-chromium`
+artifact for seven days. A newer push to a pull request cancels the run of
+the one before it.
 
 Before a release, run both glue suites as well as the CI checks, then record
 the human checks in `tests/MANUAL-CHECKLIST.md` with the browser version, OS

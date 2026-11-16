@@ -200,9 +200,11 @@ of what is still open to the job summary. It **never fails your build** —
 advisory only, a reading aid for the reviewer. Unlike a linter or a checker,
 snapii cannot be pointed at its own pull request, so nothing runs the project
 on the diff itself; review rests on the claims and the tests. The **tests**
-workflow (`pnpm check`, `pnpm test`, `pnpm build`, `pnpm lint:ext` and
-`pnpm test:glue:chromium`) is the one that has to pass. Firefox glue remains
-a local gate; both glue suites must run outside a process sandbox.
+workflow is the one that has to pass, all three of its jobs: `check`
+(`pnpm check`, `pnpm test:unit`, `pnpm build`, `pnpm lint:ext`) and one
+`layout` job per browser (the layout half of `pnpm test` for that browser;
+Chromium's then runs `pnpm test:glue:chromium`). Firefox glue remains a
+local gate; both glue suites must run outside a process sandbox.
 
 Write claims as one bullet per user-visible change, files, functions and SVG
 elements in `backticks`, issues as `#N`. Claim what the change *does*, not
