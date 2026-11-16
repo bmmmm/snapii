@@ -311,6 +311,7 @@ export async function runOcrPass(
     await engine.start();
     const occupied = domRuns.map(runBox);
     const runs: TextRun[] = [];
+    const wordWidths: number[] = [];
     let line = 0;
     let words = 0;
     for (const [block, area] of todo.entries()) {
@@ -318,10 +319,11 @@ export async function runOcrPass(
       recognized++;
       for (const l of lines) {
         runs.push(...lineToRuns(l, line++, block));
+        wordWidths.push(...l.map((w) => w.width));
         words += l.length;
       }
     }
-    return { runs, info: record("ok", words) };
+    return { runs, wordWidths, info: record("ok", words) };
   } catch (e) {
     const timeout = opts.isTimeout(e);
     if (!timeout) console.warn("snapii: OCR failed", e);

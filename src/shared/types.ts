@@ -229,6 +229,9 @@ export interface Scene {
   unsupported: Partial<Record<UnsupportedReason, number>>;
 }
 
+/** Where the page stood when it was measured: what a capture of the viewport needs to find a region in it. */
+export type PageView = Pick<PageMeta, "viewport" | "scroll" | "devicePixelRatio">;
+
 export interface CaptureModel {
   region: DocRect;
   runs: TextRun[];
@@ -268,8 +271,38 @@ export interface OcrInfo {
 export interface OcrOutput {
   /** Region-relative, like the DOM runs; empty unless status is "ok". */
   runs: TextRun[];
+  /**
+   * Each run's word as wide as it was recognised, parallel to `runs`: a run
+   * reaches on to the next word's start (its hit area in the file), which is
+   * not where the word ends.
+   */
+  wordWidths?: number[];
   info: OcrInfo;
 }
+
+/**
+ * Copy text with the OCR setting on: the images the selection touches, for
+ * the background to capture and read. `region` (document CSS px) is what is
+ * captured, the areas' bounding box; areas and runs are relative to it.
+ */
+export interface RecognizeRequest {
+  region: DocRect;
+  /** At most MAX_AREAS. */
+  areas: ImageArea[];
+  /** The DOM text on the areas: recognised words lying on it are dropped. */
+  runs: TextRun[];
+  page: PageView;
+}
+
+export type RecognizeResponse =
+  /** One run per recognised word, as wide as the word, relative to the request's region. */
+  | { ok: true; runs: TextRun[] }
+  | {
+      ok: false;
+      /** "disabled": the setting was switched off since the session started. */
+      error: "capture-failed" | "timeout" | "failed" | "disabled";
+      detail?: string;
+    };
 
 export interface RenderInput extends CaptureModel {
   tiles: RasterTile[];
@@ -286,11 +319,13 @@ export type ToContent =
   | { type: "start"; settings: Settings }
   // The background has the last tile: nothing more is read from the page, so
   // the content script gives it back before OCR, rendering and download.
-  // `ocr`: text recognition runs now (the slow part, worth a toast).
+  // `ocr`: text recognition runs now (the slow part, worth a toast). A
+  // `recognize` request is told the same way once its pixels are taken.
   | { type: "captured"; ocr: boolean };
 export type CapturedMessage = Extract<ToContent, { type: "captured" }>;
 export type ToBackground =
   | { type: "save"; model: CaptureModel }
+  | { type: "recognize"; request: RecognizeRequest }
   // Clipboard fallback: content-script navigator.clipboard is undefined on
   // non-secure http pages, the background page can always write (S12).
   | { type: "copy"; plain: string; html: string };
