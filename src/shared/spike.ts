@@ -62,10 +62,12 @@ export const SPIKE = {
 // Platform facts measured on Chromium 151.0.7922.173 and 153.0.8010.12
 // (headless, Linux, device scale factor 2) on 2026-10-03 with a throw-away
 // extension with host access that captured a calibration page whose pixels
-// encode their document position. Same rule: a value changes only with a new
-// measurement of that kind.
+// encode their document position. C17 was measured later on macOS; its own
+// comment says how. Same rule: a value changes only with a new measurement of
+// that kind.
 export const SPIKE_CHROMIUM = {
-  measuredOn: "Chromium 151.0.7922.173 and 153.0.8010.12, headless, Linux, 2026-10-03",
+  measuredOn:
+    "Chromium 151.0.7922.173 and 153.0.8010.12, headless, Linux, 2026-10-03 (C1–C16); 153.0.8010.12, headless, macOS, 2026-11-17 (C17)",
 
   // C1: a service worker has no URL.createObjectURL, navigator.clipboard,
   // Worker or devicePixelRatio; OffscreenCanvas, createImageBitmap, FileReader
@@ -109,6 +111,16 @@ export const SPIKE_CHROMIUM = {
   // dialog is answered; a cancel is the state "interrupted" with the error
   // USER_CANCELED (headless, where no dialog can open, every saveAs ends so).
   downloadResolvesBeforeSaveAs: true,
+  // C17 (2026-11-17, 153.0.8010.12, headless, macOS, load average 40–250,
+  // the built extension's offscreen document asked from the worker):
+  // execCommand("copy") answers before the browser has written the clipboard,
+  // and nothing tells when it has. With the document kept open, a page polling
+  // the clipboard saw the text at most 54 ms after the worker had the answer
+  // (400 copies, median 1 ms). A close straight after the answer dropped the
+  // write: 6, 2 and 0 of 200 copies, and 3 of 300 in a run that alternated
+  // with a close 300 ms after the answer, which lost none of 300.
+  offscreenCopyLandedWithinMs: 54,
+  offscreenCopyCloseAfterMs: 300,
 } as const;
 
 // Vector output: how SVG text renders, measured on Playwright's Firefox

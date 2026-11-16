@@ -5,11 +5,17 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { recognizeInOffscreen } from "../../../src/background/chromium/ocr.ts";
 import { createOffscreenClient, type OffscreenDeps } from "../../../src/background/chromium/offscreen.ts";
 import { isOffscreenRequest, type OffscreenRequest } from "../../../src/shared/offscreen.ts";
+import { SPIKE_CHROMIUM } from "../../../src/shared/spike.ts";
 import type { ImageArea, OcrOutput, RasterTile } from "../../../src/shared/types.ts";
 
 const COPY: OffscreenRequest = { to: "offscreen", type: "copy", plain: "p", html: "<b>p</b>" };
 
-/** A browser with at most one offscreen document, as Chromium allows. */
+/**
+ * A browser with at most one offscreen document, as Chromium allows. A copy's
+ * text reaches its clipboard as long after the answer as the slowest write
+ * measured, and a close before then drops it (C17). The clipboard's clock
+ * moves only in `deps.sleep`, and only once the sleep is over.
+ */
 function harness(
   opts: {
     existing?: boolean;
@@ -19,6 +25,9 @@ function harness(
 ) {
   const log: string[] = [];
   let open = opts.existing ?? false;
+  let clipboard = "before the copy";
+  let now = 0;
+  let writing: { at: number; text: string } | null = null;
   const deps: OffscreenDeps = {
     async create() {
       if (open) throw new Error("Only a single offscreen document may be created.");
@@ -33,21 +42,47 @@ function harness(
     async close() {
       if (!open) throw new Error("No current offscreen document.");
       open = false;
+      writing = null;
       log.push("close");
     },
     async send(request) {
       assert.equal(open, true, "a message needs the document");
       log.push(`send:${request.type}`);
+      if (request.type === "copy") {
+        writing = { at: now + SPIKE_CHROMIUM.offscreenCopyLandedWithinMs, text: request.plain };
+      }
       return opts.answer ? opts.answer(request) : true;
     },
+    async sleep(ms) {
+      await Promise.resolve();
+      now += ms;
+      if (writing && writing.at <= now) {
+        clipboard = writing.text;
+        writing = null;
+      }
+    },
   };
-  return { deps, log, isOpen: () => open };
+  return { deps, log, isOpen: () => open, clipboard: () => clipboard, now: () => now };
 }
 
 test("offscreen client: the document exists for the request and is closed after it", async () => {
   const h = harness();
   assert.equal(await createOffscreenClient(h.deps).ask(COPY), true);
   assert.deepEqual(h.log, ["create", "send:copy", "close"]);
+});
+
+test("offscreen client: a copy is on the clipboard before its document is closed", async () => {
+  const h = harness();
+  assert.equal(await createOffscreenClient(h.deps).ask(COPY), true);
+  assert.equal(h.clipboard(), "p");
+  assert.deepEqual(h.log, ["create", "send:copy", "close"]);
+});
+
+test("offscreen client: a request other than a copy closes its document without waiting", async () => {
+  const h = harness({ answer: async () => "done" });
+  await createOffscreenClient(h.deps).ask({ to: "offscreen", type: "ocr", areas: [], tiles: [], runs: [] });
+  assert.equal(h.now(), 0);
+  assert.deepEqual(h.log, ["create", "send:ocr", "close"]);
 });
 
 test("offscreen client: requests in flight share one document, closed after the last", async () => {

@@ -133,7 +133,7 @@ test("OCR on: Copy text puts the images' words on the clipboard with the DOM tex
   await g.until(async () => !(await g.offscreenOpen()), "the offscreen document to be closed");
 });
 
-test("OCR on: Copy text on a non-secure origin takes a cut word in an image whole, 2 px higher or lower alike; the pass and the write share the offscreen document", async () => {
+test("OCR on: Copy text on a non-secure origin takes a cut word in an image whole, 2 px higher or lower alike; the pass and the write each go through the offscreen document", async () => {
   const origin = `http://${NON_SECURE_HOST}:${new URL(g.base).port}`;
   // "Willkommen in Köln", 16 px into #img (40, 40), baseline at y 80: from
   // the middle of Willkommen to the middle of Köln, the height of that line only.
