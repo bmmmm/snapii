@@ -39,8 +39,11 @@ type TestWindow = Window & {
   /** While set, the stub waits here before `captured` (the capture), and before its reply (the reading). */
   __capture?: Promise<void>;
   __reading?: Promise<void>;
+  /** While set, writeClipboard has what it was handed and does not settle. */
+  __writing?: Promise<void>;
   __captureDone?: () => void;
   __readingDone?: () => void;
+  __writingDone?: () => void;
   __session: SessionHandle;
   __toggle?: () => void;
   __frames: number;
@@ -169,6 +172,7 @@ async function begin(
         async writeClipboard(data) {
           w.__clipStarted++;
           w.__clips.push(data);
+          await w.__writing;
         },
       };
       if (toggle) {
@@ -190,8 +194,8 @@ async function begin(
   );
 }
 
-/** The stubbed background takes its time over the capture, the reading, or both, until told. */
-function hold(page: Page, what: ("capture" | "reading")[]): Promise<void> {
+/** The stubbed background takes its time over the capture or the reading, the stubbed clipboard over the write, until told. */
+function hold(page: Page, what: ("capture" | "reading" | "writing")[]): Promise<void> {
   return page.evaluate((what) => {
     const w = window as unknown as TestWindow;
     if (what.includes("capture")) {
@@ -204,12 +208,19 @@ function hold(page: Page, what: ("capture" | "reading")[]): Promise<void> {
         w.__readingDone = resolve;
       });
     }
+    if (what.includes("writing")) {
+      w.__writing = new Promise((resolve) => {
+        w.__writingDone = resolve;
+      });
+    }
   }, what);
 }
 const captureDone = (page: Page): Promise<void> =>
   page.evaluate(() => (window as unknown as TestWindow).__captureDone?.());
 const readingDone = (page: Page): Promise<void> =>
   page.evaluate(() => (window as unknown as TestWindow).__readingDone?.());
+const writingDone = (page: Page): Promise<void> =>
+  page.evaluate(() => (window as unknown as TestWindow).__writingDone?.());
 
 const asks = (page: Page): Promise<Ask[]> => page.evaluate(() => (window as unknown as TestWindow).__asks);
 /** What writeClipboard was handed; the HTML without the page's line breaks between its paragraphs. */
@@ -389,17 +400,6 @@ test("a selection on the picture that reaches no word: no text", async ({ page }
   expect(await hostState(page)).toEqual(SHOWN);
 });
 
-const FAILURES: [string, Reply, boolean][] = [
-  ["the reading ran out of time", { ok: false, error: "timeout" }, true],
-  ["the reading failed", { ok: false, error: "failed" }, true],
-  ["the capture failed", { ok: false, error: "capture-failed", detail: "tab changed during capture" }, false],
-  ["the background did not answer", "throw", false],
-];
-for (const [name, reply, captured] of FAILURES) {
-  test(`${name}: the DOM text is copied, the toast says the images were not read, the overlay is back`, async ({
-    page,
-  }) => {
-    await load(page);
 test("a strip of the picture too low for any word to count: nothing is asked, nothing hidden", async ({
   page,
 }) => {
@@ -425,6 +425,17 @@ test("12 px of the picture, enough for half a word: it is asked for", async ({ p
   expect((await clips(page)).map((c) => c.plain)).toEqual(["Text below the picture."]);
 });
 
+const FAILURES: [string, Reply, boolean][] = [
+  ["the reading ran out of time", { ok: false, error: "timeout" }, true],
+  ["the reading failed", { ok: false, error: "failed" }, true],
+  ["the capture failed", { ok: false, error: "capture-failed", detail: "tab changed during capture" }, false],
+  ["the background did not answer", "throw", false],
+];
+for (const [name, reply, captured] of FAILURES) {
+  test(`${name}: the DOM text is copied, the toast says the images were not read, the overlay is back`, async ({
+    page,
+  }) => {
+    await load(page);
     await selectIntro(page);
     await begin(page, { reply, captured });
     await pickAll(page);
@@ -457,6 +468,80 @@ test("OCR switched off since the session started: the DOM text is copied without
   await clickButton(page, "copy-text", "Copied text");
   expect((await clips(page)).map((c) => c.plain)).toEqual([DOM_TEXT]);
   expect(await hostState(page)).toEqual(SHOWN);
+});
+
+// The offsets the copy holds are into the page's text at the click. A drag's range ends in the changed text node.
+const CHANGES: [string, (page: Page) => Promise<void>, string][] = [
+  ["changes a paragraph", pickAll, "Not what the reader selected."],
+  ["shortens a paragraph in a dragged selection", (page) => drag(page, 90, 50, 600, 330), "Gone."],
+];
+for (const [name, select, data] of CHANGES) {
+  test(`the page ${name} while the images are read: both flavours hold the text as it was at the click`, async ({
+    page,
+  }) => {
+    await load(page);
+    await begin(page);
+    await select(page);
+    await hold(page, ["reading"]);
+    await clickButton(page, "copy-text", "Copying… (recognizing text)");
+    await page.evaluate((data) => {
+      (document.getElementById("outro")?.firstChild as Text).data = data;
+    }, data);
+    await readingDone(page);
+    await expect.poll(() => toastText(page)).toBe("Copied text");
+    expect(await clips(page)).toEqual([
+      {
+        plain: ALL_TEXT,
+        html: "<p>Text above the picture.</p><p>On it.</p><p>Text below the picture.</p><p>Summer Sale Today<br>Half price</p>",
+      },
+    ]);
+  });
+}
+
+for (const action of ["copy-text", "save"] as const) {
+  test(`${action}: a throw while snapii leaves the screen leaves no shield, and the overlay is back`, async ({
+    page,
+  }) => {
+    await load(page);
+    await begin(page);
+    await pickAll(page);
+    // The harness runs in the page: its getSelection is the session's. It throws once the shield is up.
+    await page.evaluate(() => {
+      const real = window.getSelection;
+      window.getSelection = () => {
+        if (!document.querySelector("snapii-shield")) return real.call(window);
+        window.getSelection = real;
+        throw new Error("no selection today");
+      };
+    });
+    await clickButton(
+      page,
+      action,
+      action === "save" ? "Capture failed unexpectedly. Try again" : NOT_RECOGNIZED,
+    );
+    expect(await shields(page)).toBe(0);
+    expect(await hostState(page)).toEqual(SHOWN);
+    expect(await asks(page)).toEqual([]);
+    expect(await page.evaluate(() => (window as unknown as TestWindow).__saves)).toEqual([]);
+    if (action === "copy-text") expect((await clips(page)).map((c) => c.plain)).toEqual([DOM_TEXT]);
+  });
+}
+
+test("cancel while the clipboard is written: the toast goes as well", async ({ page }) => {
+  await load(page);
+  await begin(page);
+  await pickAll(page);
+  await hold(page, ["reading", "writing"]);
+  await clickButton(page, "copy-text", "Copying… (recognizing text)");
+  await readingDone(page);
+  await expect.poll(() => clipStarted(page)).toBe(1);
+  expect(await toastText(page)).toBe("Copying… (recognizing text)");
+  await page.evaluate(() => (window as unknown as TestWindow).__session.cancel());
+  expect(await toastText(page)).toBeNull();
+  await writingDone(page);
+  await page.waitForTimeout(300);
+  expect(await toastText(page)).toBeNull();
+  expect(await hostState(page)).toEqual(GONE);
 });
 
 test("cancel while the images are read: the clipboard is not written, the toast goes", async ({ page }) => {

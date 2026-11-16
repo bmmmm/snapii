@@ -291,7 +291,7 @@ export function startSession(deps: SessionDeps): SessionHandle {
   let captured = false;
   /** The hover shield of a capture in flight. */
   let shield: HTMLElement | null = null;
-  /** Copy texts of this session whose images are being read. */
+  /** Copy texts of this session that are under way: from the images' reading to the settled clipboard write. */
   let reading = 0;
 
   /**
@@ -355,16 +355,24 @@ export function startSession(deps: SessionDeps): SessionHandle {
   function conceal(): () => void {
     const mine = hoverShield();
     shield = mine;
-    overlay.hide();
-    const ranges = takeSelection();
+    let ranges: Range[] = [];
     let given = false;
-    return () => {
+    const giveBack = (): void => {
       if (given) return;
       given = true;
       mine.remove();
       if (shield === mine) shield = null;
       restoreSelection(ranges);
     };
+    try {
+      overlay.hide();
+      ranges = takeSelection();
+    } catch (e) {
+      // Nobody else knows of the shield yet, and it would keep every click from the page.
+      giveBack();
+      throw e;
+    }
+    return giveBack;
   }
 
   async function save(selection: Selection): Promise<void> {
@@ -483,7 +491,7 @@ export function startSession(deps: SessionDeps): SessionHandle {
     if (!request) return NO_IMAGES;
     const turn = clipboardTurn;
     const endCapture = captureWindow();
-    const giveBack = conceal();
+    let giveBack = (): void => {};
     let back = false;
     /** Once only, like giveBack: a save may have hidden the overlay again by the time the reply comes. */
     const release = (): void => {
@@ -494,8 +502,8 @@ export function startSession(deps: SessionDeps): SessionHandle {
       if (open) overlay.show();
     };
     let reply: RecognizeResponse | undefined;
-    reading++;
     try {
+      giveBack = conceal();
       // As in save(): the hide has to be on screen before the capture.
       await nextFrame();
       await nextFrame();
@@ -511,7 +519,6 @@ export function startSession(deps: SessionDeps): SessionHandle {
       // The DOM text is still worth copying.
       console.error("snapii: recognizing text failed", e);
     } finally {
-      reading--;
       release();
     }
     if (cancelled || turn !== clipboardTurn) return null;
@@ -533,14 +540,6 @@ export function startSession(deps: SessionDeps): SessionHandle {
     // Cancelled while collection waited for the fonts: the user is done, so
     // the clipboard keeps what they had there.
     if (!open) return;
-    const images = await recognizeImages(selection, runs, onReading);
-    if (!images) return;
-    const text = withRecognized(runs, images.runs);
-    if (text.length === 0) {
-      notify(images.failed ? IMAGES_NOT_READ_TOAST : NO_TEXT_TOAST);
-      return;
-    }
-    const plain = runsToPlainText(text);
     const ctx = { baseURL: document.baseURI, pageURL: location.href };
     // A range never holds shadow-tree or frame content. Where whole lines
     // live only there (a drag over a web component's paragraphs, a picked
@@ -552,15 +551,31 @@ export function startSession(deps: SessionDeps): SessionHandle {
     const ownLines = new Set(runs.filter((_, i) => own(i)).map((r) => r.line));
     const outside = runs.some((r, i) => !own(i) && !ownLines.has(r.line));
     const range = outside ? null : selectionRange(selection, sources);
+    // Before the images are read, not after: the page goes on meanwhile (a
+    // clock, a re-render), and `sources` are offsets into its text as it is now.
     const cloned = range ? fragmentToCleanHtml(toSNodes(cloneVisibleRange(range, sources, runs)), ctx) : "";
-    // The page's HTML has no place for an image's words: they follow it, a
-    // paragraph per image, the same characters as in the plain text.
-    const read = images.runs.length > 0 ? plainParagraphs(runsToPlainText(images.runs)) : [];
-    const html =
-      cloned.trim() !== ""
-        ? cloned + (read.length > 0 ? fragmentToCleanHtml(read, ctx) : "")
-        : fragmentToCleanHtml(plainParagraphs(plain), ctx);
-    await deps.writeClipboard({ plain, html });
+    let images: FromImages | null;
+    reading++;
+    try {
+      images = await recognizeImages(selection, runs, onReading);
+      if (!images) return;
+      const text = withRecognized(runs, images.runs);
+      if (text.length === 0) {
+        notify(images.failed ? IMAGES_NOT_READ_TOAST : NO_TEXT_TOAST);
+        return;
+      }
+      const plain = runsToPlainText(text);
+      // The page's HTML has no place for an image's words: they follow it, a
+      // paragraph per image, the same characters as in the plain text.
+      const read = images.runs.length > 0 ? plainParagraphs(runsToPlainText(images.runs)) : [];
+      const html =
+        cloned.trim() !== ""
+          ? cloned + (read.length > 0 ? fragmentToCleanHtml(read, ctx) : "")
+          : fragmentToCleanHtml(plainParagraphs(plain), ctx);
+      await deps.writeClipboard({ plain, html });
+    } finally {
+      reading--;
+    }
     notify(images.failed ? COPIED_WITHOUT_IMAGES_TOAST : COPIED_TEXT_TOAST);
   }
 
