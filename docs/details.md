@@ -267,10 +267,18 @@ transparent; how these viewers handle it has not been checked yet.
   runs through is copied whole — part of one letter inside is enough — also
   where markup divides it (`foo<b>bar</b>`); a word wholly beside the
   selection is not copied. The HTML holds the same words as the plain text,
-  with their links and emphasis. A word is what stands between two spaces, so
-  `(well-known,`, `3,5` and a URL stay in one piece; in scripts written
-  without spaces (Chinese, Japanese, Thai and others) it is what the browser's
-  word segmentation gives. What does not change: a line with less than half
+  with their links and emphasis; where whole lines of the selection exist only
+  in a shadow tree or a frame, it is the plain text's paragraphs instead. A
+  word is what stands between two spaces, so `(well-known,`, `3,5` and a URL
+  stay in one piece; in scripts written without spaces (Chinese, Japanese,
+  Thai and others) it is what the browser's word segmentation gives. A gap the
+  eye sees ends a word as well (links side by side with padding are separate
+  words; `letter-spacing` is no gap), the items of a flex or grid row are
+  words apart, and a ruby annotation is not part of its base's word. Text
+  hidden with `visibility` or `opacity` is never copied and ends the word
+  beside it. With "Skip text covered by other elements" on, a word counts by
+  its part inside the selection: covered there, it is left out; showing there,
+  it is copied whole. What does not change: a line with less than half
   its height in the selection is left out, and text the page itself cuts off
   (an `overflow` box) stays cut — nothing is copied that the page does not
   show. Each line stands for itself: of a word broken across two lines at its

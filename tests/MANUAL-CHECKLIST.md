@@ -56,15 +56,15 @@ the same time; 10 would collide with the Chromium suite's 8470–8479 and
 scale factor 2: popup → overlay → save (file name, sub-folder, picture pixels,
 text layer, record), zoom 150 %, the refusal of a selection beyond the
 viewport and the save after scrolling, JPEG, closed shadow trees, Copy text on
-a secure and a non-secure origin and Copy link (read back from the
-clipboard), OCR through the offscreen document, the popup on a browser page,
-the read-only shortcut section, the folder rules against the real download
-API, a save across a service-worker restart, the toolbar notice, a
-cancelled Save-as dialog (headless Chromium has no file dialog, so every
-"Ask where to save" download ends as a cancelled one), and vector output
-(shapes and visible text, pictures and patches, a selection beyond the
-viewport without patches that saves, and one with a patch there that is
-refused).
+a secure and a non-secure origin, Copy text of a selection that cuts a word at
+each edge (both words whole, in both flavours) and Copy link (read back from
+the clipboard), OCR through the offscreen document, the popup on a browser
+page, the read-only shortcut section, the folder rules against the real
+download API, a save across a service-worker restart, the toolbar notice, a
+cancelled Save-as dialog (headless Chromium has no file dialog, so every "Ask
+where to save" download ends as a cancelled one), and vector output (shapes
+and visible text, pictures and patches, a selection beyond the viewport
+without patches that saves, and one with a patch there that is refused).
 
 Human steps there (load `dist-chromium/` via `chrome://extensions` → Developer
 mode → Load unpacked):
