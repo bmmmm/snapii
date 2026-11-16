@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// "Copy text" as text/plain: the visible lines exactly as collected, so the
-// plain text matches what the capture shows (text-transform included).
+// "Copy text" as text/plain: the visible lines exactly as collected
+// (text-transform included). That is what the capture shows, plus the rest
+// of a word the region's edge cuts, which Copy text takes whole.
 import type { TextRun } from "./types.ts";
 
 /**

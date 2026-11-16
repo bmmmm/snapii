@@ -418,7 +418,7 @@ export function startSession(deps: SessionDeps): SessionHandle {
     const ownLines = new Set(runs.filter((_, i) => own(i)).map((r) => r.line));
     const outside = runs.some((r, i) => !own(i) && !ownLines.has(r.line));
     const range = outside ? null : selectionRange(selection, sources);
-    const cloned = range ? fragmentToCleanHtml(toSNodes(cloneVisibleRange(range, sources)), ctx) : "";
+    const cloned = range ? fragmentToCleanHtml(toSNodes(cloneVisibleRange(range, sources, runs)), ctx) : "";
     const html = cloned.trim() !== "" ? cloned : fragmentToCleanHtml(plainParagraphs(plain), ctx);
     await deps.writeClipboard({ plain, html });
     notify(COPIED_TEXT_TOAST);
