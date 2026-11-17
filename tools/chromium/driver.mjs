@@ -27,18 +27,8 @@ export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * replaces Playwright's about:blank and is an empty file in the directory the
  * browser starts in, which Chromium opens instead of looking up a host of
  * that name.
- *
- * The script also turns off renderer backgrounding, which Playwright's
- * --disable-renderer-backgrounding does not reach on macOS: Chromium 153
- * moves every renderer without a visible page to the background band
- * (`ps -o pri` 4, a visible page 47), the extension's process too, and with it
- * the service worker and the offscreen document for the whole save once the
- * popup has closed. Under load the system then starves that process for
- * seconds and a save outlasts the test's wait (measured 2026-11-17).
- * Chromium reads the last --disable-features only, so the feature joins
- * Playwright's list rather than a switch of its own.
  */
-function standIn(executable, lang, dir) {
+function inLanguage(executable, lang, dir) {
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, `(${lang})`), "");
   const script = join(dir, "chromium.sh");
@@ -50,11 +40,7 @@ cd "$(dirname "$0")" || exit 1
 n=$#
 while [ "$n" -gt 0 ]; do
   a=$1; shift; n=$((n - 1))
-  case $a in
-    about:blank) ;;
-    --disable-features=*) set -- "$@" "$a,MacAllowBackgroundingRenderProcesses" ;;
-    *) set -- "$@" "$a" ;;
-  esac
+  [ "$a" = "about:blank" ] || set -- "$@" "$a"
 done
 exec ${quoted} "$@" -AppleLanguages '(${lang})'
 `,
@@ -85,7 +71,7 @@ export async function launchChromium({
   profile = resolve(profile);
   const executablePath =
     process.platform === "darwin"
-      ? standIn(process.env.SNAPII_CHROMIUM ?? chromium.executablePath(), lang, `${profile}.lang`)
+      ? inLanguage(process.env.SNAPII_CHROMIUM ?? chromium.executablePath(), lang, `${profile}.lang`)
       : process.env.SNAPII_CHROMIUM;
   mkdirSync(join(profile, "Default"), { recursive: true });
   writeFileSync(
