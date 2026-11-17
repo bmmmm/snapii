@@ -138,7 +138,9 @@ for (const c of cases) {
 // 12, which ends in a blurb and an ad label like every teaser. The whole
 // range has no unique end: the generator widens it word by word, each step
 // checked against all 600 teasers (measured on Playwright's Firefox: 525-551
-// ms). Its first block, the headline, is unique at once (41 ms).
+// ms). Its first block, the headline, is unique at once (41 ms). The test
+// counts the nodes the generator's tree walkers visit, which no machine
+// changes: about 20 000 for the headline, about 280 000 for the whole range.
 test("a range over repeated teasers: links the first headline, fast", async ({ page, browser }) => {
   await load(page, "/fixtures/fragment-teasers.html");
   const gen = await page.evaluate(() => {
@@ -149,12 +151,24 @@ test("a range over repeated teasers: links the first headline, fast", async ({ p
     // Drag mode: the first run starts at the headline's first word.
     range.setStart(head, head.data.indexOf("Teaser"));
     range.setEnd(ad, ad.length);
-    const t0 = performance.now();
-    const result = window.__snapii.textFragmentURL(range, location.href);
-    return { ...result, ms: performance.now() - t0, pageURL: location.href };
+    let visits = 0;
+    const native = Document.prototype.createTreeWalker;
+    Document.prototype.createTreeWalker = function (this: Document, root, whatToShow, filter) {
+      return native.call(this, root, whatToShow, (node: Node) => {
+        visits++;
+        if (typeof filter === "function") return filter(node);
+        return filter ? filter.acceptNode(node) : NodeFilter.FILTER_ACCEPT;
+      });
+    };
+    try {
+      const result = window.__snapii.textFragmentURL(range, location.href);
+      return { ...result, visits, pageURL: location.href };
+    } finally {
+      Document.prototype.createTreeWalker = native;
+    }
   });
   expect(gen.status).toBe("SUCCESS");
-  expect(gen.ms).toBeLessThan(250);
+  expect(gen.visits).toBeLessThan(100_000);
   // No blanks from around the headline at the edges (no %20 at either end).
   expect(gen.url).toBe(`${gen.pageURL}#:~:text=teaser%20number%2010%20of%20the%20front%20page`);
   const found = await refind(browser, gen.url as string, "t10");
@@ -167,6 +181,9 @@ test("a range over repeated teasers: links the first headline, fast", async ({ p
 // one check outlasts the budget several times over (Chromium 141: 8.3-8.5 s
 // in all for a 2 s budget, 2.2 s with the guard), long enough for Firefox to
 // flag snapii as slowing it down. The budget has to hold within a check too.
+// The test's clock ticks once per node a tree walker visits, so the budget
+// counts nodes and no machine changes the result: the guard stops at the
+// budget, a check that never looks at the clock runs on to about 900 000.
 test("a range over a large page of recurring text: TIMEOUT within the budget", async ({ page }) => {
   await load(page, "/fixtures/fragment-flood.html");
   const gen = await page.evaluate(() => {
@@ -176,12 +193,31 @@ test("a range over a large page of recurring text: TIMEOUT within the budget", a
     const range = document.createRange();
     range.setStart(more, 0);
     range.setEnd(blurb, 10);
-    const t0 = performance.now();
-    const result = window.__snapii.textFragmentURL(range, location.href);
-    return { ...result, ms: performance.now() - t0, budget: window.__snapii.GENERATION_TIMEOUT_MS };
+    let ticks = 0;
+    let start: number | undefined;
+    const now = Date.now;
+    const native = Document.prototype.createTreeWalker;
+    Date.now = () => {
+      start ??= ticks;
+      return ticks;
+    };
+    Document.prototype.createTreeWalker = function (this: Document, root, whatToShow, filter) {
+      return native.call(this, root, whatToShow, (node: Node) => {
+        ticks++;
+        if (typeof filter === "function") return filter(node);
+        return filter ? filter.acceptNode(node) : NodeFilter.FILTER_ACCEPT;
+      });
+    };
+    try {
+      const result = window.__snapii.textFragmentURL(range, location.href);
+      return { ...result, ticks: ticks - (start ?? 0), budget: window.__snapii.GENERATION_TIMEOUT_MS };
+    } finally {
+      Date.now = now;
+      Document.prototype.createTreeWalker = native;
+    }
   });
   expect(gen).toMatchObject({ url: null, status: "TIMEOUT" });
-  expect(gen.ms).toBeLessThan(gen.budget + 500);
+  expect(gen.ticks).toBeLessThan(gen.budget + 100);
 });
 
 test("a drag that ends inside the first block: the link ends there too", async ({ page, browser }) => {
