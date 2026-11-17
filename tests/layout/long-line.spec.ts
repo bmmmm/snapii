@@ -17,22 +17,37 @@ async function collectLongLine(page: Page) {
   await page.addScriptTag({ path: "dist-test/harness.js" });
   return page.evaluate(async () => {
     const h = window.__snapii;
-    const { runs, stats } = await h.debug.collectTextRunsDetailed(document, h.debug.captureRect("#cap"), {});
-    return { ms: stats.ms, texts: runs.map((r) => r.text) };
+    let reads = 0;
+    const orig = Range.prototype.getClientRects;
+    Range.prototype.getClientRects = function (this: Range) {
+      reads++;
+      return orig.call(this);
+    };
+    try {
+      const { runs } = await h.debug.collectTextRunsDetailed(document, h.debug.captureRect("#cap"), {});
+      return { reads, texts: runs.map((r) => r.text) };
+    } finally {
+      Range.prototype.getClientRects = orig;
+    }
   });
 }
 
-test("a 1 MB single-line pre cut at the right edge gives its first words within a second", async ({
+test("a 1 MB single-line pre cut at the right edge gives its first words without reading the whole line", async ({
   page,
 }) => {
   const got = await collectLongLine(page);
   expect(got.texts.length).toBe(1);
   expect(got.texts[0]).toMatch(/^word word /);
-  // Minutes before the early exit; ~200 ms on Chromium now, with room for a slow CI runner.
-  expect(got.ms).toBeLessThan(3000);
+  // One rect read per character probed, the same on any machine: about 75 (a
+  // binary search, then the clip's glyphs), where the trim read on through
+  // each of the million characters before the early exit.
+  expect(got.reads).toBeGreaterThan(10);
+  expect(got.reads).toBeLessThan(500);
 });
 
-test("a capture edge a million px into a 1 MB line finds its words within a second", async ({ page }) => {
+test("a capture edge a million px into a 1 MB line finds its words without reading up to the edge", async ({
+  page,
+}) => {
   // The clip starts deep inside the line: reading one rect per character up
   // to the clip took ~14 s; a binary search finds the first glyph inside it.
   await page.goto("/fixtures/smoke.html");
@@ -43,12 +58,22 @@ test("a capture edge a million px into a 1 MB line finds its words within a seco
   const got = await page.evaluate(async () => {
     const h = window.__snapii;
     const cap = h.debug.captureRect("#p");
-    const { runs, stats } = await h.debug.collectTextRunsDetailed(
-      document,
-      { ...cap, x: cap.x + 1_000_000, width: 400 },
-      {},
-    );
-    return { ms: stats.ms, texts: runs.map((r) => r.text), x: runs.map((r) => r.x - cap.x) };
+    let reads = 0;
+    const orig = Range.prototype.getClientRects;
+    Range.prototype.getClientRects = function (this: Range) {
+      reads++;
+      return orig.call(this);
+    };
+    try {
+      const { runs } = await h.debug.collectTextRunsDetailed(
+        document,
+        { ...cap, x: cap.x + 1_000_000, width: 400 },
+        {},
+      );
+      return { reads, texts: runs.map((r) => r.text), x: runs.map((r) => r.x - cap.x) };
+    } finally {
+      Range.prototype.getClientRects = orig;
+    }
   });
   expect(got.texts.length).toBe(1);
   // Cut at both edges to whole glyphs: only letters of "word" and spaces.
@@ -57,10 +82,14 @@ test("a capture edge a million px into a 1 MB line finds its words within a seco
   // Whole glyphs inside the clip only: the run starts at or after the edge.
   expect(got.x[0]).toBeGreaterThanOrEqual(1_000_000 - 0.5);
   expect(got.x[0]).toBeLessThan(1_000_000 + 20);
-  expect(got.ms).toBeLessThan(3000);
+  // One rect read per character probed, the same on any machine: about 75 (a
+  // binary search, then the clip's own glyphs), where reading up to the clip
+  // took one for every character before it.
+  expect(got.reads).toBeGreaterThan(10);
+  expect(got.reads).toBeLessThan(500);
 });
 
-test("a right-to-left 250 KB line with the edge a million px from its start is searched as fast", async ({
+test("a right-to-left 250 KB line with the edge a million px from its start is searched with as few reads", async ({
   page,
 }) => {
   // The line starts at its right end: the search walks right to left.
@@ -73,21 +102,35 @@ test("a right-to-left 250 KB line with the edge a million px from its start is s
     const h = window.__snapii;
     const cap = h.debug.captureRect("#p");
     const edge = cap.x + cap.width - 1_000_000;
-    const { runs, stats } = await h.debug.collectTextRunsDetailed(
-      document,
-      { ...cap, x: edge - 400, width: 400 },
-      {},
-    );
-    return { ms: stats.ms, texts: runs.map((r) => r.text), right: runs.map((r) => edge - (r.x + r.width)) };
+    let reads = 0;
+    const orig = Range.prototype.getClientRects;
+    Range.prototype.getClientRects = function (this: Range) {
+      reads++;
+      return orig.call(this);
+    };
+    try {
+      const { runs } = await h.debug.collectTextRunsDetailed(
+        document,
+        { ...cap, x: edge - 400, width: 400 },
+        {},
+      );
+      return { reads, texts: runs.map((r) => r.text), right: runs.map((r) => edge - (r.x + r.width)) };
+    } finally {
+      Range.prototype.getClientRects = orig;
+    }
   });
   expect(got.texts.length).toBe(1);
   expect(got.texts[0]).toMatch(/[א-ת]{2}/);
   expect(got.right[0]).toBeGreaterThanOrEqual(-0.5);
   expect(got.right[0]).toBeLessThan(30);
-  expect(got.ms).toBeLessThan(3000);
+  // One rect read per character probed, the same on any machine: about 70 (a
+  // binary search, then the clip's own glyphs), where reading up to the clip
+  // took one for every character before it.
+  expect(got.reads).toBeGreaterThan(10);
+  expect(got.reads).toBeLessThan(500);
 });
 
-test("a 1 MB pre of 5000 lines under a 2000×200 capture gives its visible lines within a second", async ({
+test("a 1 MB pre of 5000 lines under a 2000×200 capture gives its visible lines, reading only those", async ({
   page,
 }) => {
   // Finding where each of 5000 lines starts cost one binary search per line
@@ -105,14 +148,27 @@ test("a 1 MB pre of 5000 lines under a 2000×200 capture gives its visible lines
   await page.addScriptTag({ path: "dist-test/harness.js" });
   const got = await page.evaluate(async () => {
     const h = window.__snapii;
-    const { runs, stats } = await h.debug.collectTextRunsDetailed(document, h.debug.captureRect("#cap"), {});
-    return { ms: stats.ms, texts: runs.map((r) => r.text) };
+    let reads = 0;
+    const orig = Range.prototype.getClientRects;
+    Range.prototype.getClientRects = function (this: Range) {
+      reads++;
+      return orig.call(this);
+    };
+    try {
+      const { runs } = await h.debug.collectTextRunsDetailed(document, h.debug.captureRect("#cap"), {});
+      return { reads, texts: runs.map((r) => r.text) };
+    } finally {
+      Range.prototype.getClientRects = orig;
+    }
   });
   expect(got.texts.length).toBeGreaterThanOrEqual(10);
   got.texts.forEach((t, i) => {
     expect(t.trimEnd()).toBe(`${String(i).padStart(4, "0")} ${"abcdefghi ".repeat(20)}`.trimEnd());
   });
-  expect(got.ms).toBeLessThan(1000);
+  // One rect read per character probed, the same on any machine: about 300
+  // for the lines the clip meets, about 100 000 for all 5000.
+  expect(got.reads).toBeGreaterThan(10);
+  expect(got.reads).toBeLessThan(5_000);
 });
 
 test("collapsed spaces inside the clip do not end the line early", async ({ page }) => {
@@ -194,11 +250,24 @@ test("200 000 collapsed spaces between two lines' words: the line split stays li
   await page.addScriptTag({ path: "dist-test/harness.js" });
   const got = await page.evaluate(async () => {
     const h = window.__snapii;
-    const { runs, stats } = await h.debug.collectTextRunsDetailed(document, h.debug.captureRect("#cap"), {});
-    return { ms: stats.ms, texts: runs.map((r) => r.text) };
+    let reads = 0;
+    const orig = Range.prototype.getClientRects;
+    Range.prototype.getClientRects = function (this: Range) {
+      reads++;
+      return orig.call(this);
+    };
+    try {
+      const { runs } = await h.debug.collectTextRunsDetailed(document, h.debug.captureRect("#cap"), {});
+      return { reads, texts: runs.map((r) => r.text) };
+    } finally {
+      Range.prototype.getClientRects = orig;
+    }
   });
   expect(got.texts).toEqual(["foo", "bar"]);
-  expect(got.ms).toBeLessThan(1500);
+  // One rect read per character probed, the same on any machine: about one
+  // per space now, about 15 when every step read back to "foo".
+  expect(got.reads).toBeGreaterThan(10);
+  expect(got.reads).toBeLessThan(2 * 200_000);
 });
 
 test("a capture edge behind 200 000 collapsed spaces: finding the first glyph inside stays linear", async ({
@@ -214,15 +283,29 @@ test("a capture edge behind 200 000 collapsed spaces: finding the first glyph in
   const got = await page.evaluate(async () => {
     const h = window.__snapii;
     const cap = h.debug.captureRect("#cap");
-    const { runs, stats } = await h.debug.collectTextRunsDetailed(
-      document,
-      { ...cap, x: cap.x + 12, width: cap.width - 12 },
-      {},
-    );
-    return { ms: stats.ms, texts: runs.map((r) => r.text) };
+    let reads = 0;
+    const orig = Range.prototype.getClientRects;
+    Range.prototype.getClientRects = function (this: Range) {
+      reads++;
+      return orig.call(this);
+    };
+    try {
+      const { runs } = await h.debug.collectTextRunsDetailed(
+        document,
+        { ...cap, x: cap.x + 12, width: cap.width - 12 },
+        {},
+      );
+      return { reads, texts: runs.map((r) => r.text) };
+    } finally {
+      Range.prototype.getClientRects = orig;
+    }
   });
   expect(got.texts).toEqual(["word"]);
-  expect(got.ms).toBeLessThan(1500);
+  // One rect read per character probed, the same on any machine: about two
+  // per space now (the search, then the trim), about 17 when every step of
+  // the search read on to the end of the line.
+  expect(got.reads).toBeGreaterThan(10);
+  expect(got.reads).toBeLessThan(3 * 200_000);
 });
 
 test("1 500 nested inline elements with text: each takes its block, language and link from its parent", async ({
