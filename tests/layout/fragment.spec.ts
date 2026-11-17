@@ -142,7 +142,10 @@ for (const c of cases) {
 // counts the nodes every tree walker visits during the call, snapii's own
 // (fragment.ts) and the generator's, which no machine changes: about 20 000
 // with the headline alone, about 280 000 with the whole range.
-test("a range over repeated teasers: links the first headline, fast", async ({ page, browser }) => {
+test("a range over repeated teasers: links the first headline without widening over every teaser", async ({
+  page,
+  browser,
+}) => {
   await load(page, "/fixtures/fragment-teasers.html");
   const gen = await page.evaluate(() => {
     const head = document.querySelector("#t10 h2")?.firstChild;
@@ -245,10 +248,7 @@ test("a drag that ends inside the first block: the link ends there too", async (
 // search climbs to the shadow root and loops there forever. textFragmentURL
 // looks at the clock before it runs the generator, and the test's clock
 // throws there, so without the guard the call ends at once with the clock
-// read once. Should the generator ever run before the clock, this test fails
-// on its own short timeout (the evaluate never returns); Playwright then
-// tears down the worker with its Firefox, and the rest of the suite runs on
-// a fresh one.
+// read once.
 test("text in a shadow tree with no block ancestor: INVALID_SELECTION, without running the generator", async ({
   page,
 }) => {
