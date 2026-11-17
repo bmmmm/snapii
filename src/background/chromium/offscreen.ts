@@ -5,6 +5,7 @@
 // down mid-request is taken over.
 
 import type { OffscreenRequest } from "../../shared/offscreen.ts";
+import { SPIKE_CHROMIUM } from "../../shared/spike.ts";
 
 /** The browser calls the client needs; parameters so unit tests run without `browser`. */
 export interface OffscreenDeps {
@@ -13,6 +14,7 @@ export interface OffscreenDeps {
   exists(): Promise<boolean>;
   close(): Promise<void>;
   send(request: OffscreenRequest): Promise<unknown>;
+  sleep(ms: number): Promise<void>;
 }
 
 export interface OffscreenClient {
@@ -37,6 +39,9 @@ export function createOffscreenClient(deps: OffscreenDeps): OffscreenClient {
         await ready;
         const answer = await deps.send(request);
         if (answer === undefined) throw new Error("the offscreen document did not answer");
+        // The copy command answers before the browser has written the
+        // clipboard, and closing the document drops a write still on its way (C17).
+        if (request.type === "copy") await deps.sleep(SPIKE_CHROMIUM.offscreenCopyCloseAfterMs);
         return answer;
       } finally {
         users--;
@@ -61,4 +66,5 @@ export const offscreen = createOffscreenClient({
     (await browser.runtime.getContexts({ contextTypes: ["OFFSCREEN_DOCUMENT"] })).length > 0,
   close: () => browser.offscreen.closeDocument(),
   send: (request) => browser.runtime.sendMessage(request),
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 });
