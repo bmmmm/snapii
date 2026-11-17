@@ -15,6 +15,24 @@ export interface TileLimits {
   maxTilePixels: number;
 }
 
+/**
+ * The longest side in CSS px that a region, image area or patch can have:
+ * no page lays out a larger one. Firefox 159 stops at 17 895 698 CSS px at
+ * 100 % and at 30 % zoom, Chromium 153 at 33 554 428 at device scale factors
+ * 0.25–2 and CSS zoom 0.25–4 (page zoom not measured); measured 2026-11-17
+ * on elements made larger. Four times Chromium's, should its lowest page
+ * zoom (25 %) divide that limit. A longer side is a forged message's.
+ */
+export const MAX_REGION_SIDE = 2 ** 27;
+
+/**
+ * The most capture calls one plan may hold. A region within MAX_REGION_SIDE
+ * needs about 3 500 at the default maxTotalPixels (a strip one CSS px high:
+ * √(10⁸ × 2²⁷) / 32 766 columns), a vector capture about one per patch (at
+ * most 2 000, content/extract/scene.ts). A longer plan is a forged message's.
+ */
+export const MAX_TILES = 10_000;
+
 export interface PlannedTile {
   /** Document CSS px, whole numbers: the `rect` for the capture call. */
   doc: DocRect;
@@ -122,7 +140,8 @@ function cuts(total: number, size: number, min: number): Array<[number, number]>
  * starts between CSS pixels: that is where the captured pixels really are.
  * Every tile has at least one device px per side: a rect thinner than that
  * (a 1 px patch at a scale below 1) is widened past its far edge.
- * Throws RangeError when not even one CSS px fits the limits.
+ * Throws RangeError when not even one CSS px fits the limits, or when the
+ * rect is larger than MAX_REGION_SIDE or takes more than MAX_TILES calls.
  */
 export function planTiles(rect: DocRect, scale: number, limits: TileLimits): PlannedTile[] {
   if (!(scale > 0) || !Number.isFinite(scale)) throw new RangeError(`invalid scale ${scale}`);
@@ -131,6 +150,12 @@ export function planTiles(rect: DocRect, scale: number, limits: TileLimits): Pla
   const min = minLength(scale);
   snapped.width = Math.max(snapped.width, min);
   snapped.height = Math.max(snapped.height, min);
+  // Larger than any page, or widened so by a scale no capture has: fitLength
+  // counts down for about 1 / scale rounds and cuts once per piece. A 1e16 px
+  // square never leaves fitLength (subtracting 1 changes nothing above 2^53),
+  // a 1e20 × 1 strip is cut into billions.
+  if (snapped.width > MAX_REGION_SIDE || snapped.height > MAX_REGION_SIDE)
+    throw new RangeError(`${snapped.width} × ${snapped.height} px is larger than any page`);
   const area = Math.min(limits.maxArea, limits.maxTilePixels);
 
   let step = deviceStep(scale);
@@ -160,6 +185,9 @@ export function planTiles(rect: DocRect, scale: number, limits: TileLimits): Pla
   // A band under one device px (limits of a few px): nothing both fits and shows.
   if (bandHeight <= 0 || devicePx(bandHeight, scale) < 1)
     throw new RangeError(`scale ${scale} too large for the capture limits`);
+  // At most this many: cuts merges a rest thinner than min into the piece before.
+  if (Math.ceil(snapped.height / bandHeight) * Math.ceil(snapped.width / colWidth) > MAX_TILES)
+    throw new RangeError(`more than ${MAX_TILES} capture calls`);
 
   const tiles: PlannedTile[] = [];
   for (const [dy, h] of cuts(snapped.height, bandHeight, min)) {
@@ -180,7 +208,8 @@ export function planTiles(rect: DocRect, scale: number, limits: TileLimits): Pla
 /**
  * The capture calls for a vector capture's patches (region-relative): each
  * patch planned like a region of its own, with `rel` made relative to the
- * capture region again.
+ * capture region again. At most MAX_TILES in all: the scale is the region's,
+ * so a patch far larger than the region would take far more calls than it.
  */
 export function planPatches(
   region: DocRect,
@@ -188,9 +217,12 @@ export function planPatches(
   scale: number,
   limits: TileLimits,
 ): PlannedTile[] {
-  return patches.flatMap((p) =>
-    planTiles({ x: region.x + p.x, y: region.y + p.y, width: p.width, height: p.height }, scale, limits).map(
-      (t) => ({ ...t, rel: { ...t.rel, x: t.rel.x + p.x, y: t.rel.y + p.y } }),
-    ),
-  );
+  const out: PlannedTile[] = [];
+  for (const p of patches) {
+    const rect = { x: region.x + p.x, y: region.y + p.y, width: p.width, height: p.height };
+    const tiles = planTiles(rect, scale, limits);
+    if (out.length + tiles.length > MAX_TILES) throw new RangeError(`more than ${MAX_TILES} capture calls`);
+    for (const t of tiles) out.push({ ...t, rel: { ...t.rel, x: t.rel.x + p.x, y: t.rel.y + p.y } });
+  }
+  return out;
 }
