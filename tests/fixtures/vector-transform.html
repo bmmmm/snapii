@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>vector transform</title>
+    <!--
+      A transform that only moves a box in its plane is drawn where the
+      browser paints it, fractional moves too; any other is a patch.
+        .moved   moved by transform: translate(); its border, background, text
+                 and inline background move with it. It is a stacking context:
+                 its z-index:-1 child (.neg) paints over its background. It is
+                 the containing block of its absolute (.abs) and fixed (.fix)
+                 children, so .clip's overflow cuts both.
+        .lift    moved down over the next sibling (.after): a transformed box
+                 paints after the static blocks of its context, so it hides
+                 "Under the moved box".
+        .prop    moved by the translate property, in percent and px; a stacking
+                 context too (.pneg over its background).
+        .inl     an inline box, where a transform does not apply: neither moved
+                 nor a stacking context (.ineg under its background), though
+                 its computed transform names the move (measured, both browsers).
+        .pic     an inline picture, where a transform applies: moved over the
+                 positioned span before it, which it hides as a stacking
+                 context does ("Under the moved picture").
+        patches  a turn, a move in depth (matrix3d), a move under perspective(),
+                 a translate with a depth, and the rotate and scale properties.
+    -->
+    <style>
+      body { margin: 0; padding: 20px; font: 16px/1.5 serif; background: rgb(255, 255, 255); }
+      #cap { width: 420px; }
+      .clip { overflow: hidden; width: 320px; height: 100px; margin-bottom: 12px; background: rgb(225, 225, 225); }
+      .moved { transform: translate(12.3px, 4.7px); width: 200px; height: 60px; border: 2px solid rgb(0, 0, 160); background: rgb(255, 230, 180); }
+      .mark { background: rgb(255, 255, 0); }
+      .neg { position: absolute; z-index: -1; left: 110px; top: 28px; width: 80px; height: 28px; background: rgb(150, 0, 150); }
+      .abs { position: absolute; left: 8px; top: 40px; width: 90px; height: 70px; background: rgb(0, 150, 0); }
+      .fix { position: fixed; left: 240px; top: 6px; width: 120px; height: 30px; background: rgb(0, 150, 150); }
+      .lift { transform: translateY(24.5px); width: 200px; height: 40px; background: rgb(255, 140, 0); }
+      .after { width: 300px; height: 30px; margin-bottom: 12px; background: rgb(0, 128, 128); color: rgb(255, 255, 255); }
+      .prop { translate: 2.5% 3.25px; width: 200px; height: 30px; margin-bottom: 12px; background: rgb(200, 220, 255); }
+      .pneg { position: absolute; z-index: -1; right: 0; top: 0; width: 60px; height: 30px; background: rgb(100, 0, 100); }
+      .line { margin: 0 0 12px; }
+      .inl { position: relative; transform: translate(5px, 0); background: rgb(255, 255, 160); }
+      .ineg { position: absolute; z-index: -1; left: 0; top: 0; width: 30px; height: 10px; background: rgb(200, 0, 200); }
+      .under { position: relative; }
+      .pic { transform: translate(-170px, 0); width: 180px; height: 24px; vertical-align: top; }
+      .patch { width: 200px; height: 24px; margin: 0 0 12px 10px; background: rgb(120, 120, 220); }
+    </style>
+    <script type="application/json" id="expect">
+      {
+        "capture": "#cap",
+        "lines": ["Moved text marked", "Under the moved box", "Moved by translate", "Not moved: an inline box", "Under the moved picture"],
+        "reason": "tolerance: Firefox paints a fractionally moved box snapped to device pixels (12.3, 4.7 at 12, 5), the SVG draws its edges antialiased: one row of pixels along each edge, 0.99 % of the region (measured, Firefox 159); Chromium antialiases both, 0.10 %. A wrong paint order is about 1 % (.neg) and 2.5 % (.lift); the spec's order checks catch it in both browsers.",
+        "vector": {
+          "tolerance": 0.015,
+          "maxPatchArea": 0.2,
+          "unsupported": { "transform": 6 },
+          "hidden": ["Under the moved box", "Under the moved picture"],
+          "visible": ["Moved text ", "marked", "Moved by translate", "an inline box"]
+        },
+        "engines": { "chromium": { "vector": { "tolerance": 0.005 } } }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="cap">
+      <div class="clip">
+        <div class="moved">
+          Moved text <span class="mark">marked</span>
+          <div class="neg"></div>
+          <div class="abs"></div>
+          <div class="fix"></div>
+        </div>
+      </div>
+      <div class="lift"></div>
+      <div class="after">Under the moved box</div>
+      <div class="prop">Moved by translate<div class="pneg"></div></div>
+      <p class="line">Not moved: <span class="inl">an inline box<i class="ineg"></i></span></p>
+      <p class="line"><span class="under">Under the moved picture</span><img class="pic" alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAUCAIAAABwJOjsAAAAJklEQVR4nGMQoQD86mEgGzGMWjxq8ajFoxaPWjxq8ajFoxaPHIsBP+O/P0Zs1ccAAAAASUVORK5CYII=" /></p>
+      <div class="patch" style="transform: rotate(2deg)"></div>
+      <div class="patch" style="transform: translate3d(4px, 2px, 1px)"></div>
+      <div class="patch" style="transform: perspective(300px) translate(5px, 2px)"></div>
+      <div class="patch" style="translate: 4px 2px 6px"></div>
+      <div class="patch" style="rotate: 2deg"></div>
+      <div class="patch" style="scale: 0.95"></div>
+    </main>
+  </body>
+</html>

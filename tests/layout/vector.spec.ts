@@ -1574,3 +1574,174 @@ test("patches: a same-origin frame turned half round or mirrored is patched, its
   // No text of either frame: unturned, it would lie where the picture is turned.
   expect(scene.text).toEqual([]);
 });
+
+test("transforms: a move in the plane is drawn at the browser's rects, as a stacking context that holds its positioned children", async ({
+  page,
+}) => {
+  await page.goto("/fixtures/vector-transform.html");
+  await page.addScriptTag({ path: "dist-test/harness.js" });
+  const names = [
+    ".moved",
+    ".mark",
+    ".neg",
+    ".abs",
+    ".fix",
+    ".lift",
+    ".after",
+    ".prop",
+    ".pneg",
+    ".inl",
+    ".ineg",
+  ] as const;
+  const got = await page.evaluate(async (names) => {
+    const h = window.__snapii;
+    const capture = h.debug.captureRect("#cap");
+    const { runs, sources } = await h.debug.collectTextRunsDetailed(document, capture, {});
+    const scene = h.buildScene(document, capture, { runs, sources });
+    const el = (sel: string) => document.querySelector(sel) as HTMLElement;
+    const rel = (e: Element) => {
+      const r = e.getBoundingClientRect();
+      return { x: r.x + scrollX - capture.x, y: r.y + scrollY - capture.y, width: r.width, height: r.height };
+    };
+    // The box where layout put it: the move taken away for one read.
+    const unmoved = (sel: string, prop: string) => {
+      el(sel).style.setProperty(prop, "none");
+      const r = rel(el(sel));
+      el(sel).style.removeProperty(prop);
+      return r;
+    };
+    el(".moved").style.setProperty("transform", "none");
+    el(".prop").style.setProperty("translate", "none");
+    const still = (await h.debug.collectTextRunsDetailed(document, capture, {})).runs;
+    el(".moved").style.removeProperty("transform");
+    el(".prop").style.removeProperty("translate");
+    const round = (v: number) => Math.round(v * 100) / 100;
+    return {
+      scene,
+      runs: runs.map((r) => r.text),
+      runMoves: runs.map((r, i) => [
+        r.text,
+        round(r.x - (still[i]?.x ?? 0)),
+        round(r.y - (still[i]?.y ?? 0)),
+      ]),
+      rects: names.map((s) => rel(el(s))),
+      colours: names.map((s) => getComputedStyle(el(s)).backgroundColor),
+      layout: [
+        unmoved(".moved", "transform"),
+        unmoved(".lift", "transform"),
+        unmoved(".prop", "translate"),
+        unmoved(".inl", "transform"),
+      ],
+      clip: rel(el(".clip")),
+      patches: [...document.querySelectorAll(".patch")].map(rel),
+    };
+  }, names);
+  const near = (r: DocRect) => [r.x, r.y, r.width, r.height].map((v) => Math.round(v * 100) / 100);
+  // Every fill in paint order, with the clip of the group around it.
+  const fills: { colour: string; rect: DocRect; clip: DocRect | null }[] = [];
+  const walk = (ops: Scene["ops"], clip: DocRect | null) => {
+    for (const op of ops) {
+      if (op.op === "group") walk(op.children, op.clip ?? clip);
+      else if (op.op === "rect" && op.fill)
+        fills.push({ colour: `rgb(${op.fill.r}, ${op.fill.g}, ${op.fill.b})`, rect: op, clip });
+    }
+  };
+  walk(got.scene.ops, null);
+  const fillOf = (s: (typeof names)[number]) => {
+    const own = fills.filter((f) => f.colour === got.colours[names.indexOf(s)]);
+    expect(own.length, `one fill of ${s}`).toBe(1);
+    return own[0] as (typeof fills)[number];
+  };
+  for (const [i, s] of names.entries())
+    expect(near(fillOf(s).rect), `${s} drawn at its rect`).toEqual(near(got.rects[i] as DocRect));
+  // The rects carry the move, fractions too.
+  const [moved, lift, prop, inline] = got.layout as [DocRect, DocRect, DocRect, DocRect];
+  const by = (r: DocRect, dx: number, dy: number) => near({ ...r, x: r.x + dx, y: r.y + dy });
+  expect(near(fillOf(".moved").rect)).toEqual(by(moved, 12.3, 4.7));
+  expect(near(fillOf(".lift").rect)).toEqual(by(lift, 0, 24.5));
+  expect(near(fillOf(".prop").rect)).toEqual(by(prop, 5, 3.25));
+  expect(near(fillOf(".inl").rect), "an inline box is not moved").toEqual(by(inline, 0, 0));
+  expect(got.runMoves, "the runs carry the move").toEqual([
+    ["Moved text ", 12.3, 4.7],
+    ["marked", 12.3, 4.7],
+    ["Under the moved box", 0, 0],
+    ["Moved by translate", 5, 3.25],
+    ["Not moved: ", 0, 0],
+    ["an inline box", 0, 0],
+    ["Under the moved picture", 0, 0],
+  ]);
+  // The moved box is the containing block of its absolute and fixed children:
+  // .clip's overflow cuts them, nothing cuts the box itself.
+  expect(near(fillOf(".abs").clip ?? moved)).toEqual(near(got.clip));
+  expect(near(fillOf(".fix").clip ?? moved)).toEqual(near(got.clip));
+  expect(fillOf(".moved").clip).toBeNull();
+  // Paint order: a moved box is a stacking context, its z-index:-1 child over
+  // its background, and paints over a later static sibling; an inline box is
+  // none, an inline picture is (it hides the positioned text it is moved over).
+  const order = (s: (typeof names)[number]) => fills.indexOf(fillOf(s));
+  expect.soft(order(".neg"), ".neg after .moved").toBeGreaterThan(order(".moved"));
+  expect.soft(order(".lift"), ".lift after .after").toBeGreaterThan(order(".after"));
+  expect.soft(order(".pneg"), ".pneg after .prop").toBeGreaterThan(order(".prop"));
+  expect.soft(order(".ineg"), ".ineg before .inl").toBeLessThan(order(".inl"));
+  expect(got.runs.map((t, i) => [t, got.scene.text[i] !== null])).toEqual([
+    ["Moved text ", true],
+    ["marked", true],
+    ["Under the moved box", false],
+    ["Moved by translate", true],
+    ["Not moved: ", true],
+    ["an inline box", true],
+    ["Under the moved picture", false],
+  ]);
+  // Everything else is a patch at the box's own rect.
+  expect(got.scene.patches.map((p) => [p.reason, ...near(p)])).toEqual(
+    got.patches.map((r) => ["transform", ...near(r)]),
+  );
+  expect(got.scene.unsupported).toEqual({ transform: 6 });
+});
+
+test("transforms: a move in the plane is no patch, whichever way the engine computes it; a turn, a scale or a depth is", async ({
+  page,
+}) => {
+  const moves = [
+    "transform: translate(12.3px, 4.7px)",
+    "transform: translateZ(0)",
+    "transform: rotate(360deg)",
+    "translate: 6.5px 3.25px",
+    "translate: -10% 50%",
+    "translate: calc(10% + 2px) 0",
+    "translate: 3px 0 0",
+    "translate: 0 0",
+  ];
+  const others = [
+    "transform: rotate(2deg)",
+    "transform: scale(0.98)",
+    "transform: skewX(10deg)",
+    "transform: translate3d(4px, 2px, 1px)",
+    "transform: perspective(300px) translate(5px, 2px)",
+    "translate: 4px 2px 6px",
+    "rotate: 2deg",
+    "scale: 0.95",
+  ];
+  const styles = [...moves, ...others];
+  const boxes = styles.map(
+    (s) => `<div style="width:100px;height:10px;margin-bottom:20px;background:rgb(0,0,200);${s}"></div>`,
+  );
+  const scene = await sceneOf(
+    page,
+    `<main id="cap" style="width:300px;padding:10px">${boxes.join("")}</main>`,
+  );
+  const centres = await page.evaluate(() => {
+    const cap = (document.getElementById("cap") as HTMLElement).getBoundingClientRect();
+    return [...document.querySelectorAll("#cap > div")].map((e) => {
+      const r = e.getBoundingClientRect();
+      return { x: r.x - cap.x + r.width / 2, y: r.y - cap.y + r.height / 2 };
+    });
+  });
+  const patched = centres.map(({ x, y }) =>
+    scene.patches.some((p) => x >= p.x && x < p.x + p.width && y >= p.y && y < p.y + p.height),
+  );
+  expect(Object.fromEntries(styles.map((s, i) => [s, patched[i]]))).toEqual(
+    Object.fromEntries(styles.map((s) => [s, others.includes(s)])),
+  );
+  expect(scene.unsupported).toEqual({ transform: others.length });
+});

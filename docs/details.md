@@ -59,7 +59,9 @@ picture. Raster stays the default and its files are unchanged.
 - **Patches.** What cannot be drawn so is a picture of the page, cut from a
   screenshot as in raster output. The record counts the patched elements
   per reason:
-  - `transform`: transforms (`transform`, `rotate`, `scale`, `translate`);
+  - `transform`: transforms (`transform`, `rotate`, `scale`, `translate`)
+    other than a move in the plane, which is drawn where the page shows it:
+    turns, scales, skews, and moves in depth or under `perspective()`;
   - `effect`: filters, `backdrop-filter`, blend modes, masks, an element's
     own `clip-path` or `clip`;
   - `box-shadow`: inset shadows, shadows on an inline box across lines, and
