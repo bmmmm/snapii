@@ -139,8 +139,9 @@ for (const c of cases) {
 // range has no unique end: the generator widens it word by word, each step
 // checked against all 600 teasers (measured on Playwright's Firefox: 525-551
 // ms). Its first block, the headline, is unique at once (41 ms). The test
-// counts the nodes the generator's tree walkers visit, which no machine
-// changes: about 20 000 for the headline, about 280 000 for the whole range.
+// counts the nodes every tree walker visits during the call, snapii's own
+// (fragment.ts) and the generator's, which no machine changes: about 20 000
+// with the headline alone, about 280 000 with the whole range.
 test("a range over repeated teasers: links the first headline, fast", async ({ page, browser }) => {
   await load(page, "/fixtures/fragment-teasers.html");
   const gen = await page.evaluate(() => {
@@ -168,6 +169,7 @@ test("a range over repeated teasers: links the first headline, fast", async ({ p
     }
   });
   expect(gen.status).toBe("SUCCESS");
+  expect(gen.visits).toBeGreaterThan(5_000);
   expect(gen.visits).toBeLessThan(100_000);
   // No blanks from around the headline at the edges (no %20 at either end).
   expect(gen.url).toBe(`${gen.pageURL}#:~:text=teaser%20number%2010%20of%20the%20front%20page`);
@@ -184,6 +186,8 @@ test("a range over repeated teasers: links the first headline, fast", async ({ p
 // The test's clock ticks once per node a tree walker visits, so the budget
 // counts nodes and no machine changes the result: the guard stops at the
 // budget, a check that never looks at the clock runs on to about 900 000.
+// The count starts at the first look at the clock, where textFragmentURL
+// starts its budget; the walk over the range before that is not part of it.
 test("a range over a large page of recurring text: TIMEOUT within the budget", async ({ page }) => {
   await load(page, "/fixtures/fragment-flood.html");
   const gen = await page.evaluate(() => {
@@ -217,6 +221,7 @@ test("a range over a large page of recurring text: TIMEOUT within the budget", a
     }
   });
   expect(gen).toMatchObject({ url: null, status: "TIMEOUT" });
+  expect(gen.ticks).toBeGreaterThanOrEqual(gen.budget);
   expect(gen.ticks).toBeLessThan(gen.budget + 100);
 });
 
@@ -237,10 +242,13 @@ test("a drag that ends inside the first block: the link ends there too", async (
 });
 
 // Handed to the generator, this range freezes the page: its block-ancestor
-// search climbs to the shadow root and loops there forever. Without the
-// guard, this test fails on its own short timeout (the evaluate never
-// returns); Playwright then tears down the worker with its Firefox, and the
-// rest of the suite runs on a fresh one.
+// search climbs to the shadow root and loops there forever. textFragmentURL
+// looks at the clock before it runs the generator, and the test's clock
+// throws there, so without the guard the call ends at once with the clock
+// read once. Should the generator ever run before the clock, this test fails
+// on its own short timeout (the evaluate never returns); Playwright then
+// tears down the worker with its Firefox, and the rest of the suite runs on
+// a fresh one.
 test("text in a shadow tree with no block ancestor: INVALID_SELECTION, without running the generator", async ({
   page,
 }) => {
@@ -248,15 +256,33 @@ test("text in a shadow tree with no block ancestor: INVALID_SELECTION, without r
   await load(page, "/fixtures/shadow-noblock.html");
   const res = await page.evaluate(() => {
     const a = document.getElementById("card")?.shadowRoot?.getElementById("more");
-    if (!a) throw new Error("no #more in #card's shadow root");
-    const range = document.createRange();
-    range.selectNodeContents(a);
-    const t0 = performance.now();
-    const result = window.__snapii.textFragmentURL(range, location.href);
-    return { ...result, ms: performance.now() - t0 };
+    const p = document.querySelector("#cap > p");
+    if (!a || !p) throw new Error("no #more in #card's shadow root, or no paragraph before it");
+    const contents = (el: Element) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      return range;
+    };
+    let reads = 0;
+    const now = Date.now;
+    Date.now = () => {
+      reads++;
+      throw new Error("the generator's clock");
+    };
+    try {
+      const result = window.__snapii.textFragmentURL(contents(a), location.href);
+      const clock = reads;
+      // The paragraph before the card passes the guard: the clock counts.
+      reads = 0;
+      window.__snapii.textFragmentURL(contents(p), location.href);
+      return { ...result, clock, control: reads };
+    } finally {
+      Date.now = now;
+    }
   });
+  expect(res.control).toBeGreaterThan(0);
+  expect(res.clock).toBe(0);
   expect(res).toMatchObject({ url: null, status: "INVALID_SELECTION" });
-  expect(res.ms).toBeLessThan(500);
 });
 
 // Same loop under an XHTML root that is not <html>: nothing above the text
