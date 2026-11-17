@@ -4,10 +4,11 @@
     <meta charset="utf-8" />
     <title>vector patches</title>
     <!--
-      One element per reason vector output takes as pixels: a transform, a
-      filter, a form control, a groove border, a text shadow (images:
-      vector-images.html, gradients: vector-gradients.html, box shadows:
-      vector-shadows.html). Each is one patch and its text runs are invisible
+      One element per reason vector output takes as pixels: a transform (a
+      move in depth), a filter, a form control, a groove border, a text
+      shadow (images: vector-images.html, gradients: vector-gradients.html,
+      box shadows: vector-shadows.html, transforms: vector-transform.html).
+      Each is one patch and its text runs are invisible
       (the pixels show them); the plain paragraph between them stays vector,
       as do the boxes with a linear gradient and an outer shadow, and the
       shadow the bar above the capture casts into it. A black overlay clipped
@@ -71,7 +72,7 @@
   <body>
     <div style="height: 8px; margin-bottom: 4px; background: rgb(240, 240, 240); box-shadow: 0 14px 12px rgba(0, 0, 0, 0.6)"></div>
     <main id="cap">
-      <div style="transform: translateX(8px); background: rgb(255, 204, 204)">Translated box</div>
+      <div style="transform: translate3d(8px, 0, 1px); background: rgb(255, 204, 204)">Translated box</div>
       <div style="filter: blur(1px); background: rgb(204, 255, 204)">Blurred box</div>
       <div style="box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5); background: rgb(204, 204, 255)">Shadowed box</div>
       <div style="background: linear-gradient(90deg, rgb(255, 0, 0), rgb(0, 0, 255)); color: rgb(255, 255, 255)">Gradient box</div>

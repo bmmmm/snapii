@@ -179,6 +179,26 @@ const textEffect = (cs: CSSStyleDeclaration): boolean =>
   /text/.test(cs.getPropertyValue("background-clip")) ||
   /text/.test(cs.getPropertyValue("-webkit-background-clip"));
 
+// A computed transform that only moves the box in its plane.
+const MOVE = /^matrix\(1, 0, 0, 1, [^,]+, [^,]+\)$/;
+
+/**
+ * No transform, or one that only moves the box in its plane: the client
+ * rects of the box, its descendants and its text already carry the move,
+ * fractional ones too, so it is drawn where it is painted (measured, both
+ * browsers). matrix3d() (a depth or a perspective), a translate with a third
+ * value (calc() and the like taken whole; nested ones count as more) and the
+ * rotate and scale properties are not read.
+ */
+const onlyMoves = (cs: CSSStyleDeclaration): boolean =>
+  (cs.transform === "none" || MOVE.test(cs.transform)) &&
+  cs.translate
+    .replace(/\([^()]*\)/g, "")
+    .trim()
+    .split(/\s+/).length <= 2 &&
+  cs.rotate === "none" &&
+  cs.scale === "none";
+
 /**
  * Whether the decorations b's parent carries reach b: CSS propagates them
  * to in-flow descendants, not into an inline-block, a replaced element, a
@@ -589,8 +609,7 @@ class Builder {
     if (FORM.has(name) || (name === "button" && cs.appearance !== "none")) return "form";
     if (b.opaque) return "frame";
     // These change how the whole subtree is painted: checked wherever the box is.
-    if (cs.transform !== "none" || cs.rotate !== "none" || cs.scale !== "none" || cs.translate !== "none")
-      return "transform";
+    if (!onlyMoves(cs)) return "transform";
     if (
       cs.filter !== "none" ||
       (cs.getPropertyValue("backdrop-filter") || "none") !== "none" ||
@@ -941,7 +960,7 @@ class Builder {
     );
   }
 
-  /** CSS creates a stacking context for this box (the ones that matter once transforms and effects are patches). */
+  /** CSS creates a stacking context for this box (the ones that matter once effects and transforms other than a move are patches). */
   #isContext(b: Box, zIndexed: boolean): boolean {
     const { cs, el } = b;
     return (
@@ -950,6 +969,11 @@ class Builder {
       cs.position === "fixed" ||
       cs.position === "sticky" ||
       Number.parseFloat(cs.opacity) < 1 ||
+      // A move, where a transform applies: not on an inline box, whose
+      // computed transform still names it, but on a replaced one (measured,
+      // both browsers).
+      ((cs.display !== "inline" || REPLACED.has(el.localName)) &&
+        (cs.transform !== "none" || cs.translate !== "none")) ||
       cs.isolation === "isolate" ||
       // Paint or layout containment (container-type's size and style
       // containment makes none: measured, both browsers).
