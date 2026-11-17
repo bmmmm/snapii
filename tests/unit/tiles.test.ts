@@ -5,6 +5,8 @@ import { SPIKE } from "../../src/shared/spike.ts";
 import {
   captureScale,
   deviceStep,
+  MAX_REGION_SIDE,
+  MAX_TILES,
   type PlannedTile,
   planPatches,
   planTiles,
@@ -405,4 +407,61 @@ test("planTiles: an area too small for one CSS px throws instead of looping", as
   });
   await worker.terminate();
   assert.equal(outcome, "RangeError");
+});
+
+/** The scale capture.ts plans a region with: captureScale × zoom, at DPR 2 and the default maxTotalPixels. */
+const planScale = (region: DocRect, zoom = 1) => captureScale(region, 2, zoom, 100_000_000) * zoom;
+
+test("planTiles: a rect larger than any page throws at once", () => {
+  // A 1e16 square never left fitLength, a 1e20 × 1 strip was cut into billions
+  // of pieces, a 1e14 × 1 strip planned about 3 million calls. One px beyond
+  // the bound comes first: it fails at once where the larger ones never return.
+  for (const [width, height] of [
+    [MAX_REGION_SIDE + 1, 1],
+    [1, MAX_REGION_SIDE + 1],
+    [1e16, 1e16],
+    [1e20, 1],
+    [1e14, 1],
+  ] as [number, number][]) {
+    const rect = { x: 0, y: 0, width, height };
+    assert.throws(() => planTiles(rect, planScale(rect), DEFAULT_LIMITS), RangeError, `${width} × ${height}`);
+  }
+  // A scale no capture has widens a one-px rect to 1e12 px a side.
+  assert.throws(() => planTiles({ x: 0, y: 0, width: 1, height: 1 }, 1e-12, DEFAULT_LIMITS), RangeError);
+});
+
+test("planTiles: the largest page Firefox lays out, and a strip at the bound, still plan", () => {
+  // 17 895 698 CSS px a side in Firefox 159, at 100 % and at 30 % zoom.
+  const page = { x: 0, y: 0, width: 17_895_698, height: 17_895_698 };
+  for (const zoom of [1, 0.3]) {
+    const scale = planScale(page, zoom);
+    const tiles = planTiles(page, scale, DEFAULT_LIMITS);
+    assertPartition(page, tiles);
+    assertLimits(tiles, scale, DEFAULT_LIMITS);
+  }
+  // One CSS px high: the most calls a region within the bound takes.
+  const strip = { x: 0, y: 0, width: MAX_REGION_SIDE, height: 1 };
+  const tiles = planTiles(strip, planScale(strip), DEFAULT_LIMITS);
+  assert.ok(tiles.length > 3000 && tiles.length <= MAX_TILES, `${tiles.length} calls`);
+  assert.equal(
+    tiles.reduce((sum, t) => sum + t.doc.width, 0),
+    MAX_REGION_SIDE,
+  );
+});
+
+test("planTiles/planPatches: a plan of more than MAX_TILES calls throws before it is built", () => {
+  // Within the bound at full resolution: 2 rows of 8 193 columns, 16 386 calls.
+  const wide = { x: 0, y: 0, width: MAX_REGION_SIDE, height: 600 };
+  assert.throws(() => planTiles(wide, 2, DEFAULT_LIMITS), RangeError);
+  // Patches are planned at their region's scale: a patch the size of the bound
+  // in a region of 100 px would take about two billion calls.
+  const region = { x: 0, y: 0, width: 100, height: 100 };
+  const scale = planScale(region);
+  const huge = { x: 0, y: 0, width: MAX_REGION_SIDE, height: MAX_REGION_SIDE };
+  assert.throws(() => planPatches(region, [huge], scale, DEFAULT_LIMITS), RangeError);
+  // Each patch within MAX_TILES, together beyond it.
+  const strip = { x: 0, y: 0, width: MAX_REGION_SIDE, height: 1 };
+  const one = planPatches(region, [strip], scale, DEFAULT_LIMITS).length;
+  assert.ok(one <= MAX_TILES && 2 * one > MAX_TILES, `${one} calls`);
+  assert.throws(() => planPatches(region, [strip, strip], scale, DEFAULT_LIMITS), RangeError);
 });

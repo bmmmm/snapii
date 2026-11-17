@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { isToBackground, isToContent, MAX_RECOGNIZE_RUNS, routeMessage } from "../../src/shared/messages.ts";
 import { MAX_AREAS } from "../../src/shared/ocr.ts";
 import { DEFAULT_SETTINGS } from "../../src/shared/settings.ts";
+import { MAX_REGION_SIDE } from "../../src/shared/tiles.ts";
 import type { CaptureModel, RecognizeRequest, Scene } from "../../src/shared/types.ts";
 
 const model = (): CaptureModel => ({
@@ -88,6 +89,10 @@ const mutations: Array<[string, (m: Loose) => void]> = [
     "imageArea width NaN",
     (m) => (m.imageAreas = [{ x: 0, y: 0, width: Number.NaN, height: 30, kind: "img" }]),
   ],
+  // Smaller than MIN_AREA (24 × 12), which the content script never sends.
+  ["imageArea of no height", (m) => (m.imageAreas = [{ x: 0, y: 0, width: 1e9, height: 0, kind: "img" }])],
+  ["imageArea too narrow", (m) => (m.imageAreas = [{ x: 0, y: 0, width: 23, height: 12, kind: "img" }])],
+  ["imageArea too low", (m) => (m.imageAreas = [{ x: 0, y: 0, width: 24, height: 11, kind: "img" }])],
   // `every` skips a hole and Firefox's structured clone keeps one.
   ["runs with a hole", (m) => (m.runs = holed([m.runs[0], m.runs[0], m.runs[0]], 1))],
   ["links with a hole", (m) => (m.links = holed([m.links[0], m.links[0]], 0))],
@@ -114,6 +119,9 @@ test("isToBackground: accepts a well-formed save", () => {
   // Image areas are optional (sent only with OCR on).
   const imageAreas = [{ x: 0, y: 0, width: 30, height: 20, kind: "background" }];
   assert.equal(isToBackground({ type: "save", model: { ...model(), imageAreas } }), true);
+  // The smallest the content script sends: MIN_AREA, 24 × 12.
+  const smallest = [{ x: 0, y: 0, width: 24, height: 12, kind: "img" }];
+  assert.equal(isToBackground({ type: "save", model: { ...model(), imageAreas: smallest } }), true);
 });
 
 test("isToBackground: rejects non-messages and unknown types", () => {
@@ -488,6 +496,9 @@ const requestMutations: Array<[string, (r: Loose) => void]> = [
   ["more areas than a pass reads", (r) => (r.areas = Array(MAX_AREAS + 1).fill(r.areas[0]))],
   ["area kind unknown", (r) => (r.areas[0].kind = "video")],
   ["area width Infinity", (r) => (r.areas[0].width = Number.POSITIVE_INFINITY)],
+  ["area of no height", (r) => (r.areas[0] = { ...r.areas[0], width: 1e9, height: 0 })],
+  ["area too narrow", (r) => (r.areas[0] = { ...r.areas[0], width: 23, height: 12 })],
+  ["area too low", (r) => (r.areas[0] = { ...r.areas[0], width: 24, height: 11 })],
   ["areas with a hole", (r) => (r.areas = holed([r.areas[0], r.areas[0]], 0))],
   ["runs missing", (r) => delete r.runs],
   ["run text not a string", (r) => (r.runs[0].text = { toString: () => "x" })],
@@ -510,6 +521,8 @@ test("isToBackground: accepts a well-formed recognize, with or without DOM text 
   assert.equal(isToBackground({ type: "recognize", request: { ...request(), runs: [] } }), true);
   const full = { ...request(), areas: Array(MAX_AREAS).fill(request().areas[0]) };
   assert.equal(isToBackground({ type: "recognize", request: full }), true);
+  const smallest = { ...request(), areas: [{ x: 0, y: 0, width: 24, height: 12, kind: "img" }] };
+  assert.equal(isToBackground({ type: "recognize", request: smallest }), true);
 });
 
 test("isToBackground: rejects a recognize whose request is malformed in any one field", () => {
@@ -557,6 +570,73 @@ test("routeMessage: a malformed recognize, or one from another frame, gets a cap
     kind: "reject",
     response: { ok: false, error: "capture-failed", detail: "not sent from the top frame" },
   });
+});
+
+const imageArea = (width: number, height: number) => ({ x: 0, y: 0, width, height, kind: "img" });
+const patch = (width: number, height: number) => ({ x: 0, y: 0, width, height, reason: "pseudo" });
+const rect = (width: number, height: number) => ({ x: 0, y: 0, width, height });
+
+test("routeMessage: a save with a region, image area or patch larger than any page gets too-large", () => {
+  const tooLarge = {
+    kind: "reject",
+    response: { ok: false, error: "too-large", detail: "larger than any page" },
+  };
+  const over = MAX_REGION_SIDE + 1;
+  const saves: Array<[string, Loose]> = [
+    ["region 1e16 square", { ...model(), region: rect(1e16, 1e16) }],
+    ["region 1e20 × 1", { ...model(), region: rect(1e20, 1) }],
+    ["region 1e14 × 1", { ...model(), region: rect(1e14, 1) }],
+    ["region one px too high", { ...model(), region: rect(300, over) }],
+    ["image area 1e9 wide", { ...model(), imageAreas: [imageArea(30, 20), imageArea(1e9, 12)] }],
+    ["image area one px too high", { ...model(), imageAreas: [imageArea(30, over)] }],
+    ["patch 1e16 wide", { ...model(), scene: { ...scene(), patches: [patch(10, 10), patch(1e16, 10)] } }],
+    ["patch one px too high", { ...model(), scene: { ...scene(), patches: [patch(10, over)] } }],
+  ];
+  for (const [name, m] of saves) {
+    assert.deepEqual(routeMessage({ type: "save", model: m }, TOP), tooLarge, name);
+  }
+});
+
+test("routeMessage: a recognition with a region or area larger than any page gets capture-failed", () => {
+  const failed = {
+    kind: "reject",
+    response: { ok: false, error: "capture-failed", detail: "larger than any page" },
+  };
+  const over = MAX_REGION_SIDE + 1;
+  const requests: Array<[string, Loose]> = [
+    ["region 1e16 square", { ...request(), region: rect(1e16, 1e16) }],
+    ["region one px too high", { ...request(), region: rect(320, over) }],
+    ["area 1e9 wide", { ...request(), areas: [imageArea(1e9, 90)] }],
+    ["area one px too high", { ...request(), areas: [imageArea(320, over)] }],
+  ];
+  for (const [name, r] of requests) {
+    assert.deepEqual(routeMessage({ type: "recognize", request: r }, TOP), failed, name);
+  }
+});
+
+test("routeMessage: the largest pages Firefox and Chromium lay out are handled", () => {
+  // 17 895 698 CSS px a side in Firefox 159, 33 554 428 in Chromium 153 (tiles.ts).
+  for (const side of [17_895_698, 33_554_428, MAX_REGION_SIDE]) {
+    const save = {
+      type: "save",
+      model: {
+        ...model(),
+        region: rect(side, side),
+        imageAreas: [imageArea(side, side)],
+        scene: { ...scene(), patches: [patch(side, side)] },
+      },
+    };
+    assert.deepEqual(routeMessage(save, TOP), { kind: "handle", message: save }, `save ${side}`);
+    const recognize = {
+      type: "recognize",
+      request: { ...request(), region: rect(side, side), areas: [imageArea(side, side)] },
+    };
+    assert.deepEqual(
+      routeMessage(recognize, TOP),
+      { kind: "handle", message: recognize },
+      `recognize ${side}`,
+    );
+  }
 });
 
 test("routeMessage: unknown or foreign messages get no reply", () => {

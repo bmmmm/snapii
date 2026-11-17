@@ -4,8 +4,16 @@
 // against the types before any of it reaches capture, rendering or metadata.
 
 import { isKeptHref } from "./links.ts";
-import { MAX_AREAS } from "./ocr.ts";
-import type { FromPopup, SaveResponse, ToBackground, ToContent, UnsupportedReason } from "./types.ts";
+import { MAX_AREAS, MIN_AREA } from "./ocr.ts";
+import { MAX_REGION_SIDE } from "./tiles.ts";
+import type {
+  DocRect,
+  FromPopup,
+  SaveResponse,
+  ToBackground,
+  ToContent,
+  UnsupportedReason,
+} from "./types.ts";
 
 type Rec = Record<string, unknown>;
 
@@ -81,7 +89,15 @@ const isPageMeta = (x: unknown): boolean =>
 
 const isImageKind = isOneOf("img", "canvas", "svg-image", "background");
 
-const isImageArea = (x: unknown): boolean => isRect(x) && isImageKind((x as Rec).kind);
+// The content script sends no smaller one (content/extract/image-areas.ts).
+// ocrScale caps a crop's pixels by width × height, yet a crop has at least
+// one row: an area of 1e9 × 0 got a crop of 2e9 × 1.
+const isImageArea = (x: unknown): boolean =>
+  isRec(x) &&
+  isRect(x) &&
+  (x.width as number) >= MIN_AREA.width &&
+  (x.height as number) >= MIN_AREA.height &&
+  isImageKind(x.kind);
 
 // Every reason, so a new one cannot be added to the type and forgotten here.
 const REASONS: Record<UnsupportedReason, true> = {
@@ -308,7 +324,8 @@ export type Route =
   | { kind: "ignore" }
   /**
    * A save or a recognition that cannot run: answered, so the content script
-   * gets a response (`capture-failed` is one of both kinds), not undefined.
+   * gets a response (`capture-failed` is one of both kinds; `too-large` goes
+   * to a save only), not undefined.
    */
   | { kind: "reject"; response: Extract<SaveResponse, { ok: false }> }
   | { kind: "handle"; message: ToBackground }
@@ -320,10 +337,21 @@ export interface MessageOrigin {
   url?: string | undefined;
 }
 
-const reject = (detail: string): Route => ({
+const reject = (detail: string, error: "capture-failed" | "too-large" = "capture-failed"): Route => ({
   kind: "reject",
-  response: { ok: false, error: "capture-failed", detail },
+  response: { ok: false, error, detail },
 });
+
+const fits = (r: DocRect): boolean => r.width <= MAX_REGION_SIDE && r.height <= MAX_REGION_SIDE;
+
+/** A region, image area or patch larger than any page lays out: no selection's, a forged message's. */
+function isOversized(x: ToBackground): boolean {
+  if (x.type === "save") {
+    const { region, imageAreas = [], scene } = x.model;
+    return !fits(region) || !imageAreas.every(fits) || !(scene?.patches ?? []).every(fits);
+  }
+  return x.type === "recognize" && (!fits(x.request.region) || !x.request.areas.every(fits));
+}
 
 /**
  * @param popupUrl the toolbar popup's own URL (runtime.getURL("popup.html")):
@@ -347,6 +375,9 @@ export function routeMessage(x: unknown, sender: MessageOrigin, popupUrl?: strin
     // top-document coordinates; a request from any other frame is not ours.
     if (sender.frameId !== 0) return reject("not sent from the top frame");
     if (!isToBackground(x)) return reject(x.type === "save" ? "invalid model" : "invalid request");
+    // A recognition has no too-large: the content script copies the DOM text without the images'.
+    if (isOversized(x))
+      return reject("larger than any page", x.type === "save" ? "too-large" : "capture-failed");
   }
   if (isToBackground(x)) return { kind: "handle", message: x };
   return { kind: "ignore" };
